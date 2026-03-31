@@ -1,0 +1,17 @@
+dist
+build
+/idea
+/.idea
+sassdoc
+.DS_Store
+.env.local
+.sass-cache
+node_modules
+package-lock.json
+
+# Playwright (local E2E testing — never commit)
+playwright-report/
+test-results/
+.playwright/
+tests/e2e/
+playwright.config.ts

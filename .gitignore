@@ -1,0 +1,4 @@
+# Local dev secrets (do not commit)
+Api/appsettings.Local.json
+Api/appsettings.*.Local.json
+dev-start.bat
