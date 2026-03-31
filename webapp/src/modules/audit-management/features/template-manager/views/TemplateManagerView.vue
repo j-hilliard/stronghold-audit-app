@@ -1,0 +1,19 @@
+<template>
+    <BasePageHeader
+        title="Template Manager"
+        subtitle="Manage checklist templates, questions, and versions"
+        icon="pi pi-table"
+    />
+    <div class="p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 text-slate-400 text-center">
+            <i class="pi pi-table text-4xl mb-3 block text-slate-500" />
+            <p class="text-lg font-medium text-slate-300 mb-1">Template Manager</p>
+            <p class="text-sm">Add/remove questions, manage versions, publish checklists — coming in Phase 6</p>
+            <p class="text-xs mt-2 text-amber-500/70">Admin only</p>
+        </div>
+    </div>
+</template>
+
+<script setup lang="ts">
+import BasePageHeader from '@/components/layout/BasePageHeader.vue';
+</script>

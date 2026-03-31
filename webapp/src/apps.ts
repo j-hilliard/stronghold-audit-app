@@ -43,4 +43,21 @@ export const apps = {
             admin: [],
         },
     } as App,
+    auditManagement: {
+        baseSlug: 'audit-management',
+        name: 'Compliance Audit',
+        description: 'Create and manage field compliance audits',
+        icon: 'pi pi-clipboard',
+        menu: {
+            user: [
+                { label: 'Audits', icon: 'pi pi-fw pi-list', to: '/audit-management/audits' },
+                { label: 'New Audit', icon: 'pi pi-fw pi-plus', to: '/audit-management/audits/new' },
+                { label: 'Reports', icon: 'pi pi-fw pi-chart-bar', to: '/audit-management/reports' },
+            ],
+            admin: [
+                { label: 'Templates', icon: 'pi pi-fw pi-table', to: '/audit-management/admin/templates' },
+                { label: 'Email Routing', icon: 'pi pi-fw pi-envelope', to: '/audit-management/admin/settings' },
+            ],
+        },
+    } as App,
 };

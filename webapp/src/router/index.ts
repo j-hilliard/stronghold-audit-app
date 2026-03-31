@@ -5,6 +5,7 @@ import { billingPacketRoutes } from '@/modules/billing-packet-request-system/rou
 import { strongholdBizAppsSuiteRoutes } from '@/modules/stronghold-biz-apps-suite/router';
 import { projectManagementSystemRoutes } from '@/modules/project-management-system/router';
 import { incidentManagementRoutes } from '@/modules/incident-management/router';
+import { auditManagementRoutes } from '@/modules/audit-management/router';
 import NProgress from 'nprogress';
 import 'nprogress/nprogress.css';
 
@@ -28,6 +29,11 @@ const routes = [
         path: `/${apps.incidentManagement.baseSlug}`,
         component: () => import('@/layout/AppLayout.vue'),
         children: incidentManagementRoutes,
+    },
+    {
+        path: `/${apps.auditManagement.baseSlug}`,
+        component: () => import('@/layout/AppLayout.vue'),
+        children: auditManagementRoutes,
     },
     {
         path: '/authentication/login-callback',
