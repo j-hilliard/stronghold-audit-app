@@ -1,0 +1,42 @@
+# Stronghold Audit App — Local Development Database
+#
+# This file manages ONLY the audit app database container.
+# It does NOT touch safety-sql (port 14330) or stronghold-estimating-db (port 14331).
+#
+# Container : stronghold-audit-db
+# Port      : 14332  (host) → 1433 (container)
+# Database  : StrongholdAuditDb
+# User      : sa
+# Password  : Str0nghold@Audit2026!
+#
+# Commands:
+#   Start:   docker-compose up -d
+#   Stop:    docker-compose down
+#   Logs:    docker-compose logs -f
+#   Reset DB: docker-compose down -v   ← WARNING: destroys all data
+
+version: '3.8'
+
+services:
+  stronghold-audit-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: stronghold-audit-db
+    environment:
+      SA_PASSWORD: "Str0nghold@Audit2026!"
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+    ports:
+      - "14332:1433"
+    volumes:
+      - stronghold-audit-db-data:/var/opt/mssql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Str0nghold@Audit2026!' -Q 'SELECT 1' -No 2>/dev/null || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'Str0nghold@Audit2026!' -Q 'SELECT 1'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  stronghold-audit-db-data:
+    name: stronghold-audit-db-data

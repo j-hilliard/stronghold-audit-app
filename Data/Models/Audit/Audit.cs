@@ -1,0 +1,32 @@
+namespace Stronghold.AppDashboard.Data.Models.Audit;
+
+/// <summary>
+/// A single compliance audit instance.
+/// Status lifecycle: Draft → Submitted → (Reopened → Draft) → Closed
+///
+/// TemplateVersionId is locked at creation and never changes.
+/// Submitted audits are immutable without an explicit reopen (see ADR-008).
+/// </summary>
+public class Audit : AuditableEntity
+{
+    public int DivisionId { get; set; }
+
+    /// <summary>Locked at creation — never changes. Ensures historical accuracy (see ADR-004).</summary>
+    public int TemplateVersionId { get; set; }
+
+    /// <summary>"JobSite" | "Facility" — copied from Division.AuditType at creation</summary>
+    public string AuditType { get; set; } = null!;
+
+    /// <summary>"Draft" | "Submitted" | "Reopened" | "Closed"</summary>
+    public string Status { get; set; } = "Draft";
+
+    public DateTime? SubmittedAt { get; set; }
+
+    // Navigation
+    public Division Division { get; set; } = null!;
+    public AuditTemplateVersion TemplateVersion { get; set; } = null!;
+    public AuditHeader? Header { get; set; }
+    public ICollection<AuditResponse> Responses { get; set; } = new List<AuditResponse>();
+    public ICollection<AuditFinding> Findings { get; set; } = new List<AuditFinding>();
+    public ICollection<AuditAttachment> Attachments { get; set; } = new List<AuditAttachment>();
+}

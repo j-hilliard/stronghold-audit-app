@@ -28,12 +28,12 @@ These migrations are from the enterprise template and are not modified.
 
 ---
 
-### Audit Module Migrations (to be added)
+### Audit Module Migrations
 
 | Migration | Date | Authorized By | Description |
 |---|---|---|---|
-| `AuditModule_Initial` | TBD | TBD | Divisions, AuditTemplates, AuditTemplateVersions, AuditSections, AuditQuestions, AuditVersionQuestions, Audits, AuditHeaders, AuditResponses, AuditFindings, CorrectiveActions, AuditAttachments, EmailRoutingRules, TemplateChangeLog |
-| `AuditModule_SeedData` | TBD | TBD | Seed: 9 divisions, initial template versions with all questions from prototype, default email routing rules |
+| `EnsureCreated — audit schema` | 2026-03-31 | j.hilliard | All 14 audit tables created via `EnsureCreated()` in Local environment. Tables in `audit` SQL schema: Division, AuditTemplate, AuditTemplateVersion, AuditSection, AuditQuestion, AuditVersionQuestion, Audit, AuditHeader, AuditResponse, AuditFinding, CorrectiveAction, AuditAttachment, EmailRoutingRule, TemplateChangeLog |
+| `DBInitializer.Audit seed` | 2026-03-31 | j.hilliard | Seed data: 9 divisions (TKIE, STS, STG, SHI, SHI_RT, SHI_RA, ETS, CSL, FACILITY), 487 questions across all division templates, 46 email routing rules migrated from SHC_Compliance_Audit_Tool.html prototype |
 
 ---
 

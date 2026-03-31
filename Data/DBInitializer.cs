@@ -12,6 +12,7 @@ public static class DbInitializer
         SeedReferenceData(dbContext);
         SeedCompaniesRegionsAndSeverities(dbContext);
         SeedTestIncidents(dbContext);
+        AuditDbInitializer.SeedAuditData(dbContext);
     }
 
     private const string AdministratorRoleDescription =

@@ -147,7 +147,7 @@ builder.Services.AddOpenApiDocument(
         configure.DocumentName = "v1";
         configure.ApiGroupNames = new[] { "v1" };
         configure.FlattenInheritanceHierarchy = false;
-        configure.Title = "Stronghold App Template API";
+        configure.Title = "Stronghold Audit App API";
         configure.SchemaProcessors.Add(
             serviceProvider.GetService<FluentValidationSchemaProcessor>()
         );

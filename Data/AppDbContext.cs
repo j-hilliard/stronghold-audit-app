@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Stronghold.AppDashboard.Data.Models;
+using Stronghold.AppDashboard.Data.Models.Audit;
 using Stronghold.AppDashboard.Data.Models.Safety;
 
 namespace Stronghold.AppDashboard.Data;
@@ -15,6 +16,22 @@ public class AppDbContext : DbContext
     public DbSet<Settings> Settings { get; set; } = null!;
     public DbSet<SystemOwner> SystemOwners { get; set; } = null!;
     public DbSet<TechSupport> TechSupports { get; set; } = null!;
+
+    // ── Audit schema ─────────────────────────────────────────────
+    public DbSet<Division> Divisions { get; set; } = null!;
+    public DbSet<AuditTemplate> AuditTemplates { get; set; } = null!;
+    public DbSet<AuditTemplateVersion> AuditTemplateVersions { get; set; } = null!;
+    public DbSet<AuditSection> AuditSections { get; set; } = null!;
+    public DbSet<AuditQuestion> AuditQuestions { get; set; } = null!;
+    public DbSet<AuditVersionQuestion> AuditVersionQuestions { get; set; } = null!;
+    public DbSet<Models.Audit.Audit> Audits { get; set; } = null!;
+    public DbSet<AuditHeader> AuditHeaders { get; set; } = null!;
+    public DbSet<AuditResponse> AuditResponses { get; set; } = null!;
+    public DbSet<AuditFinding> AuditFindings { get; set; } = null!;
+    public DbSet<CorrectiveAction> CorrectiveActions { get; set; } = null!;
+    public DbSet<AuditAttachment> AuditAttachments { get; set; } = null!;
+    public DbSet<EmailRoutingRule> EmailRoutingRules { get; set; } = null!;
+    public DbSet<TemplateChangeLog> TemplateChangeLogs { get; set; } = null!;
 
     // Safety schema
     public DbSet<IncidentReport> IncidentReports { get; set; } = null!;
@@ -298,6 +315,225 @@ public class AppDbContext : DbContext
             b.Property(p => p.RelatedObject).HasColumnName("related_object");
             b.Property(p => p.RunId).HasColumnName("run_id").IsRequired();
             b.Property(p => p.LoggedAt).HasColumnName("logged_at");
+        });
+
+        // ── Audit schema — all tables in the "audit" SQL schema ──────────────
+
+        modelBuilder.Entity<Division>(b =>
+        {
+            b.ToTable("Division", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Code).IsRequired().HasMaxLength(20);
+            b.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            b.Property(e => e.AuditType).IsRequired().HasMaxLength(20);
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.UpdatedBy).HasMaxLength(200);
+            b.Property(e => e.DeletedBy).HasMaxLength(200);
+            b.HasIndex(e => e.Code).IsUnique();
+            b.HasQueryFilter(e => !e.IsDeleted);
+        });
+
+        modelBuilder.Entity<AuditTemplate>(b =>
+        {
+            b.ToTable("AuditTemplate", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.UpdatedBy).HasMaxLength(200);
+            b.Property(e => e.DeletedBy).HasMaxLength(200);
+            b.HasOne(e => e.Division).WithMany(d => d.Templates).HasForeignKey(e => e.DivisionId).OnDelete(DeleteBehavior.Restrict);
+            b.HasQueryFilter(e => !e.IsDeleted);
+        });
+
+        modelBuilder.Entity<AuditTemplateVersion>(b =>
+        {
+            b.ToTable("AuditTemplateVersion", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Status).IsRequired().HasMaxLength(20);
+            b.Property(e => e.PublishedBy).HasMaxLength(200);
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.UpdatedBy).HasMaxLength(200);
+            b.Property(e => e.DeletedBy).HasMaxLength(200);
+            b.HasOne(e => e.Template).WithMany(t => t.Versions).HasForeignKey(e => e.TemplateId).OnDelete(DeleteBehavior.Restrict);
+            b.HasQueryFilter(e => !e.IsDeleted);
+        });
+
+        modelBuilder.Entity<AuditSection>(b =>
+        {
+            b.ToTable("AuditSection", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.UpdatedBy).HasMaxLength(200);
+            b.Property(e => e.DeletedBy).HasMaxLength(200);
+            b.HasOne(e => e.TemplateVersion).WithMany(v => v.Sections).HasForeignKey(e => e.TemplateVersionId).OnDelete(DeleteBehavior.Restrict);
+            b.HasQueryFilter(e => !e.IsDeleted);
+        });
+
+        modelBuilder.Entity<AuditQuestion>(b =>
+        {
+            b.ToTable("AuditQuestion", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.QuestionText).IsRequired().HasMaxLength(1000);
+            b.Property(e => e.ArchivedBy).HasMaxLength(200);
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.UpdatedBy).HasMaxLength(200);
+            b.Property(e => e.DeletedBy).HasMaxLength(200);
+            // Note: no soft-delete query filter on AuditQuestion — archived questions must be
+            // queryable for the admin archive view and for historical audit rendering.
+        });
+
+        modelBuilder.Entity<AuditVersionQuestion>(b =>
+        {
+            b.ToTable("AuditVersionQuestion", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.UpdatedBy).HasMaxLength(200);
+            b.Property(e => e.DeletedBy).HasMaxLength(200);
+            b.HasOne(e => e.TemplateVersion).WithMany(v => v.VersionQuestions).HasForeignKey(e => e.TemplateVersionId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne(e => e.Section).WithMany(s => s.VersionQuestions).HasForeignKey(e => e.SectionId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne(e => e.Question).WithMany(q => q.VersionQuestions).HasForeignKey(e => e.QuestionId).OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(e => e.TemplateVersionId);
+            b.HasIndex(e => e.QuestionId);
+            b.HasQueryFilter(e => !e.IsDeleted);
+        });
+
+        modelBuilder.Entity<Models.Audit.Audit>(b =>
+        {
+            b.ToTable("Audit", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.AuditType).IsRequired().HasMaxLength(20);
+            b.Property(e => e.Status).IsRequired().HasMaxLength(20);
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.UpdatedBy).HasMaxLength(200);
+            b.Property(e => e.DeletedBy).HasMaxLength(200);
+            b.HasOne(e => e.Division).WithMany().HasForeignKey(e => e.DivisionId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne(e => e.TemplateVersion).WithMany().HasForeignKey(e => e.TemplateVersionId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne(e => e.Header).WithOne(h => h.Audit).HasForeignKey<AuditHeader>(h => h.AuditId);
+            b.HasIndex(e => e.DivisionId);
+            b.HasIndex(e => e.Status);
+            b.HasIndex(e => e.CreatedBy);
+            b.HasQueryFilter(e => !e.IsDeleted);
+        });
+
+        modelBuilder.Entity<AuditHeader>(b =>
+        {
+            b.ToTable("AuditHeader", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.JobNumber).HasMaxLength(50);
+            b.Property(e => e.Client).HasMaxLength(200);
+            b.Property(e => e.Location).HasMaxLength(200);
+            b.Property(e => e.PM).HasMaxLength(200);
+            b.Property(e => e.Auditor).HasMaxLength(200);
+            b.Property(e => e.AuditDate)
+                .HasConversion(
+                    v => v.HasValue ? v.Value.ToDateTime(TimeOnly.MinValue) : (DateTime?)null,
+                    v => v.HasValue ? DateOnly.FromDateTime(v.Value) : (DateOnly?)null)
+                .HasColumnType("date");
+            b.Property(e => e.Unit).HasMaxLength(100);
+            b.Property(e => e.Time).HasMaxLength(20);
+            b.Property(e => e.Shift).HasMaxLength(10);
+            b.Property(e => e.WorkDescription).HasMaxLength(1000);
+            b.Property(e => e.Company1).HasMaxLength(200);
+            b.Property(e => e.Company2).HasMaxLength(200);
+            b.Property(e => e.Company3).HasMaxLength(200);
+            b.Property(e => e.ResponsibleParty).HasMaxLength(200);
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.UpdatedBy).HasMaxLength(200);
+            b.Property(e => e.DeletedBy).HasMaxLength(200);
+            b.HasQueryFilter(e => !e.IsDeleted);
+        });
+
+        modelBuilder.Entity<AuditResponse>(b =>
+        {
+            b.ToTable("AuditResponse", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.QuestionTextSnapshot).IsRequired().HasMaxLength(1000);
+            b.Property(e => e.Status).HasMaxLength(20);
+            b.Property(e => e.Comment).HasMaxLength(2000);
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.UpdatedBy).HasMaxLength(200);
+            b.Property(e => e.DeletedBy).HasMaxLength(200);
+            b.HasOne(e => e.Audit).WithMany(a => a.Responses).HasForeignKey(e => e.AuditId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne(e => e.Question).WithMany(q => q.Responses).HasForeignKey(e => e.QuestionId).OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(e => e.AuditId);
+            b.HasQueryFilter(e => !e.IsDeleted);
+        });
+
+        modelBuilder.Entity<AuditFinding>(b =>
+        {
+            b.ToTable("AuditFinding", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.QuestionTextSnapshot).IsRequired().HasMaxLength(1000);
+            b.Property(e => e.Description).HasMaxLength(2000);
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.UpdatedBy).HasMaxLength(200);
+            b.Property(e => e.DeletedBy).HasMaxLength(200);
+            b.HasOne(e => e.Audit).WithMany(a => a.Findings).HasForeignKey(e => e.AuditId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne(e => e.Question).WithMany().HasForeignKey(e => e.QuestionId).OnDelete(DeleteBehavior.Restrict);
+            b.HasQueryFilter(e => !e.IsDeleted);
+        });
+
+        modelBuilder.Entity<CorrectiveAction>(b =>
+        {
+            b.ToTable("CorrectiveAction", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Description).IsRequired().HasMaxLength(2000);
+            b.Property(e => e.AssignedTo).HasMaxLength(200);
+            b.Property(e => e.DueDate)
+                .HasConversion(
+                    v => v.HasValue ? v.Value.ToDateTime(TimeOnly.MinValue) : (DateTime?)null,
+                    v => v.HasValue ? DateOnly.FromDateTime(v.Value) : (DateOnly?)null)
+                .HasColumnType("date");
+            b.Property(e => e.CompletedDate)
+                .HasConversion(
+                    v => v.HasValue ? v.Value.ToDateTime(TimeOnly.MinValue) : (DateTime?)null,
+                    v => v.HasValue ? DateOnly.FromDateTime(v.Value) : (DateOnly?)null)
+                .HasColumnType("date");
+            b.Property(e => e.Status).IsRequired().HasMaxLength(20);
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.UpdatedBy).HasMaxLength(200);
+            b.Property(e => e.DeletedBy).HasMaxLength(200);
+            b.HasOne(e => e.Finding).WithMany(f => f.CorrectiveActions).HasForeignKey(e => e.FindingId).OnDelete(DeleteBehavior.Restrict);
+            b.HasQueryFilter(e => !e.IsDeleted);
+        });
+
+        modelBuilder.Entity<AuditAttachment>(b =>
+        {
+            b.ToTable("AuditAttachment", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.FileName).IsRequired().HasMaxLength(500);
+            b.Property(e => e.BlobPath).HasMaxLength(1000);
+            b.Property(e => e.UploadedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.UpdatedBy).HasMaxLength(200);
+            b.Property(e => e.DeletedBy).HasMaxLength(200);
+            b.HasOne(e => e.Audit).WithMany(a => a.Attachments).HasForeignKey(e => e.AuditId).OnDelete(DeleteBehavior.Restrict);
+            b.HasQueryFilter(e => !e.IsDeleted);
+        });
+
+        modelBuilder.Entity<EmailRoutingRule>(b =>
+        {
+            b.ToTable("EmailRoutingRule", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.EmailAddress).IsRequired().HasMaxLength(200);
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.UpdatedBy).HasMaxLength(200);
+            b.Property(e => e.DeletedBy).HasMaxLength(200);
+            b.HasOne(e => e.Division).WithMany(d => d.EmailRoutingRules).HasForeignKey(e => e.DivisionId).OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(e => e.DivisionId);
+            b.HasQueryFilter(e => !e.IsDeleted);
+        });
+
+        modelBuilder.Entity<TemplateChangeLog>(b =>
+        {
+            b.ToTable("TemplateChangeLog", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.ChangedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.ChangeType).IsRequired().HasMaxLength(50);
+            b.Property(e => e.ChangeNote).HasMaxLength(1000);
+            b.HasOne(e => e.TemplateVersion).WithMany(v => v.ChangeLogs).HasForeignKey(e => e.TemplateVersionId).OnDelete(DeleteBehavior.Restrict);
+            // No soft delete — change logs are permanent audit trail
         });
     }
 

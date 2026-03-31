@@ -1,4 +1,11 @@
-# Local dev secrets (do not commit)
+# Local dev secrets — never commit these
 Api/appsettings.Local.json
 Api/appsettings.*.Local.json
 dev-start.bat
+
+# Build output
+**/bin/
+**/obj/
+
+# Desktop shortcuts
+*.lnk
