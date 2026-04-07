@@ -2,6 +2,8 @@ param(
     [ValidateSet('baseline', 'full', 'pr', 'premerge', 'prerelease')]
     [string]$Gate = 'baseline',
     [switch]$RequireLive,
+    [switch]$EnableTemplateGate,
+    [switch]$EnableReportingGate,
     [string]$ArtifactsRoot = 'qa-artifacts'
 )
 
@@ -13,6 +15,18 @@ $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $artifactPath = Join-Path $repoRoot "$ArtifactsRoot\$timestamp-$Gate"
 $logPath = Join-Path $artifactPath 'logs'
 
+# Always start from a clean transient Playwright state.
+$transientPaths = @(
+    (Join-Path $webappPath 'playwright-report'),
+    (Join-Path $webappPath 'test-results'),
+    (Join-Path $webappPath '.playwright')
+)
+foreach ($path in $transientPaths) {
+    if (Test-Path $path) {
+        Remove-Item -LiteralPath $path -Recurse -Force
+    }
+}
+
 New-Item -ItemType Directory -Path $logPath -Force | Out-Null
 
 if ($RequireLive) {
@@ -20,6 +34,9 @@ if ($RequireLive) {
 } else {
     $env:PW_LIVE_GATE = 'false'
 }
+
+$env:PW_AUDIT_TEMPLATE_GATE = if ($EnableTemplateGate) { 'true' } else { 'false' }
+$env:PW_AUDIT_REPORTING_GATE = if ($EnableReportingGate) { 'true' } else { 'false' }
 
 function Invoke-GateStep {
     param(
@@ -74,6 +91,8 @@ Copy-Artifacts -SourcePath (Join-Path $webappPath 'test-results')
 $summary = @"
 QA Gate: $Gate
 Require live checks: $RequireLive
+Template admin gate enabled: $EnableTemplateGate
+Reporting gate enabled: $EnableReportingGate
 Run time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 Artifacts: $artifactPath
 "@

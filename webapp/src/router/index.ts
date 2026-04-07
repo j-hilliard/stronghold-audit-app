@@ -36,6 +36,18 @@ const routes = [
         children: auditManagementRoutes,
     },
     {
+        // Quarterly summary — standalone print view
+        path: '/audit-management/reports/quarterly-summary',
+        name: 'audit-management-quarterly-summary',
+        component: () => import('@/modules/audit-management/features/reports/views/QuarterlySummaryView.vue'),
+    },
+    {
+        // Print view — no AppLayout wrapper, renders standalone for window.print()
+        path: '/audit-management/print/:divisionId',
+        name: 'audit-management-print',
+        component: () => import('@/modules/audit-management/features/audit-form/views/PrintableAuditFormView.vue'),
+    },
+    {
         path: '/authentication/login-callback',
         name: 'authentication-login-callback',
         component: () => import('@/views/auth/AuthRedirectView.vue'),

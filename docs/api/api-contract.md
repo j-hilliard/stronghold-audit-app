@@ -2,9 +2,9 @@
 
 Base URL: `https://localhost:7221/api/v1` (local dev)
 
-Auth: Bearer token (Phase 2+). Phase 1: auth bypass via `LocalDevAuthHandler`.
+Auth: Bearer token (Phase 2+). Phase 1 can use local dev bypass.
 
-Full interactive docs available at: `https://localhost:7221/swagger`
+Interactive docs: `https://localhost:7221/swagger`
 
 ---
 
@@ -13,8 +13,9 @@ Full interactive docs available at: `https://localhost:7221/swagger`
 ### GET /divisions
 Returns all active divisions.
 
-**Auth:** Any authenticated user  
-**Response:**
+**Auth:** Any authenticated user
+
+**Response**
 ```json
 [
   { "id": 1, "code": "TKIE", "name": "TKIE Division", "auditType": "JobSite" },
@@ -27,10 +28,11 @@ Returns all active divisions.
 ## Templates
 
 ### GET /templates/active?divisionId={id}
-Returns the active published template for a division, with all sections and questions.
+Returns the active published template for a division, with sections and questions.
 
-**Auth:** Auditor+  
-**Response:**
+**Auth:** Auditor+
+
+**Response**
 ```json
 {
   "templateVersionId": 3,
@@ -44,7 +46,7 @@ Returns the active published template for a division, with all sections and ques
       "questions": [
         {
           "id": 45,
-          "questionText": "Is the Permit Correct & being followed?",
+          "questionText": "Is the Permit Correct and being followed?",
           "displayOrder": 1,
           "allowNA": true,
           "requireCommentOnNC": true,
@@ -61,40 +63,55 @@ Returns the active published template for a division, with all sections and ques
 ## Audits
 
 ### POST /audits
-Creates a new draft audit. Locks to the current active template version.
+Creates a new draft audit and locks to the current active template version.
 
-**Auth:** Auditor+  
-**Request:**
+**Auth:** Auditor+
+
+**Request**
 ```json
 { "divisionId": 1 }
 ```
-**Response:** `{ "auditId": 42 }`
+
+**Response**
+```json
+{ "auditId": 42 }
+```
 
 ---
 
 ### GET /audits
-Returns audit list for the current user's accessible divisions.
+Returns audits visible to the current user scope.
 
-**Auth:** Auditor+ (scoped to own division/audits); AuditManager+ (all)  
+**Auth:** Auditor+ (scoped), AuditManager+ (broader scope)
+
 **Query params:** `divisionId`, `status`, `fromDate`, `toDate`, `auditor`
 
 ---
 
 ### GET /audits/{id}
-Returns a full audit with all responses.
+Returns full audit detail with responses.
 
-**Auth:** Auditor (own audits only); DivisionManager+ (all in division)
+**Auth:** Auditor (own scope), Manager/Reviewer (authorized scope)
 
 ---
 
 ### PUT /audits/{id}/responses
-Saves all responses for a draft audit (batch upsert). Rejected if audit is Submitted.
+Batch upsert responses for a draft audit. Rejected for submitted/finalized audits.
 
-**Auth:** Auditor (own drafts only)  
-**Request:**
+**Auth:** Auditor (own draft scope)
+
+**Request**
 ```json
 {
-  "header": { "jobNumber": "I25-036", "date": "2026-03-31", "client": "Client Co", "location": "Houston, TX", "pm": "J. Smith", "auditor": "T. Jones", "shift": "DAY" },
+  "header": {
+    "jobNumber": "I25-036",
+    "date": "2026-03-31",
+    "client": "Client Co",
+    "location": "Houston, TX",
+    "pm": "J. Smith",
+    "auditor": "T. Jones",
+    "shift": "DAY"
+  },
   "responses": [
     { "questionId": 45, "status": "Conforming", "comment": null, "correctedOnSite": false },
     { "questionId": 46, "status": "NonConforming", "comment": "PPE not worn", "correctedOnSite": true }
@@ -105,88 +122,104 @@ Saves all responses for a draft audit (batch upsert). Rejected if audit is Submi
 ---
 
 ### POST /audits/{id}/submit
-Submits the audit. Validates all required header fields. Generates AuditFindings from NonConforming responses.
+Submits audit, validates required fields, and generates findings for non-conforming responses.
 
-**Auth:** Auditor (own audits only)
+**Auth:** Auditor (own scope)
 
 ---
 
 ### GET /audits/{id}/review
-Returns the review summary: header, score, conforming/NC/warning/NA counts, NC item list.
+Returns review summary with counts, score, and non-conformance list.
 
-**Auth:** Auditor (own); DivisionManager+
+**Auth:** Auditor (own scope), Reviewer/Manager (authorized scope)
 
 ---
 
-## Admin — Templates
+## Admin - Templates
 
 ### GET /admin/templates?divisionId={id}
-Returns all template versions for a division.
+Returns template versions for a division.
 
-**Auth:** SystemAdmin
+**Auth:** TemplateAdmin or SystemAdmin
 
 ---
 
 ### POST /admin/templates/{versionId}/clone
-Clones the active version into a new Draft. Only one Draft per template at a time.
+Clones the active version into a draft.
 
-**Auth:** SystemAdmin
+**Auth:** TemplateAdmin or SystemAdmin
 
 ---
 
 ### POST /admin/versions/{draftId}/questions
-Adds a question to a draft version section.
+Adds a question to a draft section.
 
-**Auth:** SystemAdmin  
-**Request:**
+**Auth:** TemplateAdmin or SystemAdmin
+
+**Request**
 ```json
-{ "sectionId": 12, "questionText": "New question text", "displayOrder": 5, "allowNA": true, "requireCommentOnNC": true, "isScoreable": true }
+{
+  "sectionId": 12,
+  "questionText": "New question text",
+  "displayOrder": 5,
+  "allowNA": true,
+  "requireCommentOnNC": true,
+  "isScoreable": true
+}
 ```
 
 ---
 
 ### DELETE /admin/versions/{draftId}/questions/{questionId}
-Archives the question and removes it from the draft version. **Does not delete the question record.**
+Archives a question and removes it from the draft version.
 
-**Auth:** SystemAdmin
+**Auth:** TemplateAdmin or SystemAdmin
 
 ---
 
 ### PUT /admin/versions/{draftId}/questions/reorder
-Updates display order for questions in a section.
+Persists drag/drop question order in a draft section.
 
-**Auth:** SystemAdmin
+**Auth:** TemplateAdmin or SystemAdmin
+
+---
+
+### PUT /admin/versions/{draftId}/sections/reorder
+Persists drag/drop section order in a draft version.
+
+**Auth:** TemplateAdmin or SystemAdmin
 
 ---
 
 ### PUT /admin/versions/{draftId}/publish
-Publishes the draft → Active. Previous Active → Superseded.
+Publishes draft to active and supersedes prior active version.
 
-**Auth:** SystemAdmin
+**Auth:** TemplateAdmin or SystemAdmin
 
 ---
 
 ### GET /admin/questions/archived
-Returns all archived questions for audit trail purposes.
+Returns archived questions for audit trail review.
 
-**Auth:** SystemAdmin
+**Auth:** TemplateAdmin or SystemAdmin
 
 ---
 
-## Admin — Email Routing
+## Admin - Email Routing
 
 ### GET /admin/email-routing?divisionId={id}
 Returns email routing rules for a division.
 
-**Auth:** SystemAdmin
+**Auth:** TemplateAdmin or SystemAdmin
 
 ---
 
 ### PUT /admin/email-routing
 Upserts email routing rules for a division.
 
-**Auth:** SystemAdmin  
-**Request:**
+**Auth:** TemplateAdmin or SystemAdmin
+
+**Request**
 ```json
 {
   "divisionId": 1,
@@ -196,9 +229,53 @@ Upserts email routing rules for a division.
 
 ---
 
+## Reporting and KPI
+
+### GET /reports/kpi
+Returns KPI summary cards for caller's permitted scope.
+
+**Auth:** AuditManager, AuditReviewer, ReadOnlyViewer, ExecutiveViewer
+
+**Query params:** `divisionId`, `siteId`, `fromDate`, `toDate`, `auditorId`, `status`
+
+---
+
+### GET /reports/trends
+Returns trend series grouped by reporting category.
+
+**Auth:** AuditManager, AuditReviewer, ReadOnlyViewer, ExecutiveViewer
+
+**Query params:** `divisionId`, `siteId`, `fromDate`, `toDate`, `groupBy`
+
+---
+
+### GET /reports/findings
+Returns findings table rows for the current filter scope.
+
+**Auth:** AuditManager, AuditReviewer, ReadOnlyViewer, ExecutiveViewer
+
+**Query params:** `divisionId`, `siteId`, `fromDate`, `toDate`, `severity`, `status`, `questionId`
+
+---
+
+### GET /reports/corrective-actions
+Returns corrective action aging and overdue data.
+
+**Auth:** AuditManager, AuditReviewer, CorrectiveActionOwner, ReadOnlyViewer, ExecutiveViewer
+
+**Query params:** `divisionId`, `siteId`, `owner`, `dueFrom`, `dueTo`, `status`
+
+---
+
+## Security Rule
+- All list and reporting endpoints must enforce role + scope filtering server-side.
+- Responses must never include rows outside authorized scope.
+
+---
+
 ## Error Responses
 
-All errors follow the standard ASP.NET Core problem details format:
+All errors use ASP.NET Core Problem Details.
 
 ```json
 {
@@ -213,7 +290,7 @@ All errors follow the standard ASP.NET Core problem details format:
 |---|---|
 | 400 | Validation failed or business rule violation |
 | 401 | Not authenticated |
-| 403 | Authenticated but not authorized for this action |
+| 403 | Authenticated but not authorized |
 | 404 | Record not found |
-| 409 | Conflict (e.g., attempt to modify a Submitted audit) |
-| 500 | Unexpected server error (logged to ProcessLog) |
+| 409 | Conflict (example: modifying submitted audit) |
+| 500 | Unexpected server error |

@@ -74,8 +74,42 @@ body {
     @apply bg-slate-800/30;
 }
 
+.p-datatable .p-datatable-tbody > tr {
+    transition: background-color 0.15s ease;
+}
+
 .p-datatable .p-datatable-tbody > tr:hover {
-    @apply bg-slate-700/30;
+    @apply bg-slate-600/40;
+    cursor: pointer;
+}
+
+/* ── Global hover "color grows" effect ─────────────────────────────────────── */
+
+/* PrimeVue buttons — brightness glow on hover */
+.p-button:not(:disabled) {
+    transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease !important;
+}
+.p-button:not(:disabled):hover {
+    filter: brightness(1.15);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+    transform: translateY(-1px);
+}
+.p-button:not(:disabled):active {
+    transform: translateY(0);
+    filter: brightness(0.95);
+}
+
+/* Nav sidebar menu links — smooth fill-in on hover */
+.menu-wrapper .layout-menu-container .layout-menu li > a {
+    transition: background-color 0.15s ease, color 0.15s ease !important;
+}
+
+/* Clickable cards — glow on hover */
+.hover-card {
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.hover-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .p-dropdown {
@@ -132,4 +166,75 @@ body {
     border: none !important;
     padding: 2px 1rem !important;
     background-color: transparent !important;
+}
+
+/* ── Print / PDF styles ─────────────────────────────────────────────────────── */
+@media print {
+    /* Hide chrome: sidebar, nav, header buttons, footer */
+    .layout-sidebar,
+    .layout-topbar,
+    .layout-menu-container,
+    .p-button,
+    nav,
+    header {
+        display: none !important;
+    }
+
+    /* White page */
+    body, .layout-main-container, .layout-main {
+        background: #fff !important;
+        color: #111 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Cards — white with border */
+    .p-card {
+        background: #fff !important;
+        border: 1px solid #ccc !important;
+        box-shadow: none !important;
+        break-inside: avoid;
+        margin-bottom: 12px !important;
+    }
+
+    .p-card-title,
+    .p-card-content,
+    .p-card .text-white,
+    .p-card .text-slate-200,
+    .p-card .text-slate-300 {
+        color: #111 !important;
+    }
+
+    .p-card .text-slate-400,
+    .p-card .text-slate-500 {
+        color: #555 !important;
+    }
+
+    /* Score number colors stay colored */
+    .text-emerald-400 { color: #059669 !important; }
+    .text-amber-400   { color: #d97706 !important; }
+    .text-red-400     { color: #dc2626 !important; }
+
+    /* Stat boxes */
+    .bg-emerald-900\/50, .bg-red-900\/50, .bg-amber-900\/50, .bg-slate-700 {
+        background: #f0f0f0 !important;
+        border: 1px solid #ccc !important;
+    }
+    .text-emerald-300 { color: #059669 !important; }
+    .text-red-300     { color: #dc2626 !important; }
+    .text-amber-300   { color: #d97706 !important; }
+    .text-slate-300   { color: #333 !important; }
+
+    /* NC findings */
+    .border-red-800 { border-color: #fca5a5 !important; }
+    .bg-red-950\/20 { background: #fff5f5 !important; }
+
+    /* Progress bar */
+    .bg-slate-700.rounded-full { background: #e2e8f0 !important; }
+
+    /* Ensure full-width content area */
+    .layout-main-container {
+        margin-left: 0 !important;
+        padding: 8px !important;
+    }
 }

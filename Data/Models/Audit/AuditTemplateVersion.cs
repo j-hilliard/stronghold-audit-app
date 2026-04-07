@@ -24,6 +24,12 @@ public class AuditTemplateVersion : AuditableEntity
     /// <summary>The version this was cloned from, if any</summary>
     public int? ClonedFromVersionId { get; set; }
 
+    /// <summary>Date from which this version is in effect (defaults to PublishedAt)</summary>
+    public DateTime? EffectiveDate { get; set; }
+
+    /// <summary>Admin notes on what changed in this version</summary>
+    public string? Notes { get; set; }
+
     // Navigation
     public AuditTemplate Template { get; set; } = null!;
     public ICollection<AuditSection> Sections { get; set; } = new List<AuditSection>();

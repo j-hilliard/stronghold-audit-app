@@ -20,9 +20,10 @@
         <div class="layout-main bg-gradient-to-b from-slate-900 to-slate-800">
             <div class="layout-content p-12">
                 <router-view v-slot="{ Component }">
-                    <Transition name="fade" mode="out-in">
-                        <component :is="Component" :key="route.fullPath" />
-                    </Transition>
+                    <component v-if="Component" :is="Component" :key="route.fullPath" />
+                    <div v-else class="text-slate-400" data-testid="route-view-loading">
+                        Loading...
+                    </div>
                 </router-view>
             </div>
         </div>

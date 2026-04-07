@@ -17,8 +17,10 @@
 </template>
 
 <script setup lang="ts">
+defineOptions({ inheritAttrs: false });
+
 defineProps<{
   value: any[],
   emptyMessage?: string
 }>();
-</script> 
+</script>

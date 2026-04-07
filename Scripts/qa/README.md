@@ -9,8 +9,23 @@
 # Baseline gate (mock-backed UI checks)
 .\Scripts\qa\Invoke-QAGate.ps1 -Gate baseline
 
+# Mock-only baseline (skip live audit API guard intentionally)
+$env:PW_REQUIRE_AUDIT_API = 'false'
+.\Scripts\qa\Invoke-QAGate.ps1 -Gate baseline
+
 # Full gate with live integration checks
 .\Scripts\qa\Invoke-QAGate.ps1 -Gate full -RequireLive
+
+# Full gate plus feature-gated template and reporting contract suites
+.\Scripts\qa\Invoke-QAGate.ps1 -Gate full -EnableTemplateGate -EnableReportingGate
+
+# Standalone template admin contract checks
+$env:PW_AUDIT_TEMPLATE_GATE = 'true'
+cmd /c "npm --prefix webapp run test:e2e:audit:template-gate"
+
+# Standalone KPI/reporting contract checks
+$env:PW_AUDIT_REPORTING_GATE = 'true'
+cmd /c "npm --prefix webapp run test:e2e:audit:reporting-gate"
 ```
 
 ## Output

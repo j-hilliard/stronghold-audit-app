@@ -7,11 +7,17 @@ flowchart LR
     QA --> Buttons[Button Contract Tests]
     QA --> Visuals[Visual Snapshot Tests]
     QA --> CoreE2E[Core E2E Tests]
+    QA --> AuditCore[Audit Core Regression Tests]
+    QA --> TemplateGate[Template Admin Contract Gate]
+    QA --> ReportingGate[KPI and Reporting Contract Gate]
     QA --> Live[Live DB/Integration Gate]
     Smoke --> Report[Playwright Report + JUnit]
     Buttons --> Report
     Visuals --> Report
     CoreE2E --> Report
+    AuditCore --> Report
+    TemplateGate --> Report
+    ReportingGate --> Report
     Live --> Report
     Report --> Decision{Gate Pass?}
     Decision -- Yes --> Merge[Merge Allowed]

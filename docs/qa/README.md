@@ -10,6 +10,13 @@ This folder defines the QA-only operating model for the Stronghold Audit App.
 - `release-readiness-checklist.md`: Sign-off checklist for pre-merge and pre-release.
 - `visual-approval-policy.md`: Manual snapshot-review policy.
 - `claude-defect-handoff-template.md`: Problem + solution handoff format for Claude.
+- `audit-form-source-of-truth.md`: Locked baseline from the original Audit Form files.
+- `claude-qa-delivery-plan.md`: Phase-by-phase execution plan for Claude implementation + QA enforcement.
+- `claude-execution-brief.md`: Implementation brief with required testability hooks and milestone outputs.
+- `defect-handoffs/`: Time-stamped QA handoffs with reproducible failures and solution guidance.
+
+## Requirements Baseline
+- `docs/requirements/audit-template-engine-requirements.md`: Product requirements for template engine, drag/drop admin, KPI reporting, and scoped visibility.
 
 ## Mermaid Diagrams
 - `diagrams/test-architecture.md`

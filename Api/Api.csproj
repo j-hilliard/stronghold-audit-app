@@ -8,6 +8,9 @@
         <RootNamespace>Stronghold.AppDashboard.Api</RootNamespace>
         <PackageId>Api</PackageId>
         <NoWarn>$(NoWarn);CA1416</NoWarn>
+        <!-- NSwag client codegen fails in local dev due to comma in the OneDrive folder path.
+             Skip it in Debug; re-enable manually in Release when needed. -->
+        <skipNswagClientGeneration Condition="'$(Configuration)' == 'Debug'">true</skipNswagClientGeneration>
     </PropertyGroup>
 
     <ItemGroup>

@@ -228,3 +228,37 @@ Every table in the Audit schema includes these columns — no exceptions:
 | `AuditVersionQuestion` | `IX_AVQ_TemplateVersionId` | TemplateVersionId | Joined on every template load |
 | `AuditVersionQuestion` | `IX_AVQ_QuestionId` | QuestionId | Archive lookups |
 | `EmailRoutingRule` | `IX_EmailRouting_DivisionId` | DivisionId | Looked up on every submit |
+
+---
+
+## Required Template Engine Extensions
+
+The following entities are required to satisfy the template-engine and reporting requirements baseline in:
+`docs/requirements/audit-template-engine-requirements.md`
+
+### `ResponseType`
+- Holds reusable response input models (`status-choice`, `yes-no`, `yes-no-na`, `text`, `number`, `date`, `multi-select`).
+
+### `ResponseOption`
+- Holds selectable options for response types.
+- For status-style options, includes scoring and finding triggers:
+  - `ScoreValue`
+  - `IsNegativeFinding`
+  - `TriggersComment`
+  - `TriggersCorrectiveAction`
+
+### `ReportingCategory`
+- Stable category mapping for trend analytics.
+- Decouples reporting rollups from editable display section names.
+
+### `UserDivision` (or equivalent scope mapping)
+- Maps user identity to authorized visibility scopes.
+- Supports row-level audit visibility by division/site/company/audit type policy.
+
+### Snapshot fields (required on `AuditResponse`)
+- `QuestionTextSnapshot`
+- `SectionNameSnapshot`
+- `ReportingCategorySnapshot`
+- `SortOrderSnapshot`
+
+These preserve legal/reporting integrity when templates evolve.

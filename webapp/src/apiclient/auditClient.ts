@@ -1,0 +1,650 @@
+﻿/**
+ * Handwritten TypeScript API client for the Audit module.
+ * Mirrors the shape of the NSwag-generated IncidentReportClient but written manually
+ * because the NSwag post-build step cannot run on the OneDrive path (comma in folder name).
+ *
+ * Keep in sync with Api/Models/Audit/*.cs
+ */
+
+import type { AxiosInstance, CancelToken } from 'axios';
+
+// â”€â”€ DTOs (mirror Api/Models/Audit/*.cs) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export interface DivisionDto {
+    id: number;
+    code: string;
+    name: string;
+    /** "JobSite" | "Facility" */
+    auditType: string;
+}
+
+export interface TemplateQuestionDto {
+    /** AuditVersionQuestion.Id */
+    versionQuestionId: number;
+    /** AuditQuestion.Id â€” stored on AuditResponse */
+    questionId: number;
+    questionText: string;
+    displayOrder: number;
+    allowNA: boolean;
+    requireCommentOnNC: boolean;
+    isScoreable: boolean;
+}
+
+export interface TemplateSectionDto {
+    id: number;
+    name: string;
+    displayOrder: number;
+    questions: TemplateQuestionDto[];
+}
+
+export interface TemplateDto {
+    versionId: number;
+    versionNumber: number;
+    divisionCode: string;
+    divisionName: string;
+    /** "JobSite" | "Facility" */
+    auditType: string;
+    sections: TemplateSectionDto[];
+}
+
+export interface AuditHeaderDto {
+    id?: number;
+    jobNumber?: string;
+    client?: string;
+    pm?: string;
+    unit?: string;
+    time?: string;
+    shift?: string;
+    workDescription?: string;
+    company1?: string;
+    company2?: string;
+    company3?: string;
+    responsibleParty?: string;
+    location?: string;
+    /** ISO date string "YYYY-MM-DD" */
+    auditDate?: string;
+    auditor?: string;
+}
+
+export interface AuditResponseDto {
+    id: number;
+    questionId: number;
+    questionTextSnapshot: string;
+    /** "Conforming" | "NonConforming" | "Warning" | "NA" | null (unanswered) */
+    status?: string | null;
+    comment?: string | null;
+    correctedOnSite: boolean;
+}
+
+export interface AuditResponseUpsertDto {
+    questionId: number;
+    questionTextSnapshot: string;
+    status?: string | null;
+    comment?: string | null;
+    correctedOnSite: boolean;
+}
+
+export interface SaveResponsesRequest {
+    header?: AuditHeaderDto;
+    responses: AuditResponseUpsertDto[];
+}
+
+export interface AuditDetailDto {
+    id: number;
+    divisionId: number;
+    divisionCode: string;
+    divisionName: string;
+    templateVersionId: number;
+    /** "JobSite" | "Facility" */
+    auditType: string;
+    /** "Draft" | "Submitted" | "Reopened" | "Closed" */
+    status: string;
+    createdAt: string;
+    createdBy: string;
+    submittedAt?: string | null;
+    header?: AuditHeaderDto | null;
+    responses: AuditResponseDto[];
+}
+
+export interface AuditListItemDto {
+    id: number;
+    divisionCode: string;
+    divisionName: string;
+    auditType: string;
+    status: string;
+    createdBy: string;
+    createdAt: string;
+    submittedAt?: string | null;
+    auditor?: string | null;
+    auditDate?: string | null;
+    jobNumber?: string | null;
+    location?: string | null;
+}
+
+export interface AuditFindingDto {
+    id: number;
+    questionText: string;
+    comment?: string | null;
+    correctedOnSite: boolean;
+    correctiveActions: CorrectiveActionDto[];
+}
+
+export interface ReviewResponseItemDto {
+    questionId: number;
+    questionText: string;
+    status?: string | null;
+    comment?: string | null;
+    correctedOnSite: boolean;
+    sortOrder: number;
+}
+
+export interface ReviewSectionDto {
+    sectionName: string;
+    items: ReviewResponseItemDto[];
+}
+
+export interface EmailRoutingDto {
+    emailAddress: string;
+}
+
+// ── Admin DTOs (mirror Api/Models/Audit/AdminDto.cs) ──────────────────────────
+
+export interface TemplateVersionListItemDto {
+    id: number;
+    templateId: number;
+    divisionCode: string;
+    divisionName: string;
+    versionNumber: number;
+    /** "Draft" | "Active" | "Superseded" */
+    status: string;
+    publishedAt?: string | null;
+    publishedBy?: string | null;
+    clonedFromVersionId?: number | null;
+    questionCount: number;
+}
+
+export interface DraftQuestionDto {
+    versionQuestionId: number;
+    questionId: number;
+    questionText: string;
+    shortLabel?: string | null;
+    helpText?: string | null;
+    displayOrder: number;
+    allowNA: boolean;
+    requireCommentOnNC: boolean;
+    isScoreable: boolean;
+    isArchived: boolean;
+    responseTypeId?: number | null;
+    responseTypeCode?: string | null;
+    weight: number;
+}
+
+export interface DraftSectionDto {
+    id: number;
+    name: string;
+    sectionCode?: string | null;
+    displayOrder: number;
+    isRequired: boolean;
+    reportingCategoryId?: number | null;
+    reportingCategoryName?: string | null;
+    questions: DraftQuestionDto[];
+}
+
+export interface DraftVersionDetailDto {
+    id: number;
+    versionNumber: number;
+    divisionCode: string;
+    divisionName: string;
+    sections: DraftSectionDto[];
+}
+
+export interface AddQuestionRequest {
+    sectionId: number;
+    questionText: string;
+    allowNA?: boolean;
+    requireCommentOnNC?: boolean;
+    isScoreable?: boolean;
+}
+
+export interface ReorderQuestionsRequest {
+    versionQuestionIds: number[];
+}
+
+export interface EmailRoutingRuleDto {
+    id: number;
+    divisionId: number;
+    divisionCode: string;
+    divisionName: string;
+    emailAddress: string;
+    isActive: boolean;
+}
+
+export interface EmailRoutingRuleUpsertDto {
+    id?: number | null;
+    divisionId: number;
+    emailAddress: string;
+    isActive: boolean;
+}
+
+export interface UpdateEmailRoutingRequest {
+    rules: EmailRoutingRuleUpsertDto[];
+}
+
+export interface UserAuditRoleDto {
+    userId: number;
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string | null;
+    /** Current audit role name, or null if none assigned */
+    auditRole?: string | null;
+}
+
+export interface SectionLibraryItemDto {
+    sectionId: number;
+    name: string;
+    sectionCode?: string | null;
+    divisionCode: string;
+    divisionName: string;
+    questionCount: number;
+}
+
+export interface CopySectionRequest {
+    sourceSectionId: number;
+}
+
+export interface AddSectionRequest {
+    name: string;
+}
+
+export interface UpdateSectionRequest {
+    name: string;
+    isRequired: boolean;
+    reportingCategoryId?: number | null;
+}
+
+export interface ReorderSectionsRequest {
+    sectionIds: number[];
+}
+
+export interface CorrectiveActionDto {
+    id: number;
+    findingId: number;
+    auditId?: number | null;
+    description: string;
+    assignedTo?: string | null;
+    dueDate?: string | null;
+    completedDate?: string | null;
+    status: string;
+    createdBy: string;
+    createdAt: string;
+}
+
+export interface AssignCorrectiveActionRequest {
+    findingId: number;
+    description: string;
+    assignedTo?: string | null;
+    dueDate?: string | null;
+}
+
+export interface CloseCorrectiveActionRequest {
+    notes: string;
+    completedDate?: string | null;
+}
+
+export interface AuditTrendPointDto {
+    week: string;
+    avgScore: number | null;
+    auditCount: number;
+}
+
+export interface AuditReportRowDto {
+    id: number;
+    divisionCode: string;
+    status: string;
+    auditDate?: string | null;
+    auditor?: string | null;
+    jobNumber?: string | null;
+    location?: string | null;
+    scorePercent?: number | null;
+    nonConformingCount: number;
+    warningCount: number;
+}
+
+export interface SectionNcBreakdownDto {
+    sectionName: string;
+    ncCount: number;
+}
+
+export interface OpenCorrectiveActionSummaryDto {
+    id: number;
+    auditId: number;
+    description: string;
+    assignedTo?: string | null;
+    dueDate?: string | null;
+    status: string;
+    isOverdue: boolean;
+    daysOpen: number;
+}
+
+export interface AuditReportDto {
+    totalAudits: number;
+    avgScorePercent?: number | null;
+    totalNonConforming: number;
+    totalWarnings: number;
+    correctedOnSiteCount: number;
+    trend: AuditTrendPointDto[];
+    sectionBreakdown: SectionNcBreakdownDto[];
+    openCorrectiveActions: OpenCorrectiveActionSummaryDto[];
+    rows: AuditReportRowDto[];
+}
+
+export interface AuditReviewDto {
+    id: number;
+    divisionCode: string;
+    divisionName: string;
+    auditType: string;
+    status: string;
+    header?: AuditHeaderDto | null;
+    conformingCount: number;
+    nonConformingCount: number;
+    warningCount: number;
+    naCount: number;
+    unansweredCount: number;
+    /** Null if no scored items answered */
+    scorePercent?: number | null;
+    nonConformingItems: AuditFindingDto[];
+    warningItems: ReviewResponseItemDto[];
+    sections: ReviewSectionDto[];
+    reviewEmailRouting: EmailRoutingDto[];
+}
+
+type JsonObject = Record<string, unknown>;
+
+function readString(input: unknown): string {
+    return typeof input === 'string' ? input : '';
+}
+
+function readNumber(input: unknown): number | null {
+    if (typeof input === 'number' && Number.isFinite(input)) return input;
+    if (typeof input === 'string' && input.trim() !== '') {
+        const parsed = Number(input);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+}
+
+function normalizeDivision(raw: unknown): DivisionDto | null {
+    if (!raw || typeof raw !== 'object') return null;
+
+    const data = raw as JsonObject;
+    const id = readNumber(data['id'] ?? data['Id']);
+    if (id === null || id <= 0) return null;
+
+    const code = readString(data['code'] ?? data['Code']).trim();
+    const name = readString(data['name'] ?? data['Name']).trim();
+    const auditType = readString(data['auditType'] ?? data['AuditType']).trim();
+
+    return {
+        id,
+        code,
+        name,
+        auditType,
+    };
+}
+
+// â”€â”€ Client class â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export class AuditClient {
+    private instance: AxiosInstance;
+    private baseUrl: string;
+
+    constructor(baseUrl?: string, instance?: AxiosInstance) {
+        if (!instance) throw new Error('AxiosInstance is required');
+        this.instance = instance;
+        this.baseUrl = baseUrl ?? '';
+    }
+
+    // â”€â”€ Divisions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+    getDivisions(cancelToken?: CancelToken): Promise<DivisionDto[]> {
+        return this.instance
+            .get<unknown>(`${this.baseUrl}/v1/divisions`, { cancelToken })
+            .then(r => {
+                const rows = Array.isArray(r.data) ? r.data : [];
+                const normalized = rows
+                    .map(normalizeDivision)
+                    .filter((div): div is DivisionDto => div !== null);
+
+                // Deduplicate by code so that seeder duplicates in the DB
+                // don't produce hundreds of identical cards in the UI.
+                // Keeps the first (lowest Id) record for each division code.
+                const unique = new Map<string, DivisionDto>();
+                for (const div of normalized) {
+                    if (div.code && !unique.has(div.code)) {
+                        unique.set(div.code, div);
+                    }
+                }
+                return Array.from(unique.values()).sort((a, b) => a.code.localeCompare(b.code));
+            });
+    }
+
+    // â”€â”€ Templates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+    getActiveTemplate(divisionId: number, cancelToken?: CancelToken): Promise<TemplateDto> {
+        return this.instance
+            .get<TemplateDto>(`${this.baseUrl}/v1/templates/active`, { params: { divisionId }, cancelToken })
+            .then(r => r.data);
+    }
+
+    // â”€â”€ Audits â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+    createAudit(divisionId: number, cancelToken?: CancelToken): Promise<number> {
+        return this.instance
+            .post<number>(`${this.baseUrl}/v1/audits`, { divisionId }, { cancelToken })
+            .then(r => r.data);
+    }
+
+    getAudit(id: number, cancelToken?: CancelToken): Promise<AuditDetailDto> {
+        return this.instance
+            .get<AuditDetailDto>(`${this.baseUrl}/v1/audits/${id}`, { cancelToken })
+            .then(r => r.data);
+    }
+
+    getAuditList(
+        divisionId?: number | null,
+        status?: string | null,
+        auditor?: string | null,
+        dateFrom?: string | null,
+        dateTo?: string | null,
+        cancelToken?: CancelToken,
+    ): Promise<AuditListItemDto[]> {
+        const params: Record<string, unknown> = {};
+        if (divisionId != null) params['divisionId'] = divisionId;
+        if (status) params['status'] = status;
+        if (auditor) params['auditor'] = auditor;
+        if (dateFrom) params['dateFrom'] = dateFrom;
+        if (dateTo) params['dateTo'] = dateTo;
+        return this.instance
+            .get<AuditListItemDto[]>(`${this.baseUrl}/v1/audits`, { params, cancelToken })
+            .then(r => r.data);
+    }
+
+    deleteAudit(id: number, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .delete(`${this.baseUrl}/v1/audits/${id}`, { cancelToken })
+            .then(() => undefined);
+    }
+
+    saveResponses(id: number, request: SaveResponsesRequest, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .put(`${this.baseUrl}/v1/audits/${id}/responses`, request, { cancelToken })
+            .then(() => undefined);
+    }
+
+    submitAudit(id: number, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .post(`${this.baseUrl}/v1/audits/${id}/submit`, null, { cancelToken })
+            .then(() => undefined);
+    }
+
+    assignCorrectiveAction(request: AssignCorrectiveActionRequest, cancelToken?: CancelToken): Promise<number> {
+        return this.instance
+            .post<number>(`${this.baseUrl}/v1/audits/corrective-actions`, request, { cancelToken })
+            .then(r => r.data);
+    }
+
+    closeCorrectiveAction(id: number, request: CloseCorrectiveActionRequest, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .put(`${this.baseUrl}/v1/audits/corrective-actions/${id}/close`, request, { cancelToken })
+            .then(() => undefined);
+    }
+
+    getAuditReport(
+        divisionId?: number | null,
+        status?: string | null,
+        dateFrom?: string | null,
+        dateTo?: string | null,
+        cancelToken?: CancelToken,
+    ): Promise<AuditReportDto> {
+        const params: Record<string, unknown> = {};
+        if (divisionId != null) params['divisionId'] = divisionId;
+        if (status) params['status'] = status;
+        if (dateFrom) params['dateFrom'] = dateFrom;
+        if (dateTo) params['dateTo'] = dateTo;
+        return this.instance
+            .get<AuditReportDto>(`${this.baseUrl}/v1/audits/report`, { params, cancelToken })
+            .then(r => r.data);
+    }
+
+    getAuditReview(id: number, cancelToken?: CancelToken): Promise<AuditReviewDto> {
+        return this.instance
+            .get<AuditReviewDto>(`${this.baseUrl}/v1/audits/${id}/review`, { cancelToken })
+            .then(r => r.data);
+    }
+
+    // ── Admin — Templates ─────────────────────────────────────────────────────
+
+    getTemplates(cancelToken?: CancelToken): Promise<TemplateVersionListItemDto[]> {
+        return this.instance
+            .get<TemplateVersionListItemDto[]>(`${this.baseUrl}/v1/admin/templates`, { cancelToken })
+            .then(r => r.data);
+    }
+
+    getDraftVersionDetail(draftId: number, cancelToken?: CancelToken): Promise<DraftVersionDetailDto> {
+        return this.instance
+            .get<DraftVersionDetailDto>(`${this.baseUrl}/v1/admin/versions/${draftId}`, { cancelToken })
+            .then(r => r.data);
+    }
+
+    cloneTemplateVersion(versionId: number, cancelToken?: CancelToken): Promise<number> {
+        return this.instance
+            .post<number>(`${this.baseUrl}/v1/admin/templates/${versionId}/clone`, null, { cancelToken })
+            .then(r => r.data);
+    }
+
+    // ── Admin — Questions ─────────────────────────────────────────────────────
+
+    addQuestion(draftId: number, request: AddQuestionRequest, cancelToken?: CancelToken): Promise<number> {
+        return this.instance
+            .post<number>(`${this.baseUrl}/v1/admin/versions/${draftId}/questions`, request, { cancelToken })
+            .then(r => r.data);
+    }
+
+    updateQuestion(draftId: number, versionQuestionId: number, questionText: string, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .put(`${this.baseUrl}/v1/admin/versions/${draftId}/questions/${versionQuestionId}`, { questionText }, { cancelToken })
+            .then(() => undefined);
+    }
+
+    removeQuestion(draftId: number, versionQuestionId: number, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .delete(`${this.baseUrl}/v1/admin/versions/${draftId}/questions/${versionQuestionId}`, { cancelToken })
+            .then(() => undefined);
+    }
+
+    reorderQuestions(draftId: number, versionQuestionIds: number[], cancelToken?: CancelToken): Promise<void> {
+        const request: ReorderQuestionsRequest = { versionQuestionIds };
+        return this.instance
+            .put(`${this.baseUrl}/v1/admin/versions/${draftId}/questions/reorder`, request, { cancelToken })
+            .then(() => undefined);
+    }
+
+    publishTemplateVersion(draftId: number, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .put(`${this.baseUrl}/v1/admin/versions/${draftId}/publish`, null, { cancelToken })
+            .then(() => undefined);
+    }
+
+    // ── Admin — Email Routing ─────────────────────────────────────────────────
+
+    // ── Admin — Section Library ───────────────────────────────────────────────
+
+    getSectionLibrary(cancelToken?: CancelToken): Promise<SectionLibraryItemDto[]> {
+        return this.instance
+            .get<SectionLibraryItemDto[]>(`${this.baseUrl}/v1/admin/section-library`, { cancelToken })
+            .then(r => r.data);
+    }
+
+    copySection(draftId: number, sourceSectionId: number, cancelToken?: CancelToken): Promise<number> {
+        const request: CopySectionRequest = { sourceSectionId };
+        return this.instance
+            .post<number>(`${this.baseUrl}/v1/admin/versions/${draftId}/sections/copy`, request, { cancelToken })
+            .then(r => r.data);
+    }
+
+    // ── Admin — Sections ──────────────────────────────────────────────────────
+
+    addSection(draftId: number, request: AddSectionRequest, cancelToken?: CancelToken): Promise<number> {
+        return this.instance
+            .post<number>(`${this.baseUrl}/v1/admin/versions/${draftId}/sections`, request, { cancelToken })
+            .then(r => r.data);
+    }
+
+    updateSection(draftId: number, sectionId: number, request: UpdateSectionRequest, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .put(`${this.baseUrl}/v1/admin/versions/${draftId}/sections/${sectionId}`, request, { cancelToken })
+            .then(() => undefined);
+    }
+
+    removeSection(draftId: number, sectionId: number, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .delete(`${this.baseUrl}/v1/admin/versions/${draftId}/sections/${sectionId}`, { cancelToken })
+            .then(() => undefined);
+    }
+
+    reorderSections(draftId: number, sectionIds: number[], cancelToken?: CancelToken): Promise<void> {
+        const request: ReorderSectionsRequest = { sectionIds };
+        return this.instance
+            .put(`${this.baseUrl}/v1/admin/versions/${draftId}/sections/reorder`, request, { cancelToken })
+            .then(() => undefined);
+    }
+
+    // ── Admin — Email Routing ─────────────────────────────────────────────────
+
+    getEmailRouting(cancelToken?: CancelToken): Promise<EmailRoutingRuleDto[]> {
+        return this.instance
+            .get<EmailRoutingRuleDto[]>(`${this.baseUrl}/v1/admin/email-routing`, { cancelToken })
+            .then(r => r.data);
+    }
+
+    updateEmailRouting(rules: EmailRoutingRuleUpsertDto[], cancelToken?: CancelToken): Promise<void> {
+        const request: UpdateEmailRoutingRequest = { rules };
+        return this.instance
+            .put(`${this.baseUrl}/v1/admin/email-routing`, request, { cancelToken })
+            .then(() => undefined);
+    }
+
+    // ── Admin — User Audit Roles ──────────────────────────────────────────────
+
+    getUsersWithAuditRoles(cancelToken?: CancelToken): Promise<UserAuditRoleDto[]> {
+        return this.instance
+            .get<UserAuditRoleDto[]>(`${this.baseUrl}/v1/admin/users/audit-roles`, { cancelToken })
+            .then(r => r.data);
+    }
+
+    setUserAuditRole(userId: number, roleName: string | null, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .put(`${this.baseUrl}/v1/admin/users/${userId}/audit-role`, { roleName }, { cancelToken })
+            .then(() => undefined);
+    }
+}

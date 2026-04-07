@@ -6,6 +6,16 @@ dev-start.bat
 # Build output
 **/bin/
 **/obj/
+**/dist/
 
 # Desktop shortcuts
 *.lnk
+
+# Node / QA artifacts
+**/node_modules/
+webapp/test-results/
+webapp/playwright-report/
+webapp/.playwright/
+webapp/.cache/
+webapp/.vite/
+webapp/.eslintcache

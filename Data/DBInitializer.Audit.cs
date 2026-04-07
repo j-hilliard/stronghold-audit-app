@@ -17,20 +17,148 @@ public static class AuditDbInitializer
 
     public static void SeedAuditData(AppDbContext dbContext)
     {
+        SeedReportingCategories(dbContext);
+        SeedResponseTypes(dbContext);
+
         // IgnoreQueryFilters so soft-deleted rows still count — prevents duplicate seeding
         if (dbContext.Divisions.IgnoreQueryFilters().Any())
             return;
 
         var now = DateTime.UtcNow;
 
-        foreach (var divSeed in GetDivisionSeeds())
-            SeedDivision(dbContext, divSeed, now);
+        // Use execution strategy to support SqlServerRetryingExecutionStrategy with transactions.
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        strategy.Execute(() =>
+        {
+            using var tx = dbContext.Database.BeginTransaction();
+            try
+            {
+                foreach (var divSeed in GetDivisionSeeds())
+                    SeedDivision(dbContext, divSeed, now);
+
+                tx.Commit();
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        });
+    }
+
+    private static void SeedReportingCategories(AppDbContext dbContext)
+    {
+        var now = DateTime.UtcNow;
+        var categories = new[]
+        {
+            ("PERMITTING",   "Permitting",                  1),
+            ("PPE",          "PPE",                         2),
+            ("EQUIPMENT",    "Equipment",                   3),
+            ("JOBSITE_CSE",  "Job Site / CSE",              4),
+            ("SCAFFOLDS",    "Scaffolds",                   5),
+            ("LOTO",         "LOTO",                        6),
+            ("JHA",          "JHA / JSA",                   7),
+            ("DAILY_LOGS",   "Daily Logs",                  8),
+            ("CULTURE",      "Culture / Attitudes",         9),
+            ("ENVIRONMENTAL","Environmental",               10),
+            ("HAZ_MATERIAL", "Hazardous Material Storage",  11),
+            ("CO_SPECIFIC",  "Company Specific",            12),
+            ("GENERAL",      "General",                     13),
+        };
+
+        foreach (var (code, name, sortOrder) in categories)
+        {
+            if (!dbContext.ReportingCategories.IgnoreQueryFilters().Any(rc => rc.Code == code))
+            {
+                dbContext.ReportingCategories.Add(new ReportingCategory
+                {
+                    Code = code,
+                    Name = name,
+                    SortOrder = sortOrder,
+                    IsActive = true,
+                    CreatedAt = now,
+                    CreatedBy = System,
+                });
+            }
+        }
+        dbContext.SaveChanges();
+    }
+
+    private static void SeedResponseTypes(AppDbContext dbContext)
+    {
+        var now = DateTime.UtcNow;
+        var types = new[]
+        {
+            ("STATUS_CHOICE", "Status Choice", "Conforming / NonConforming / Warning / NA — primary audit response type"),
+            ("YES_NO",        "Yes / No",       "Binary yes/no response"),
+            ("YES_NO_NA",     "Yes / No / NA",  "Yes, No, or Not Applicable"),
+            ("TEXT",          "Text",           "Free-text comment only"),
+            ("NUMBER",        "Number",         "Numeric entry"),
+            ("DATE",          "Date",           "Date picker"),
+        };
+
+        foreach (var (code, name, description) in types)
+        {
+            if (!dbContext.ResponseTypes.IgnoreQueryFilters().Any(rt => rt.Code == code))
+            {
+                dbContext.ResponseTypes.Add(new ResponseType
+                {
+                    Code = code,
+                    Name = name,
+                    Description = description,
+                    CreatedAt = now,
+                    CreatedBy = System,
+                });
+            }
+        }
+        dbContext.SaveChanges();
+
+        // Seed options for STATUS_CHOICE
+        var statusChoice = dbContext.ResponseTypes.FirstOrDefault(rt => rt.Code == "STATUS_CHOICE");
+        if (statusChoice == null) return;
+
+        if (!dbContext.ResponseOptions.IgnoreQueryFilters().Any(ro => ro.ResponseTypeId == statusChoice.Id))
+        {
+            var options = new[]
+            {
+                new ResponseOption { ResponseTypeId = statusChoice.Id, OptionLabel = "Conforming",    OptionValue = "Conforming",    ScoreValue = 1,    DisplayOrder = 1, IsNegativeFinding = false, TriggersComment = false, TriggersCorrectiveAction = false, CreatedAt = now, CreatedBy = System },
+                new ResponseOption { ResponseTypeId = statusChoice.Id, OptionLabel = "Non-Conforming",OptionValue = "NonConforming", ScoreValue = 0,    DisplayOrder = 2, IsNegativeFinding = true,  TriggersComment = true,  TriggersCorrectiveAction = true,  CreatedAt = now, CreatedBy = System },
+                new ResponseOption { ResponseTypeId = statusChoice.Id, OptionLabel = "Warning",       OptionValue = "Warning",       ScoreValue = 0,    DisplayOrder = 3, IsNegativeFinding = true,  TriggersComment = false, TriggersCorrectiveAction = false, CreatedAt = now, CreatedBy = System },
+                new ResponseOption { ResponseTypeId = statusChoice.Id, OptionLabel = "N/A",           OptionValue = "NA",            ScoreValue = null, DisplayOrder = 4, IsNegativeFinding = false, TriggersComment = false, TriggersCorrectiveAction = false, CreatedAt = now, CreatedBy = System },
+            };
+            dbContext.ResponseOptions.AddRange(options);
+            dbContext.SaveChanges();
+        }
+
+        // Seed options for YES_NO
+        var yesNo = dbContext.ResponseTypes.FirstOrDefault(rt => rt.Code == "YES_NO");
+        if (yesNo != null && !dbContext.ResponseOptions.IgnoreQueryFilters().Any(ro => ro.ResponseTypeId == yesNo.Id))
+        {
+            dbContext.ResponseOptions.AddRange(
+                new ResponseOption { ResponseTypeId = yesNo.Id, OptionLabel = "Yes", OptionValue = "Yes", ScoreValue = 1,    DisplayOrder = 1, IsNegativeFinding = false, TriggersComment = false, TriggersCorrectiveAction = false, CreatedAt = now, CreatedBy = System },
+                new ResponseOption { ResponseTypeId = yesNo.Id, OptionLabel = "No",  OptionValue = "No",  ScoreValue = 0,    DisplayOrder = 2, IsNegativeFinding = true,  TriggersComment = true,  TriggersCorrectiveAction = false, CreatedAt = now, CreatedBy = System }
+            );
+            dbContext.SaveChanges();
+        }
+
+        // Seed options for YES_NO_NA
+        var yesNoNa = dbContext.ResponseTypes.FirstOrDefault(rt => rt.Code == "YES_NO_NA");
+        if (yesNoNa != null && !dbContext.ResponseOptions.IgnoreQueryFilters().Any(ro => ro.ResponseTypeId == yesNoNa.Id))
+        {
+            dbContext.ResponseOptions.AddRange(
+                new ResponseOption { ResponseTypeId = yesNoNa.Id, OptionLabel = "Yes", OptionValue = "Yes", ScoreValue = 1,    DisplayOrder = 1, IsNegativeFinding = false, TriggersComment = false, TriggersCorrectiveAction = false, CreatedAt = now, CreatedBy = System },
+                new ResponseOption { ResponseTypeId = yesNoNa.Id, OptionLabel = "No",  OptionValue = "No",  ScoreValue = 0,    DisplayOrder = 2, IsNegativeFinding = true,  TriggersComment = true,  TriggersCorrectiveAction = false, CreatedAt = now, CreatedBy = System },
+                new ResponseOption { ResponseTypeId = yesNoNa.Id, OptionLabel = "N/A", OptionValue = "NA",  ScoreValue = null, DisplayOrder = 3, IsNegativeFinding = false, TriggersComment = false, TriggersCorrectiveAction = false, CreatedAt = now, CreatedBy = System }
+            );
+            dbContext.SaveChanges();
+        }
     }
 
     // ── Core seeding logic ────────────────────────────────────────────────────
 
     private static void SeedDivision(AppDbContext dbContext, DivisionSeed divSeed, DateTime now)
     {
+        // ── Division ──────────────────────────────────────────────────────────
         var division = new Division
         {
             Code = divSeed.Code,
@@ -41,8 +169,9 @@ public static class AuditDbInitializer
             CreatedBy = System
         };
         dbContext.Divisions.Add(division);
-        dbContext.SaveChanges();
+        dbContext.SaveChanges(); // need division.Id
 
+        // ── Template ──────────────────────────────────────────────────────────
         var template = new AuditTemplate
         {
             Name = $"{divSeed.Name} Compliance Audit",
@@ -51,8 +180,9 @@ public static class AuditDbInitializer
             CreatedBy = System
         };
         dbContext.AuditTemplates.Add(template);
-        dbContext.SaveChanges();
+        dbContext.SaveChanges(); // need template.Id
 
+        // ── Version ───────────────────────────────────────────────────────────
         var version = new AuditTemplateVersion
         {
             TemplateId = template.Id,
@@ -64,65 +194,76 @@ public static class AuditDbInitializer
             CreatedBy = System
         };
         dbContext.AuditTemplateVersions.Add(version);
-        dbContext.SaveChanges();
+        dbContext.SaveChanges(); // need version.Id
 
-        int sectionOrder = 1;
-        foreach (var (sectionName, questions) in divSeed.Sections)
-        {
-            if (questions.Length == 0) continue;
-
-            var section = new AuditSection
+        // ── Sections (batch) ──────────────────────────────────────────────────
+        var activeSections = divSeed.Sections
+            .Where(s => s.Questions.Length > 0)
+            .Select((s, i) => new AuditSection
             {
                 TemplateVersionId = version.Id,
-                Name = sectionName,
-                DisplayOrder = sectionOrder++,
+                Name = s.Name,
+                DisplayOrder = i + 1,
                 CreatedAt = now,
                 CreatedBy = System
-            };
-            dbContext.AuditSections.Add(section);
-            dbContext.SaveChanges();
+            }).ToList();
 
-            int qOrder = 1;
-            foreach (var qText in questions)
-            {
-                var question = new AuditQuestion
+        dbContext.AuditSections.AddRange(activeSections);
+        dbContext.SaveChanges(); // need section IDs
+
+        // ── Questions + VersionQuestions (batch per section) ──────────────────
+        var sectionLookup = activeSections
+            .Zip(divSeed.Sections.Where(s => s.Questions.Length > 0), (entity, seed) => (entity, seed))
+            .ToList();
+
+        var allVersionQuestions = new List<AuditVersionQuestion>();
+
+        foreach (var (sectionEntity, sectionSeed) in sectionLookup)
+        {
+            // Batch all question inserts for this section
+            var questions = sectionSeed.Questions
+                .Select(qText => new AuditQuestion
                 {
                     QuestionText = qText,
                     IsArchived = false,
                     CreatedAt = now,
                     CreatedBy = System
-                };
-                dbContext.AuditQuestions.Add(question);
-                dbContext.SaveChanges();
+                }).ToList();
 
-                dbContext.AuditVersionQuestions.Add(new AuditVersionQuestion
+            dbContext.AuditQuestions.AddRange(questions);
+            dbContext.SaveChanges(); // need question IDs
+
+            // Build version-question links
+            for (int i = 0; i < questions.Count; i++)
+            {
+                allVersionQuestions.Add(new AuditVersionQuestion
                 {
                     TemplateVersionId = version.Id,
-                    SectionId = section.Id,
-                    QuestionId = question.Id,
-                    DisplayOrder = qOrder++,
+                    SectionId = sectionEntity.Id,
+                    QuestionId = questions[i].Id,
+                    DisplayOrder = i + 1,
                     AllowNA = true,
                     RequireCommentOnNC = true,
                     IsScoreable = true,
                     CreatedAt = now,
                     CreatedBy = System
                 });
-                dbContext.SaveChanges();
             }
         }
 
-        foreach (var email in divSeed.Emails)
+        // ── Email routing + VersionQuestions (single batch SaveChanges) ────────
+        dbContext.AuditVersionQuestions.AddRange(allVersionQuestions);
+
+        dbContext.EmailRoutingRules.AddRange(divSeed.Emails.Select(email => new EmailRoutingRule
         {
-            dbContext.EmailRoutingRules.Add(new EmailRoutingRule
-            {
-                DivisionId = division.Id,
-                EmailAddress = email,
-                IsActive = true,
-                CreatedAt = now,
-                CreatedBy = System
-            });
-        }
-        dbContext.SaveChanges();
+            DivisionId = division.Id,
+            EmailAddress = email,
+            IsActive = true,
+            CreatedAt = now,
+            CreatedBy = System
+        }));
+
+        dbContext.SaveChanges(); // version questions + email rules together
     }
 
     // ── Shared review recipients (added to every division) ────────────────────

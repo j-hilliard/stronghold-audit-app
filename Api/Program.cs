@@ -2,8 +2,10 @@ using System.Diagnostics;
 using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Identity.Client;
 using Microsoft.Identity.Web;
+using Microsoft.Extensions.Logging.EventLog;
 using NSwag;
 using NSwag.AspNetCore;
 using NSwag.Generation.Processors.Security;
@@ -20,6 +22,15 @@ string clientId = "619f5cca-8c0c-465c-8cfc-25427697f82c";
 var builder = WebApplication.CreateBuilder(args);
 var environment = builder.Environment.EnvironmentName;
 var isLocal = builder.Environment.IsEnvironment("Local");
+
+if (isLocal)
+{
+    // Avoid Windows EventLog write permission issues in local dev sessions.
+    builder.Logging.ClearProviders();
+    builder.Logging.AddConsole();
+    builder.Logging.AddDebug();
+    builder.Logging.AddFilter<EventLogLoggerProvider>(_ => false);
+}
 
 #pragma warning disable ASP0013
 builder.Host.ConfigureAppConfiguration(configurationBuilder =>
@@ -188,10 +199,13 @@ builder.Services.AddDbContextFactory<AppDbContext>(options =>
         .UseSqlServer(
             builder.Configuration.GetConnectionString("SqlDb"),
             providerOptions =>
-                providerOptions
-                    .EnableRetryOnFailure()
-                    .UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)
+            {
+                if (!isLocal)
+                    providerOptions.EnableRetryOnFailure();
+                providerOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+            }
         )
+        .ConfigureWarnings(warnings => warnings.Ignore(CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning))
         .EnableSensitiveDataLogging()
 );
 #else
@@ -199,10 +213,12 @@ builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("SqlDb"),
         providerOptions =>
-            providerOptions
-                .EnableRetryOnFailure()
-                .UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)
-    )
+        {
+            if (!isLocal)
+                providerOptions.EnableRetryOnFailure();
+            providerOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+        }
+    ).ConfigureWarnings(warnings => warnings.Ignore(CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning))
 );
 #endif
 
@@ -257,7 +273,7 @@ if (!AppConfigExtensions.IsRunningForNswagCodegen())
 
     if (app.Environment.IsEnvironment("Local") || app.Environment.IsDevelopment())
     {
-        context.Database.EnsureCreated();
+        context.Database.Migrate();
         DbInitializer.Initialize(context);
     }
     else if (app.Environment.IsProduction())
@@ -267,7 +283,9 @@ if (!AppConfigExtensions.IsRunningForNswagCodegen())
 }
 
 app.UseCors(policyBuilder => policyBuilder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
-app.UseHttpsRedirection();
+// Skip HTTPS redirect in Local dev — Vite proxy uses plain HTTP to avoid OpenSSL cert issues
+if (!isLocal)
+    app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

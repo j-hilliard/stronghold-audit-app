@@ -8,11 +8,13 @@ public static class DbInitializer
     public static void Initialize(AppDbContext dbContext, bool isProductionEnvironment = false)
     {
         SeedUserRoles(dbContext);
+        SeedAuditRoles(dbContext);
         SeedDefaultLocalUser(dbContext);
         SeedReferenceData(dbContext);
         SeedCompaniesRegionsAndSeverities(dbContext);
         SeedTestIncidents(dbContext);
         AuditDbInitializer.SeedAuditData(dbContext);
+        AuditDemoDataSeeder.SeedDemoAudits(dbContext);
     }
 
     private const string AdministratorRoleDescription =
@@ -62,6 +64,32 @@ public static class DbInitializer
                 dbContext.SaveChanges();
             }
         }
+    }
+
+    /// <summary>
+    /// Idempotent upsert of audit-specific roles. Safe to run after initial seeding because
+    /// it checks per-role rather than using an Any() bail-out.
+    /// </summary>
+    private static void SeedAuditRoles(AppDbContext dbContext)
+    {
+        var auditRoles = new[]
+        {
+            (Shared.Enumerations.AuthorizationRoles.TemplateAdmin,          "Audit Template Admin — create, edit, and publish audit templates. Cannot manage users."),
+            (Shared.Enumerations.AuthorizationRoles.AuditManager,           "Audit Manager — view and finalize audits in assigned divisions, manage corrective actions, run reports."),
+            (Shared.Enumerations.AuthorizationRoles.AuditReviewer,          "Audit Reviewer — read-only access to submitted audits and reports. Cannot edit templates or audits."),
+            (Shared.Enumerations.AuthorizationRoles.CorrectiveActionOwner,  "Corrective Action Owner — update and close assigned corrective actions only."),
+            (Shared.Enumerations.AuthorizationRoles.ReadOnlyViewer,         "Read-Only Viewer — search, view, and export audits. No edit rights."),
+            (Shared.Enumerations.AuthorizationRoles.ExecutiveViewer,        "Executive Viewer — access KPI dashboards and summary reports only."),
+        };
+
+        foreach (var (name, description) in auditRoles)
+        {
+            if (!dbContext.Roles.Any(r => r.Name == name))
+            {
+                dbContext.Roles.Add(new Role { Name = name, Description = description });
+            }
+        }
+        dbContext.SaveChanges();
     }
 
     private static void SeedDefaultLocalUser(AppDbContext dbContext)

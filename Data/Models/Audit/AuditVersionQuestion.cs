@@ -24,6 +24,9 @@ public class AuditVersionQuestion : AuditableEntity
     /// <summary>Does this question count toward the conformance score?</summary>
     public bool IsScoreable { get; set; } = true;
 
+    /// <summary>Per-version weight override. Null means use AuditQuestion.Weight.</summary>
+    public decimal? Weight { get; set; }
+
     // Navigation
     public AuditTemplateVersion TemplateVersion { get; set; } = null!;
     public AuditSection Section { get; set; } = null!;

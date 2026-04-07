@@ -34,6 +34,9 @@ Welcome! This guide is intended for developers working on this application. It p
 - [Development Workflow](./docs/workflow.md)  
   Overview of our Git branching strategy, pull request process, and deployment practices.
 
+- [Audit Template Engine Requirements](./docs/requirements/audit-template-engine-requirements.md)  
+  Product requirements for versioned templates, drag/drop admin, KPI reporting, and scoped visibility.
+
 ---
 
 ## 👩‍💻 Team Onboarding
@@ -66,6 +69,9 @@ This repository runs with a QA-first gate model:
 - Gate runner script: `Scripts/qa/Invoke-QAGate.ps1`
 - Playwright gate commands: `webapp/package.json` (`qa:baseline`, `qa:full`, `qa:pr`, `qa:premerge`, `qa:prerelease`)
 - Button contract coverage tests: `webapp/tests/e2e/button-contract.spec.ts`
+- Feature-gated audit contracts:
+  - `webapp/tests/e2e/audit-template-admin-contract.spec.ts` (`PW_AUDIT_TEMPLATE_GATE=true`)
+  - `webapp/tests/e2e/audit-kpi-reporting-contract.spec.ts` (`PW_AUDIT_REPORTING_GATE=true`)
 
 Run baseline gate locally:
 
