@@ -10,9 +10,10 @@ public static class DbInitializer
         SeedUserRoles(dbContext);
         SeedAuditRoles(dbContext);
         SeedDefaultLocalUser(dbContext);
-        SeedReferenceData(dbContext);
-        SeedCompaniesRegionsAndSeverities(dbContext);
-        SeedTestIncidents(dbContext);
+        // Safety-module seeders — skip gracefully if the safety schema is not present in this DB
+        try { SeedReferenceData(dbContext); } catch (Exception) { }
+        try { SeedCompaniesRegionsAndSeverities(dbContext); } catch (Exception) { }
+        try { SeedTestIncidents(dbContext); } catch (Exception) { }
         AuditDbInitializer.SeedAuditData(dbContext);
         AuditDemoDataSeeder.SeedDemoAudits(dbContext);
     }

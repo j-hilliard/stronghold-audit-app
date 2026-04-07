@@ -15,6 +15,14 @@
                 @click="exportCsv"
             />
             <Button
+                label="Report Composer"
+                icon="pi pi-file-edit"
+                severity="secondary"
+                outlined
+                size="small"
+                @click="router.push('/audit-management/reports/composer')"
+            />
+            <Button
                 label="Quarterly Summary"
                 icon="pi pi-print"
                 severity="secondary"
@@ -36,6 +44,7 @@
                 class="w-44"
                 :show-clear="!!filterDivisionId"
                 @change="loadReport"
+                data-testid="report-filter-division"
             />
             <Dropdown
                 v-model="filterStatus"
@@ -46,6 +55,7 @@
                 class="w-40"
                 :show-clear="!!filterStatus"
                 @change="loadReport"
+                data-testid="report-filter-status"
             />
             <Calendar
                 v-model="filterDateFrom"
@@ -55,6 +65,7 @@
                 :show-clear="!!filterDateFrom"
                 @date-select="loadReport"
                 @clear-click="loadReport"
+                data-testid="report-filter-from"
             />
             <Calendar
                 v-model="filterDateTo"
@@ -64,7 +75,20 @@
                 :show-clear="!!filterDateTo"
                 @date-select="loadReport"
                 @clear-click="loadReport"
+                data-testid="report-filter-to"
             />
+            <div class="border-l border-slate-600 pl-3 flex items-center gap-2">
+                <span class="text-xs text-slate-400 whitespace-nowrap">Compare vs:</span>
+                <Dropdown
+                    v-model="compareAgainst"
+                    :options="compareOptions"
+                    option-label="label"
+                    option-value="value"
+                    placeholder="None"
+                    class="w-40"
+                    data-testid="report-filter-compare"
+                />
+            </div>
         </div>
 
         <div v-if="loading" class="flex justify-center py-16">
@@ -76,7 +100,7 @@
             <!-- KPI cards — row 1 -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <!-- Total Audits -->
-                <div class="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center">
+                <div class="bg-slate-800 border border-slate-700 rounded-lg p-4 text-center" data-testid="report-kpi-total-audits">
                     <div class="text-3xl font-bold text-white">{{ report.totalAudits }}</div>
                     <div class="text-xs text-slate-400 mt-1">Total Audits</div>
                     <div v-if="trendDeltas.auditCountDelta !== null" class="text-xs mt-1"
@@ -98,7 +122,7 @@
                     </div>
                 </div>
                 <!-- Non-Conformances -->
-                <div class="bg-slate-800 border border-red-900/50 rounded-lg p-4 text-center">
+                <div class="bg-slate-800 border border-red-900/50 rounded-lg p-4 text-center" data-testid="report-kpi-nc-count">
                     <div class="text-3xl font-bold text-red-400">{{ report.totalNonConforming }}</div>
                     <div class="text-xs text-slate-400 mt-1">Non-Conformances</div>
                     <div v-if="trendDeltas.ncDelta !== null" class="text-xs mt-1"
@@ -108,7 +132,7 @@
                     </div>
                 </div>
                 <!-- Warnings -->
-                <div class="bg-slate-800 border border-amber-900/50 rounded-lg p-4 text-center">
+                <div class="bg-slate-800 border border-amber-900/50 rounded-lg p-4 text-center" data-testid="report-kpi-warning-count">
                     <div class="text-3xl font-bold text-amber-400">{{ report.totalWarnings }}</div>
                     <div class="text-xs text-slate-400 mt-1">Warnings</div>
                     <div v-if="trendDeltas.warnDelta !== null" class="text-xs mt-1"
@@ -135,7 +159,7 @@
                     </div>
                 </div>
                 <!-- CA aging -->
-                <div class="bg-slate-800 border border-slate-700 rounded-lg p-4 flex items-center gap-4">
+                <div class="bg-slate-800 border border-slate-700 rounded-lg p-4 flex items-center gap-4" data-testid="report-kpi-overdue-corrective-actions">
                     <div class="text-3xl font-bold"
                         :class="caAgingStats.overdueCount > 0 ? 'text-red-400' : 'text-emerald-400'">
                         {{ caAgingStats.overdueCount }}
@@ -147,6 +171,47 @@
                             Avg {{ caAgingStats.avgDaysOpen }} days open
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Per-section KPI cards -->
+            <div v-if="sectionKpiCards.length > 0" class="space-y-2">
+                <div class="flex items-center gap-3 px-1">
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Findings Per Audit — by Section</div>
+                    <button
+                        v-if="filterSection"
+                        @click="clearSectionFilter"
+                        data-testid="report-section-clear"
+                        class="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-600/20 border border-blue-500/40 text-blue-300 hover:bg-blue-600/30 transition-colors"
+                    >
+                        <i class="pi pi-times text-xs" />
+                        Clear: {{ filterSection }}
+                    </button>
+                </div>
+                <div class="grid gap-2" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));">
+                    <button
+                        v-for="card in sectionKpiCards"
+                        :key="card.name"
+                        @click="toggleSectionFilter(card.name)"
+                        :title="card.name"
+                        :data-testid="`report-section-card-${card.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`"
+                        :class="[
+                            'rounded-lg p-3 border text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 flex flex-col',
+                            filterSection === card.name
+                                ? 'bg-blue-900/40 border-blue-500 ring-1 ring-blue-500/60'
+                                : 'bg-slate-800 border-slate-700 hover:border-slate-500',
+                            sectionRateBorder(card.rate, filterSection === card.name),
+                        ]"
+                    >
+                        <div :class="['text-xl font-bold', sectionRateColor(card.rate)]">
+                            {{ card.rate.toFixed(2) }}
+                        </div>
+                        <div class="text-xs text-slate-400 mt-0.5">NCs / audit</div>
+                        <div class="text-xs text-slate-200 mt-1.5 font-medium leading-tight line-clamp-2 flex-1">
+                            {{ card.shortName }}
+                        </div>
+                        <div class="text-xs text-slate-500 mt-0.5">{{ card.ncCount }} NCs</div>
+                    </button>
                 </div>
             </div>
 
@@ -168,21 +233,42 @@
             <!-- Trend chart -->
             <Card v-if="report.trend.length > 0">
                 <template #title>
-                    <span class="text-base font-semibold text-white">Conformance Trend (Last 12 Weeks)</span>
+                    <div class="flex items-center justify-between w-full">
+                        <span class="text-base font-semibold text-white">Conformance Trend (Last 12 Weeks)</span>
+                        <div class="flex rounded overflow-hidden border border-slate-600 text-xs">
+                            <button
+                                :class="['px-2 py-0.5 transition-colors', chartTypes.conformance === 'bar' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white']"
+                                @click="chartTypes.conformance = 'bar'">Bar</button>
+                            <button
+                                :class="['px-2 py-0.5 transition-colors', chartTypes.conformance === 'line' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white']"
+                                @click="chartTypes.conformance = 'line'">Line</button>
+                        </div>
+                    </div>
                 </template>
                 <template #content>
-                    <Chart type="bar" :data="chartData" :options="chartOptions" style="height: 280px;" />
+                    <Chart :type="chartTypes.conformance" :key="chartTypes.conformance" :data="chartData" :options="chartOptions" style="height: 280px;" />
                 </template>
             </Card>
 
             <!-- NC by Section chart -->
             <Card v-if="(report.sectionBreakdown?.length ?? 0) > 0">
                 <template #title>
-                    <span class="text-base font-semibold text-white">Non-Conformances by Section</span>
+                    <div class="flex items-center justify-between w-full">
+                        <span class="text-base font-semibold text-white">Non-Conformances by Section</span>
+                        <div class="flex rounded overflow-hidden border border-slate-600 text-xs">
+                            <button
+                                :class="['px-2 py-0.5 transition-colors', chartTypes.ncSection === 'bar' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white']"
+                                @click="chartTypes.ncSection = 'bar'">Bar</button>
+                            <button
+                                :class="['px-2 py-0.5 transition-colors', chartTypes.ncSection === 'line' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white']"
+                                @click="chartTypes.ncSection = 'line'">Line</button>
+                        </div>
+                    </div>
                 </template>
                 <template #content>
                     <Chart
-                        type="bar"
+                        :type="chartTypes.ncSection"
+                        :key="chartTypes.ncSection"
                         :data="ncCategoryChartData"
                         :options="ncCategoryChartOptions"
                         :style="`height: ${Math.max(160, (report.sectionBreakdown?.length ?? 0) * 36)}px;`"
@@ -276,10 +362,20 @@
             <!-- Quarterly trend chart -->
             <Card v-if="quarterlyTrendData.length > 1">
                 <template #title>
-                    <span class="text-base font-semibold text-white">Quarterly Conformance Trend</span>
+                    <div class="flex items-center justify-between w-full">
+                        <span class="text-base font-semibold text-white">Quarterly Conformance Trend</span>
+                        <div class="flex rounded overflow-hidden border border-slate-600 text-xs">
+                            <button
+                                :class="['px-2 py-0.5 transition-colors', chartTypes.quarterly === 'bar' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white']"
+                                @click="chartTypes.quarterly = 'bar'">Bar</button>
+                            <button
+                                :class="['px-2 py-0.5 transition-colors', chartTypes.quarterly === 'line' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white']"
+                                @click="chartTypes.quarterly = 'line'">Line</button>
+                        </div>
+                    </div>
                 </template>
                 <template #content>
-                    <Chart type="line" :data="quarterlyChartData" :options="quarterlyChartOptions" style="height: 260px;" />
+                    <Chart :type="chartTypes.quarterly" :key="chartTypes.quarterly" :data="quarterlyChartData" :options="quarterlyChartOptions" style="height: 260px;" />
                 </template>
             </Card>
 
@@ -331,7 +427,11 @@
                         :sortOrder="-1"
                         class="text-sm"
                     >
-                        <Column field="id" header="#" style="width:60px" sortable />
+                        <Column field="id" header="#" style="width:60px" sortable>
+                            <template #body="{ data }">
+                                <span data-testid="report-grid-row">{{ data.id }}</span>
+                            </template>
+                        </Column>
                         <Column field="divisionCode" header="Division" sortable />
                         <Column field="auditDate" header="Date" sortable>
                             <template #body="{ data }">{{ data.auditDate ?? '—' }}</template>
@@ -388,8 +488,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import Card from 'primevue/card';
 import Chart from 'primevue/chart';
 import DataTable from 'primevue/datatable';
@@ -405,6 +505,7 @@ import { useApiStore } from '@/stores/apiStore';
 import { AuditClient, type AuditReportDto } from '@/apiclient/auditClient';
 
 const router = useRouter();
+const route = useRoute();
 const store = useAuditStore();
 const apiStore = useApiStore();
 
@@ -414,12 +515,62 @@ const filterDivisionId = ref<number | null>(null);
 const filterStatus = ref<string | null>(null);
 const filterDateFrom = ref<Date | null>(null);
 const filterDateTo = ref<Date | null>(null);
+const filterSection = ref<string | null>((route.query.section as string) || null);
 
 const STATUS_OPTIONS = [
     { label: 'Submitted', value: 'Submitted' },
     { label: 'Closed', value: 'Closed' },
     { label: 'Draft', value: 'Draft' },
 ];
+
+// ── Chart type toggles (persisted to localStorage) ────────────────────────────
+
+type ChartKind = 'bar' | 'line';
+const chartTypes = ref<{ conformance: ChartKind; quarterly: ChartKind; ncSection: ChartKind }>(
+    (() => { try { return JSON.parse(localStorage.getItem('report-chart-types') ?? '') as any; } catch { return null; } })()
+    ?? { conformance: 'bar', quarterly: 'line', ncSection: 'bar' }
+);
+watch(chartTypes, val => localStorage.setItem('report-chart-types', JSON.stringify(val)), { deep: true });
+
+// ── Compare Against ───────────────────────────────────────────────────────────
+
+const compareAgainst = ref<null | 'company' | number>(null);
+const compareReport = ref<AuditReportDto | null>(null);
+
+const compareOptions = computed(() => [
+    { label: 'None', value: null },
+    { label: 'Company Average', value: 'company' as 'company' },
+    ...store.divisions
+        .filter(d => d.id !== filterDivisionId.value)
+        .map(d => ({ label: d.code, value: d.id as number })),
+]);
+
+const primaryLabel = computed(() =>
+    filterDivisionId.value
+        ? (store.divisions.find(d => d.id === filterDivisionId.value)?.code ?? 'Selected')
+        : 'All Divisions'
+);
+
+const compareLabel = computed(() => {
+    if (!compareAgainst.value) return '';
+    if (compareAgainst.value === 'company') return 'Company Avg';
+    return store.divisions.find(d => d.id === compareAgainst.value)?.code ?? 'Compare';
+});
+
+async function loadCompareReport() {
+    if (!compareAgainst.value) { compareReport.value = null; return; }
+    // Comparing "All Divisions" against "Company Average" would load identical data — skip
+    if (compareAgainst.value === 'company' && !filterDivisionId.value) {
+        compareReport.value = null;
+        return;
+    }
+    const from = filterDateFrom.value ? filterDateFrom.value.toISOString().split('T')[0] : null;
+    const to = filterDateTo.value ? filterDateTo.value.toISOString().split('T')[0] : null;
+    const divId = compareAgainst.value === 'company' ? null : compareAgainst.value as number;
+    compareReport.value = await getClient().getAuditReport(divId, filterStatus.value, from, to);
+}
+
+watch(compareAgainst, loadCompareReport);
 
 function getClient() {
     return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
@@ -435,10 +586,29 @@ async function loadReport() {
             filterStatus.value,
             from,
             to,
+            filterSection.value,
         );
+        await loadCompareReport();
     } finally {
         loading.value = false;
     }
+}
+
+function toggleSectionFilter(sectionName: string) {
+    filterSection.value = filterSection.value === sectionName ? null : sectionName;
+    const q = { ...route.query };
+    if (filterSection.value) q.section = filterSection.value;
+    else delete q.section;
+    router.replace({ query: q });
+    loadReport();
+}
+
+function clearSectionFilter() {
+    filterSection.value = null;
+    const q = { ...route.query };
+    delete q.section;
+    router.replace({ query: q });
+    loadReport();
 }
 
 onMounted(async () => {
@@ -487,6 +657,7 @@ function openQSummary() {
     const quarter = Math.ceil((now.getMonth() + 1) / 3);
     window.open(`/audit-management/reports/quarterly-summary?divisionId=${divId}&year=${year}&quarter=${quarter}`, '_blank');
 }
+
 
 // ── Item 2: KPI trend deltas ──────────────────────────────────────────────────
 
@@ -610,41 +781,66 @@ function statusSeverity(status: string): string {
 }
 
 const chartData = computed(() => {
-    const t = report.value?.trend ?? [];
+    const primary = report.value?.trend ?? [];
+    const compare = compareReport.value?.trend ?? [];
+    const isLine = chartTypes.value.conformance === 'line';
+
+    function scoreBarColors(t: typeof primary, alpha: boolean) {
+        return t.map(p => p.avgScore == null ? `rgba(100,116,139,${alpha ? '0.5' : '1'})`
+            : p.avgScore >= 90 ? `rgba(16,185,129,${alpha ? '0.7' : '1'})`
+            : p.avgScore >= 75 ? `rgba(245,158,11,${alpha ? '0.7' : '1'})`
+            : `rgba(239,68,68,${alpha ? '0.7' : '1'})`);
+    }
+
+    if (!compareReport.value) {
+        return {
+            labels: primary.map(p => p.week),
+            datasets: [{
+                label: primaryLabel.value,
+                data: primary.map(p => p.avgScore),
+                backgroundColor: isLine ? 'rgba(99,102,241,0.15)' : scoreBarColors(primary, true),
+                borderColor: isLine ? '#6366f1' : scoreBarColors(primary, false),
+                borderWidth: isLine ? 2 : 1,
+                borderRadius: isLine ? 0 : 4,
+                pointRadius: isLine ? 4 : 0,
+                tension: isLine ? 0.3 : 0,
+                fill: isLine,
+            }],
+        };
+    }
+
+    const allWeeks = [...new Set([...primary.map(p => p.week), ...compare.map(p => p.week)])].sort();
     return {
-        labels: t.map(p => p.week),
-        datasets: [{
-            label: 'Avg Score %',
-            data: t.map(p => p.avgScore),
-            backgroundColor: t.map(p =>
-                p.avgScore == null ? 'rgba(100,116,139,0.5)'
-                : p.avgScore >= 90 ? 'rgba(16,185,129,0.7)'
-                : p.avgScore >= 75 ? 'rgba(245,158,11,0.7)'
-                : 'rgba(239,68,68,0.7)',
-            ),
-            borderColor: t.map(p =>
-                p.avgScore == null ? '#64748b'
-                : p.avgScore >= 90 ? '#10b981'
-                : p.avgScore >= 75 ? '#f59e0b'
-                : '#ef4444',
-            ),
-            borderWidth: 1,
-            borderRadius: 4,
-        }],
+        labels: allWeeks,
+        datasets: [
+            {
+                label: primaryLabel.value,
+                data: allWeeks.map(w => primary.find(p => p.week === w)?.avgScore ?? null),
+                borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.15)',
+                borderWidth: 2.5, pointRadius: 5, tension: 0.3, fill: false, spanGaps: true,
+            },
+            {
+                label: compareLabel.value,
+                data: allWeeks.map(w => compare.find(p => p.week === w)?.avgScore ?? null),
+                borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)',
+                borderWidth: 2, pointRadius: 4, tension: 0.3, fill: false, spanGaps: true,
+                borderDash: [6, 3],
+            },
+        ],
     };
 });
 
-const chartOptions = {
+const chartOptions = computed(() => ({
     responsive: true, maintainAspectRatio: false,
     plugins: {
-        legend: { display: false },
+        legend: { display: !!compareReport.value, labels: { color: '#94a3b8' } },
         tooltip: { callbacks: { label: (ctx: { raw: number | null }) => ctx.raw != null ? `${ctx.raw}%` : 'No data' } },
     },
     scales: {
         y: { min: 0, max: 100, ticks: { color: '#94a3b8', callback: (v: number) => `${v}%` }, grid: { color: 'rgba(100,116,139,0.2)' } },
         x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(100,116,139,0.1)' } },
     },
-};
+}));
 
 const divisionStats = computed(() => {
     const map = new Map<string, { scores: number[]; ncs: number; count: number }>();
@@ -710,31 +906,79 @@ const quarterlyTrendData = computed(() => {
         }));
 });
 
-const quarterlyChartData = computed(() => ({
-    labels: quarterlyTrendData.value.map(p => p.quarter),
-    datasets: [{
-        label: 'Avg Score %',
-        data: quarterlyTrendData.value.map(p => p.avgScore),
-        borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.15)',
-        borderWidth: 2, pointRadius: 5,
-        pointBackgroundColor: quarterlyTrendData.value.map(p =>
-            p.avgScore >= 90 ? '#10b981' : p.avgScore >= 75 ? '#f59e0b' : '#ef4444',
-        ),
-        tension: 0.3, fill: true,
-    }],
-}));
+const compareQuarterlyTrendData = computed(() => {
+    if (!compareReport.value) return [] as { quarter: string; avgScore: number; count: number }[];
+    const byQuarter = new Map<string, number[]>();
+    for (const row of compareReport.value.rows) {
+        if (!row.auditDate || row.scorePercent == null) continue;
+        const d = new Date(row.auditDate);
+        const q = Math.ceil((d.getMonth() + 1) / 3);
+        const key = `${d.getFullYear()} Q${q}`;
+        if (!byQuarter.has(key)) byQuarter.set(key, []);
+        byQuarter.get(key)!.push(row.scorePercent);
+    }
+    return Array.from(byQuarter.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([quarter, scores]) => ({
+            quarter,
+            avgScore: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length * 10) / 10,
+            count: scores.length,
+        }));
+});
 
-const quarterlyChartOptions = {
+const quarterlyChartData = computed(() => {
+    const primary = quarterlyTrendData.value;
+    const compare = compareQuarterlyTrendData.value;
+    const isLine = chartTypes.value.quarterly === 'line';
+
+    if (!compareReport.value) {
+        return {
+            labels: primary.map(p => p.quarter),
+            datasets: [{
+                label: primaryLabel.value,
+                data: primary.map(p => p.avgScore),
+                borderColor: '#6366f1', backgroundColor: isLine ? 'rgba(99,102,241,0.15)' : primary.map(p =>
+                    p.avgScore >= 90 ? 'rgba(16,185,129,0.7)' : p.avgScore >= 75 ? 'rgba(245,158,11,0.7)' : 'rgba(239,68,68,0.7)'),
+                borderWidth: 2,
+                pointRadius: isLine ? 5 : 0,
+                pointBackgroundColor: primary.map(p => p.avgScore >= 90 ? '#10b981' : p.avgScore >= 75 ? '#f59e0b' : '#ef4444'),
+                tension: 0.3, fill: isLine, borderRadius: isLine ? 0 : 4,
+            }],
+        };
+    }
+
+    const allQuarters = [...new Set([...primary.map(p => p.quarter), ...compare.map(p => p.quarter)])].sort();
+    return {
+        labels: allQuarters,
+        datasets: [
+            {
+                label: primaryLabel.value,
+                data: allQuarters.map(q => primary.find(p => p.quarter === q)?.avgScore ?? null),
+                borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.15)', spanGaps: true,
+                borderWidth: 2, pointRadius: 5, tension: 0.3, fill: true,
+            },
+            {
+                label: compareLabel.value,
+                data: allQuarters.map(q => compare.find(p => p.quarter === q)?.avgScore ?? null),
+                borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)',
+                borderWidth: 2, pointRadius: 5, tension: 0.3, fill: true, spanGaps: true,
+                borderDash: [6, 3],
+            },
+        ],
+    };
+});
+
+const quarterlyChartOptions = computed(() => ({
     responsive: true, maintainAspectRatio: false,
     plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: (ctx: { raw: number; dataIndex: number }) => { const pt = quarterlyTrendData.value[ctx.dataIndex]; return `${ctx.raw}%  (${pt?.count} audit${pt?.count !== 1 ? 's' : ''})`; } } },
+        legend: { display: !!compareReport.value, labels: { color: '#94a3b8' } },
+        tooltip: { callbacks: { label: (ctx: { raw: number; dataIndex: number }) => `${ctx.raw}%` } },
     },
     scales: {
         y: { min: 0, max: 100, ticks: { color: '#94a3b8', callback: (v: number) => `${v}%` }, grid: { color: 'rgba(100,116,139,0.2)' } },
         x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(100,116,139,0.1)' } },
     },
-};
+}));
 
 const auditorStats = computed(() => {
     const map = new Map<string, { scores: number[]; ncs: number; warnings: number }>();
@@ -759,19 +1003,107 @@ const auditorStats = computed(() => {
 });
 
 const ncCategoryChartData = computed(() => {
-    const bd = report.value?.sectionBreakdown ?? [] as { sectionName: string; ncCount: number }[];
+    const primary = report.value?.sectionBreakdown ?? [] as { sectionName: string; ncCount: number }[];
+    const compare = compareReport.value?.sectionBreakdown;
+    const isLine = chartTypes.value.ncSection === 'line';
+
+    if (!compare) {
+        return {
+            labels: primary.map(x => x.sectionName),
+            datasets: [{
+                label: 'Non-Conformances',
+                data: primary.map(x => x.ncCount),
+                backgroundColor: 'rgba(239,68,68,0.7)', borderColor: '#ef4444',
+                borderWidth: 1, borderRadius: isLine ? 0 : 4,
+            }],
+        };
+    }
+
+    // Comparison: normalize to findings-per-audit rate
+    const pTotal = report.value?.totalAudits || 1;
+    const cTotal = compareReport.value?.totalAudits || 1;
+    const allSections = [...new Set([...primary.map(x => x.sectionName), ...compare.map(x => x.sectionName)])];
     return {
-        labels: bd.map(x => x.sectionName),
-        datasets: [{ label: 'Non-Conformances', data: bd.map(x => x.ncCount), backgroundColor: 'rgba(239,68,68,0.7)', borderColor: '#ef4444', borderWidth: 1, borderRadius: 4 }],
+        labels: allSections,
+        datasets: [
+            {
+                label: primaryLabel.value,
+                data: allSections.map(s => {
+                    const item = primary.find(x => x.sectionName === s);
+                    return item ? Math.round(item.ncCount / pTotal * 100) / 100 : 0;
+                }),
+                backgroundColor: 'rgba(99,102,241,0.7)', borderColor: '#6366f1',
+                borderWidth: 1, borderRadius: isLine ? 0 : 4,
+            },
+            {
+                label: compareLabel.value,
+                data: allSections.map(s => {
+                    const item = compare.find(x => x.sectionName === s);
+                    return item ? Math.round(item.ncCount / cTotal * 100) / 100 : 0;
+                }),
+                backgroundColor: 'rgba(245,158,11,0.7)', borderColor: '#f59e0b',
+                borderWidth: 1, borderRadius: isLine ? 0 : 4,
+            },
+        ],
     };
 });
 
-const ncCategoryChartOptions = {
-    indexAxis: 'y' as const, responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx: { raw: number }) => `${ctx.raw} NCs` } } },
+// ── Per-section KPI cards ─────────────────────────────────────────────────────
+
+const SECTION_SHORT: Record<string, string> = {
+    'Personal Protective Equipment': 'PPE',
+    'Equipment & Equipment Inspection': 'Equipment',
+    'Job Site & Confined Space Condition': 'Job Site / CSE',
+    'Sign-In / Sign-Out Rosters - Toolbox Safety': 'Sign-In / Toolbox',
+    'Lock-Out / Tag-Out': 'LOTO',
+    'Culture / Attitudes': 'Culture',
+    'Training / Dispatch': 'Training',
+    'Daily Job Logs': 'Daily Logs',
+    'QA / QC Documentation': 'QA / QC',
+};
+
+const sectionKpiCards = computed(() => {
+    if (!report.value || report.value.totalAudits === 0) return [];
+    const total = report.value.totalAudits;
+    return report.value.sectionBreakdown
+        .map(s => ({
+            name: s.sectionName,
+            shortName: SECTION_SHORT[s.sectionName] ?? s.sectionName,
+            ncCount: s.ncCount,
+            rate: Math.round(s.ncCount / total * 100) / 100,
+        }))
+        .sort((a, b) => b.rate - a.rate);
+});
+
+function sectionRateColor(rate: number): string {
+    if (rate === 0) return 'text-emerald-400';
+    if (rate < 0.2) return 'text-yellow-400';
+    if (rate < 0.5) return 'text-amber-400';
+    return 'text-red-400';
+}
+function sectionRateBorder(rate: number, isActive = false): string {
+    if (isActive) return ''; // active state handled by the parent class binding
+    if (rate === 0) return 'border-slate-700';
+    if (rate < 0.2) return 'border-yellow-900/50';
+    if (rate < 0.5) return 'border-amber-900/50';
+    return 'border-red-900/50';
+}
+
+const ncCategoryChartOptions = computed(() => ({
+    indexAxis: (chartTypes.value.ncSection === 'line' ? 'x' : 'y') as 'x' | 'y',
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+        legend: { display: !!compareReport.value, labels: { color: '#94a3b8' } },
+        tooltip: {
+            callbacks: {
+                label: (ctx: { raw: number }) =>
+                    compareReport.value ? `${ctx.raw.toFixed(2)} NCs/audit` : `${ctx.raw} NCs`,
+            },
+        },
+    },
     scales: {
         x: { beginAtZero: true, ticks: { color: '#94a3b8', stepSize: 1, precision: 0 }, grid: { color: 'rgba(100,116,139,0.2)' } },
         y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(100,116,139,0.1)' } },
     },
-};
+}));
 </script>

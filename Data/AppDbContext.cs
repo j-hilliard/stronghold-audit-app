@@ -36,6 +36,8 @@ public class AppDbContext : DbContext
     public DbSet<EmailRoutingRule> EmailRoutingRules { get; set; } = null!;
     public DbSet<TemplateChangeLog> TemplateChangeLogs { get; set; } = null!;
     public DbSet<UserDivision> UserDivisions { get; set; } = null!;
+    public DbSet<ReportDraft> ReportDrafts { get; set; } = null!;
+    public DbSet<NewsletterTemplate> NewsletterTemplates { get; set; } = null!;
 
     // Safety schema
     public DbSet<IncidentReport> IncidentReports { get; set; } = null!;
@@ -618,6 +620,43 @@ public class AppDbContext : DbContext
             b.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne(e => e.Division).WithMany().HasForeignKey(e => e.DivisionId).OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(e => e.UserId);
+        });
+
+        modelBuilder.Entity<ReportDraft>(b =>
+        {
+            b.ToTable("ReportDraft", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Title).IsRequired().HasMaxLength(200);
+            b.Property(e => e.Period).IsRequired().HasMaxLength(50);
+            b.Property(e => e.BlocksJson).IsRequired();
+            b.Property(e => e.RowVersion).IsRowVersion();
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.UpdatedBy).HasMaxLength(200);
+            b.Property(e => e.DeletedBy).HasMaxLength(200);
+            b.HasOne(e => e.Division).WithMany().HasForeignKey(e => e.DivisionId).OnDelete(DeleteBehavior.Restrict);
+            // Primary access pattern: list drafts for a division, excluding soft-deleted
+            b.HasIndex(e => new { e.DivisionId, e.IsDeleted });
+            // Sort/filter by last modified
+            b.HasIndex(e => e.UpdatedAt);
+            // Range query support for regeneration
+            b.HasIndex(e => new { e.DivisionId, e.DateFrom, e.DateTo });
+            b.HasQueryFilter(e => !e.IsDeleted);
+        });
+
+        modelBuilder.Entity<NewsletterTemplate>(b =>
+        {
+            b.ToTable("NewsletterTemplate", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            b.Property(e => e.PrimaryColor).IsRequired().HasMaxLength(20);
+            b.Property(e => e.AccentColor).IsRequired().HasMaxLength(20);
+            b.Property(e => e.CoverImageUrl).HasMaxLength(500);
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.UpdatedBy).HasMaxLength(200);
+            b.Property(e => e.DeletedBy).HasMaxLength(200);
+            b.HasOne(e => e.Division).WithMany().HasForeignKey(e => e.DivisionId).OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(e => new { e.DivisionId, e.IsDefault, e.IsDeleted });
+            b.HasQueryFilter(e => !e.IsDeleted);
         });
     }
 

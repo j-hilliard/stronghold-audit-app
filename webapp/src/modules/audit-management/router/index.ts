@@ -92,5 +92,31 @@ export const auditManagementRoutes = [
             ],
         },
     },
+    {
+        path: 'newsletter/template-editor',
+        name: 'audit-management-newsletter-template-editor',
+        component: () => import('@/modules/audit-management/features/reports/views/NewsletterTemplateEditorView.vue'),
+        meta: {
+            title: 'Newsletter Template Editor',
+            breadcrumbItems: () => [
+                { label: 'Compliance Audit' },
+                { label: 'Reports', to: '/audit-management/reports' },
+                { label: 'Newsletter Template Editor' },
+            ],
+        },
+    },
+    {
+        path: 'reports/composer',
+        name: 'audit-management-report-composer',
+        component: () => import('@/modules/audit-management/features/reports/views/ReportComposerView.vue'),
+        meta: {
+            title: 'Report Composer',
+            breadcrumbItems: () => [
+                { label: 'Compliance Audit' },
+                { label: 'Reports', to: '/audit-management/reports' },
+                { label: 'Report Composer' },
+            ],
+        },
+    },
     ...getErrorRoutes(apps.auditManagement),
 ];

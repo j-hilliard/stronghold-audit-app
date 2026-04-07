@@ -9,9 +9,13 @@ sassdoc
 node_modules
 package-lock.json
 
-# Playwright (local E2E testing — never commit)
+# Playwright (local E2E testing - never commit artifacts)
 playwright-report/
 test-results/
 .playwright/
 tests/e2e/
+!tests/e2e/
+tests/e2e/*
+!tests/e2e/audit-newsletter.spec.ts
+!tests/e2e/audit-report-composer-contract.spec.ts
 playwright.config.ts

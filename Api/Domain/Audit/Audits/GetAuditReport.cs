@@ -15,6 +15,11 @@ public class GetAuditReport : IRequest<AuditReportDto>
     public string? Status { get; set; }
     public DateTime? DateFrom { get; set; }
     public DateTime? DateTo { get; set; }
+    /// <summary>
+    /// When set, limits results to audits that have at least one NonConforming
+    /// response in this section. Drives the section KPI card click-to-filter feature.
+    /// </summary>
+    public string? SectionFilter { get; set; }
 }
 
 public class GetAuditReportHandler : IRequestHandler<GetAuditReport, AuditReportDto>
@@ -46,6 +51,10 @@ public class GetAuditReportHandler : IRequestHandler<GetAuditReport, AuditReport
 
         if (request.DateTo.HasValue)
             query = query.Where(a => a.SubmittedAt <= request.DateTo.Value || a.CreatedAt <= request.DateTo.Value);
+
+        if (!string.IsNullOrWhiteSpace(request.SectionFilter))
+            query = query.Where(a => a.Responses.Any(r =>
+                r.SectionNameSnapshot == request.SectionFilter && r.Status == "NonConforming"));
 
         var audits = await query.OrderByDescending(a => a.SubmittedAt ?? a.CreatedAt).ToListAsync(cancellationToken);
 

@@ -270,9 +270,7 @@ public static class AuditDbInitializer
 
     private static readonly string[] GlobalReviewEmails = new[]
     {
-        "shelby.armstrong@strongholdlimited.com",
-        "shausberger@thestrongholdcompanies.com",
-        "cwyatt@thestrongholdcompanies.com",
+        "joseph.hilliard@thestrongholdcompanies.com",
     };
 
     private static string[] DivisionEmails(params string[] divisionSpecific) =>
@@ -288,8 +286,7 @@ public static class AuditDbInitializer
                 includeCultureAttitudes: true,
                 otherQuestions: StandardOtherQuestions()),
             DivisionEmails(
-                "shc-tkiecomplianceaudits@quantaservices.com",
-                "SU_ComplianceAudits@thestrongholdcompanies.com")),
+                "joseph.hilliard@thestrongholdcompanies.com")),
 
         new DivisionSeed("STS", "STS", "JobSite",
             StandardJobSiteSections(
@@ -297,8 +294,7 @@ public static class AuditDbInitializer
                 includeCultureAttitudes: true,
                 otherQuestions: StandardOtherQuestions()),
             DivisionEmails(
-                "shc-stscomplianceaudits@quantaservices.com",
-                "SU_ComplianceAudits@thestrongholdcompanies.com")),
+                "joseph.hilliard@thestrongholdcompanies.com")),
 
         new DivisionSeed("SHI", "SHI", "JobSite",
             StandardJobSiteSections(
@@ -306,45 +302,37 @@ public static class AuditDbInitializer
                 includeCultureAttitudes: true,
                 otherQuestions: StandardOtherQuestions()),
             DivisionEmails(
-                "shc-shicomplianceaudits@quantaservices.com",
-                "SU_ComplianceAudits@thestrongholdcompanies.com")),
+                "joseph.hilliard@thestrongholdcompanies.com")),
 
         new DivisionSeed("SHI_RT", "SHI (RT)", "JobSite",
             ShiRtSections(),
             DivisionEmails(
-                "shc-shicomplianceaudits@quantaservices.com",
-                "SU_ComplianceAudits@thestrongholdcompanies.com")),
+                "joseph.hilliard@thestrongholdcompanies.com")),
 
         new DivisionSeed("SHI_RA", "SHI (RA)", "JobSite",
             ShiRaSections(),
             DivisionEmails(
-                "shc-shicomplianceaudits@quantaservices.com",
-                "SU_ComplianceAudits@thestrongholdcompanies.com")),
+                "joseph.hilliard@thestrongholdcompanies.com")),
 
         new DivisionSeed("STG", "STG", "JobSite",
             StgEtsSections(includeExtraOtherQuestions: true),
             DivisionEmails(
-                "shc-stgcomplianceaudits@quantaservices.com",
-                "SU_ComplianceAudits@thestrongholdcompanies.com")),
+                "joseph.hilliard@thestrongholdcompanies.com")),
 
         new DivisionSeed("ETS", "ETS", "JobSite",
             StgEtsSections(includeExtraOtherQuestions: false),
             DivisionEmails(
-                "shc-etscomplianceaudits@quantaservices.com",
-                "SU_ComplianceAudits@thestrongholdcompanies.com")),
+                "joseph.hilliard@thestrongholdcompanies.com")),
 
         new DivisionSeed("CSL", "CSL", "JobSite",
             CslSections(),
             DivisionEmails(
-                "cslcomplianceaudits@catspec.com",
-                "SU_ComplianceAudits@thestrongholdcompanies.com")),
+                "joseph.hilliard@thestrongholdcompanies.com")),
 
         new DivisionSeed("FACILITY", "FACILITY", "Facility",
             FacilitySections(),
             DivisionEmails(
-                "cslcomplianceaudits@catspec.com",
-                "shc-etscomplianceaudits@quantaservices.com",
-                "SU_ComplianceAudits@thestrongholdcompanies.com")),
+                "joseph.hilliard@thestrongholdcompanies.com")),
     };
 
     // ── Standard job-site section builder ─────────────────────────────────────

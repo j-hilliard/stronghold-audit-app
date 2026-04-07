@@ -21,8 +21,6 @@
                 severity="secondary"
                 outlined
                 size="small"
-                :disabled="!store.filterDivisionId"
-                title="Select a division filter first, then click to print a blank audit form"
                 @click="printBlankForm"
             />
             <BaseButtonCreate label="New Audit" @click="router.push('/audit-management/audits/new')" />
@@ -120,6 +118,38 @@
     </div>
 
     <ConfirmDialog />
+
+    <!-- Print Blank Form dialog -->
+    <Dialog
+        v-model:visible="showPrintDialog"
+        header="Print Blank Form"
+        :modal="true"
+        :style="{ width: '420px' }"
+    >
+        <div class="space-y-4 py-2">
+            <p class="text-sm text-slate-400">Choose a division to print a blank audit form.</p>
+            <div class="space-y-1">
+                <label class="block text-sm font-medium">Division</label>
+                <Dropdown
+                    v-model="printDivisionId"
+                    :options="store.divisions"
+                    option-label="code"
+                    option-value="id"
+                    placeholder="— Select a division —"
+                    class="w-full"
+                />
+            </div>
+        </div>
+        <template #footer>
+            <Button label="Cancel" severity="secondary" text @click="showPrintDialog = false" />
+            <Button
+                label="Print"
+                icon="pi pi-print"
+                :disabled="!printDivisionId"
+                @click="doPrint"
+            />
+        </template>
+    </Dialog>
 </template>
 
 <script setup lang="ts">
@@ -130,6 +160,7 @@ import Dropdown from 'primevue/dropdown';
 import InputText from 'primevue/inputtext';
 import Column from 'primevue/column';
 import ConfirmDialog from 'primevue/confirmdialog';
+import Dialog from 'primevue/dialog';
 import { useConfirm } from 'primevue/useconfirm';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import BaseButtonCreate from '@/components/buttons/BaseButtonCreate.vue';
@@ -137,13 +168,46 @@ import BaseButtonIconEdit from '@/components/buttons/BaseButtonIconEdit.vue';
 import BaseButtonIconView from '@/components/buttons/BaseButtonIconView.vue';
 import BaseDataTable from '@/components/tables/BaseDataTable.vue';
 import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
+import { useApiStore } from '@/stores/apiStore';
+import { AuditClient } from '@/apiclient/auditClient';
 import type { AuditListItemDto } from '@/apiclient/auditClient';
 
 const router = useRouter();
 const store = useAuditStore();
+const apiStore = useApiStore();
 const confirm = useConfirm();
 const loading = ref(false);
 const selectedAudits = ref<AuditListItemDto[]>([]);
+
+const showPrintDialog = ref(false);
+const printDivisionId = ref<number | null>(null);
+const printLoading = ref(false);
+const printError = ref<string | null>(null);
+
+function printBlankForm() {
+    printDivisionId.value = store.filterDivisionId ?? null;
+    printError.value = null;
+    showPrintDialog.value = true;
+}
+
+async function doPrint() {
+    if (!printDivisionId.value) return;
+    printLoading.value = true;
+    printError.value = null;
+    try {
+        // Fetch the template in the authenticated main-app context, then pass
+        // it to the print tab via sessionStorage — the print view has no auth token.
+        const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
+        const template = await client.getActiveTemplate(printDivisionId.value);
+        sessionStorage.setItem('print-blank-form-data', JSON.stringify(template));
+        window.open(`/audit-management/print/${printDivisionId.value}`, '_blank');
+        showPrintDialog.value = false;
+    } catch {
+        printError.value = 'No active template found for this division.';
+    } finally {
+        printLoading.value = false;
+    }
+}
 
 const draftSelection = computed(() => selectedAudits.value.filter(a => a.status === 'Draft'));
 
@@ -192,12 +256,6 @@ function onBulkDelete() {
     const msg = nonDraft > 0
         ? `Delete ${drafts.length} draft audit${drafts.length !== 1 ? 's' : ''}? (${nonDraft} non-draft selected will be skipped)`
         : `Delete ${drafts.length} draft audit${drafts.length !== 1 ? 's' : ''}? This cannot be undone.`;
-
-function printBlankForm() {
-    if (store.filterDivisionId) {
-        window.open(`/audit-management/print/${store.filterDivisionId}`, '_blank');
-    }
-}
 
     confirm.require({
         message: msg,

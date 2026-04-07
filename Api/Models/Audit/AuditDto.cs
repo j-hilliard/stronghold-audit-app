@@ -279,3 +279,44 @@ public class AuditReportRowDto
     public int NonConformingCount { get; set; }
     public int WarningCount { get; set; }
 }
+
+// ── Newsletter DTOs ────────────────────────────────────────────────────────────
+
+public class NewsletterAiSummaryResult
+{
+    public bool Success { get; set; }
+    public string Text { get; set; } = string.Empty;
+}
+
+public class NewsletterSendResult
+{
+    public int Sent { get; set; }
+    public bool DryRun { get; set; }
+    public List<string> Recipients { get; set; } = new();
+}
+
+public class GenerateNewsletterSummaryRequest
+{
+    public string DivisionCode { get; set; } = null!;
+    public int Quarter { get; set; }
+    public int Year { get; set; }
+    public double? AvgScore { get; set; }
+    public int TotalAudits { get; set; }
+    public int TotalNcs { get; set; }
+    public List<SectionNcItemDto> TopSections { get; set; } = new();
+    public int OpenCaCount { get; set; }
+    public int OverdueCaCount { get; set; }
+}
+
+public class SectionNcItemDto
+{
+    public string SectionName { get; set; } = null!;
+    public int NcCount { get; set; }
+}
+
+public class SendNewsletterRequest
+{
+    public int DivisionId { get; set; }
+    public string Subject { get; set; } = null!;
+    public string HtmlBody { get; set; } = null!;
+}

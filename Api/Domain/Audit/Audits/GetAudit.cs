@@ -2,7 +2,6 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Stronghold.AppDashboard.Api.Authorization;
 using Stronghold.AppDashboard.Api.Models.Audit;
-using Stronghold.AppDashboard.Api.Services;
 using Stronghold.AppDashboard.Data;
 using Stronghold.AppDashboard.Shared.Enumerations;
 
@@ -18,12 +17,10 @@ public class GetAudit : IRequest<AuditDetailDto?>
 public class GetAuditHandler : IRequestHandler<GetAudit, AuditDetailDto?>
 {
     private readonly AppDbContext _context;
-    private readonly IProcessLogService _log;
 
-    public GetAuditHandler(AppDbContext context, IProcessLogService log)
+    public GetAuditHandler(AppDbContext context)
     {
         _context = context;
-        _log = log;
     }
 
     public async Task<AuditDetailDto?> Handle(GetAudit request, CancellationToken cancellationToken)
@@ -35,10 +32,6 @@ public class GetAuditHandler : IRequestHandler<GetAudit, AuditDetailDto?>
             .FirstOrDefaultAsync(a => a.Id == request.AuditId, cancellationToken);
 
         if (audit == null) return null;
-
-        await _log.LogAsync("GetAudit", "Audit", "Info",
-            $"Audit {audit.Id} viewed by {request.RequestedBy}",
-            relatedObject: audit.Id.ToString());
 
         return new AuditDetailDto
         {

@@ -1,7 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Stronghold.AppDashboard.Api.Authorization;
-using Stronghold.AppDashboard.Api.Services;
 using Stronghold.AppDashboard.Data;
 using Stronghold.AppDashboard.Shared.Enumerations;
 using AuditEntity = Stronghold.AppDashboard.Data.Models.Audit.Audit;
@@ -18,12 +17,10 @@ public class CreateAudit : IRequest<int>
 public class CreateAuditHandler : IRequestHandler<CreateAudit, int>
 {
     private readonly AppDbContext _context;
-    private readonly IProcessLogService _log;
 
-    public CreateAuditHandler(AppDbContext context, IProcessLogService log)
+    public CreateAuditHandler(AppDbContext context)
     {
         _context = context;
-        _log = log;
     }
 
     public async Task<int> Handle(CreateAudit request, CancellationToken cancellationToken)
@@ -54,10 +51,6 @@ public class CreateAuditHandler : IRequestHandler<CreateAudit, int>
 
         _context.Audits.Add(audit);
         await _context.SaveChangesAsync(cancellationToken);
-
-        await _log.LogAsync("CreateAudit", "Audit", "Info",
-            $"Audit created for division {division.Code}, template version {version.VersionNumber}",
-            relatedObject: audit.Id.ToString());
 
         return audit.Id;
     }

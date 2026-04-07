@@ -168,24 +168,200 @@ body {
     background-color: transparent !important;
 }
 
+/* ── Views that lock the layout to viewport height (only inner panel scrolls) ── */
+/* Screen-only: must NOT apply during print or it clips the print content. */
+@media screen {
+    .layout-wrapper:has(.composer-view) .layout-main,
+    .layout-wrapper:has(.template-manager-view) .layout-main {
+        height: 100vh !important;
+        max-height: 100vh !important;
+        overflow: hidden !important;
+    }
+
+    .layout-wrapper:has(.composer-view) .layout-content,
+    .layout-wrapper:has(.template-manager-view) .layout-content {
+        flex: 1 1 0 !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    /* router-view renders a component directly — make it fill the layout-content */
+    .layout-wrapper:has(.composer-view) .layout-content > *,
+    .layout-wrapper:has(.template-manager-view) .layout-content > * {
+        flex: 1 1 0;
+        min-height: 0;
+    }
+}
+
 /* ── Print / PDF styles ─────────────────────────────────────────────────────── */
 @media print {
-    /* Hide chrome: sidebar, nav, header buttons, footer */
+    /* ── COMPOSER PRINT (clone-and-print approach) ──────────────────────────────
+       When printReport() appends #print-root, hide the entire SPA and show only
+       the cloned document page. This completely bypasses the SPA height/overflow
+       constraints that cause blank pages.
+    ─────────────────────────────────────────────────────────────────────────── */
+    body:has(#print-root) > *:not(#print-root) {
+        display: none !important;
+    }
+
+    #print-root {
+        display: block !important;
+        position: static !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        visibility: visible !important;
+    }
+
+    /* PrimeVue theme.css has a global print rule that hides body descendants
+       (`body * { visibility: hidden; }`) unless #invoice-content is used.
+       Composer uses #print-root, so force visibility back on here. */
+    #print-root * {
+        visibility: visible !important;
+    }
+
+    #print-root .document-page {
+        width: 100% !important;
+        min-height: 0 !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        padding: 24px 32px !important;
+        background: #fff !important;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    #print-root * {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    #print-root .print-block {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        margin-bottom: 16px !important;
+    }
+
+    /* Keep block inline styles (color backgrounds) intact */
+    #print-root [style] {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    /* Hide editor controls — we move the live DOM node so we can't remove these;
+       hide them via CSS instead */
+    #print-root .drag-handle,
+    #print-root [title="Move up"],
+    #print-root [title="Move down"],
+    #print-root [title="Remove block"] {
+        display: none !important;
+    }
+
+    /* Blank audit form print */
+    #print-root .print-form {
+        width: 100% !important;
+        max-width: 100% !important;
+        background: #fff !important;
+        color: #000 !important;
+        box-shadow: none !important;
+        padding: 12px 16px !important;
+        margin: 0 !important;
+        font-family: Arial, sans-serif !important;
+        font-size: 11px !important;
+    }
+
+    /* Ensure chart canvases print correctly */
+    #print-root canvas {
+        max-width: 100% !important;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    /* ── FALLBACK (non-composer pages) ──────────────────────────────────────────
+       These rules apply when #print-root is NOT present (e.g. printing other pages).
+    ─────────────────────────────────────────────────────────────────────────── */
+
+    /* Unwind SPA viewport-height layout so content flows to full print length */
+    html, body {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    /* Hide all SPA chrome */
     .layout-sidebar,
     .layout-topbar,
     .layout-menu-container,
     .p-button,
     nav,
-    header {
+    header,
+    .composer-left-rail,
+    .composer-right-rail {
         display: none !important;
     }
 
-    /* White page */
+    /* White page for entire body */
     body, .layout-main-container, .layout-main {
         background: #fff !important;
         color: #111 !important;
         margin: 0 !important;
         padding: 0 !important;
+    }
+
+    .layout-main-container {
+        margin-left: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Composer view — unwind flex/height constraints */
+    .composer-view {
+        display: block !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    .composer-main {
+        display: block !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    /* Canvas area: strip the gray background, no padding */
+    .composer-canvas {
+        display: block !important;
+        height: auto !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        background: #fff !important;
+    }
+
+    /* Document page: full width, white background, no shadow/radius */
+    .document-page {
+        width: 100% !important;
+        min-height: 0 !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        padding: 16px 24px !important;
+        background: #fff !important;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    /* Propagate exact-color to every descendant */
+    .document-page * {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    /* Block integrity — no page-splits inside a block */
+    .print-block {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        border: none !important;
+        margin-bottom: 16px !important;
     }
 
     /* Cards — white with border */
@@ -210,20 +386,20 @@ body {
         color: #555 !important;
     }
 
-    /* Score number colors stay colored */
+    /* Score / status colors stay colored */
     .text-emerald-400 { color: #059669 !important; }
     .text-amber-400   { color: #d97706 !important; }
     .text-red-400     { color: #dc2626 !important; }
+    .text-emerald-300 { color: #059669 !important; }
+    .text-red-300     { color: #dc2626 !important; }
+    .text-amber-300   { color: #d97706 !important; }
+    .text-slate-300   { color: #333 !important; }
 
     /* Stat boxes */
     .bg-emerald-900\/50, .bg-red-900\/50, .bg-amber-900\/50, .bg-slate-700 {
         background: #f0f0f0 !important;
         border: 1px solid #ccc !important;
     }
-    .text-emerald-300 { color: #059669 !important; }
-    .text-red-300     { color: #dc2626 !important; }
-    .text-amber-300   { color: #d97706 !important; }
-    .text-slate-300   { color: #333 !important; }
 
     /* NC findings */
     .border-red-800 { border-color: #fca5a5 !important; }
@@ -231,10 +407,4 @@ body {
 
     /* Progress bar */
     .bg-slate-700.rounded-full { background: #e2e8f0 !important; }
-
-    /* Ensure full-width content area */
-    .layout-main-container {
-        margin-left: 0 !important;
-        padding: 8px !important;
-    }
 }

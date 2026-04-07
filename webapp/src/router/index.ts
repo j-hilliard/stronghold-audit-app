@@ -36,6 +36,12 @@ const routes = [
         children: auditManagementRoutes,
     },
     {
+        // Newsletter - standalone print/report view
+        path: '/audit-management/newsletter',
+        name: 'audit-management-newsletter',
+        component: () => import('@/modules/audit-management/features/reports/views/NewsletterView.vue'),
+    },
+    {
         // Quarterly summary — standalone print view
         path: '/audit-management/reports/quarterly-summary',
         name: 'audit-management-quarterly-summary',

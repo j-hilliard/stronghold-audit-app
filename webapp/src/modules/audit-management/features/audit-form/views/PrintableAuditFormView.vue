@@ -94,7 +94,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { nextTick, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { useApiStore } from '@/stores/apiStore';
 import { AuditClient, type TemplateDto } from '@/apiclient/auditClient';
@@ -105,18 +105,45 @@ const loading = ref(true);
 const template = ref<TemplateDto | null>(null);
 
 onMounted(async () => {
-    const divisionId = Number(route.params.divisionId);
-    if (!isNaN(divisionId) && divisionId > 0) {
+    // Primary path: template was pre-fetched in the authenticated main app
+    // and passed via sessionStorage to avoid 401s in this new tab.
+    const stored = sessionStorage.getItem('print-blank-form-data');
+    if (stored) {
+        sessionStorage.removeItem('print-blank-form-data');
         try {
-            const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-            template.value = await client.getActiveTemplate(divisionId);
+            template.value = JSON.parse(stored) as TemplateDto;
         } catch {
-            // template stays null
+            // malformed data — fall through to API call
         }
     }
+
+    // Fallback: direct navigation (e.g. during development)
+    if (!template.value) {
+        const divisionId = Number(route.params.divisionId);
+        if (!isNaN(divisionId) && divisionId > 0) {
+            try {
+                const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
+                template.value = await client.getActiveTemplate(divisionId);
+            } catch {
+                // template stays null
+            }
+        }
+    }
+
     loading.value = false;
-    // Auto-print after DOM renders
-    setTimeout(() => window.print(), 400);
+    await nextTick();
+
+    // PrimeVue's theme CSS has a global `body * { visibility: hidden }` print rule.
+    // Move the live form node into #print-root — the existing global print CSS then
+    // hides all other SPA content and forces #print-root * to be visible.
+    const formEl = document.querySelector('.print-form') as HTMLElement | null;
+    if (formEl) {
+        const printRoot = document.createElement('div');
+        printRoot.id = 'print-root';
+        printRoot.appendChild(formEl);
+        document.body.appendChild(printRoot);
+    }
+    window.print();
 });
 </script>
 

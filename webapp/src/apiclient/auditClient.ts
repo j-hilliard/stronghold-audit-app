@@ -338,6 +338,129 @@ export interface AuditReportDto {
     rows: AuditReportRowDto[];
 }
 
+export interface SectionTrendPointDto {
+    quarter: string;
+    findingsPerAudit: number;
+    auditCount: number;
+    ncCount: number;
+}
+
+export interface SectionTrendDto {
+    sectionName: string;
+    divisionTrend: SectionTrendPointDto[];
+    companyTrend: SectionTrendPointDto[];
+}
+
+export interface SectionTrendsReportDto {
+    quarters: string[];
+    sections: SectionTrendDto[];
+}
+
+export interface NewsletterAiSummaryRequest {
+    divisionCode: string;
+    quarter: number;
+    year: number;
+    avgScore?: number | null;
+    totalAudits: number;
+    totalNcs: number;
+    topSections: { sectionName: string; ncCount: number }[];
+    openCaCount: number;
+    overdueCaCount: number;
+}
+
+export interface NewsletterAiSummaryResult {
+    success: boolean;
+    text: string;
+}
+
+export interface NewsletterSendRequest {
+    divisionId: number;
+    subject: string;
+    htmlBody: string;
+}
+
+export interface NewsletterSendResult {
+    sent: number;
+    dryRun: boolean;
+    recipients: string[];
+}
+
+// ── Newsletter Templates ──────────────────────────────────────────────────────
+
+export interface NewsletterTemplateDto {
+    id?: number | null;
+    divisionId: number;
+    name: string;
+    primaryColor: string;
+    accentColor: string;
+    coverImageUrl?: string | null;
+    visibleSections?: string[] | null;
+    isDefault: boolean;
+}
+
+export interface SaveNewsletterTemplateRequest {
+    divisionId: number;
+    name: string;
+    primaryColor: string;
+    accentColor: string;
+    coverImageUrl?: string | null;
+    visibleSections?: string[] | null;
+    isDefault: boolean;
+}
+
+// ── Report Drafts ─────────────────────────────────────────────────────────────
+
+export interface ReportDraftListItemDto {
+    id: number;
+    divisionId: number;
+    divisionCode: string;
+    title: string;
+    period: string;
+    /** "YYYY-MM-DD" or null */
+    dateFrom?: string | null;
+    /** "YYYY-MM-DD" or null */
+    dateTo?: string | null;
+    createdAt: string;
+    updatedAt?: string | null;
+    createdBy: string;
+}
+
+export interface ReportDraftDto {
+    id: number;
+    divisionId: number;
+    divisionCode: string;
+    title: string;
+    period: string;
+    dateFrom?: string | null;
+    dateTo?: string | null;
+    /** Serialized ReportBlock[] JSON. Only useReportDraft.ts may deserialize this. */
+    blocksJson: string;
+    /** Base64-encoded row version. Must be round-tripped on every PUT. */
+    rowVersion: string;
+    createdAt: string;
+    updatedAt?: string | null;
+    createdBy: string;
+}
+
+export interface CreateReportDraftRequest {
+    divisionId: number;
+    title: string;
+    period: string;
+    dateFrom?: string | null;
+    dateTo?: string | null;
+    blocksJson: string;
+}
+
+export interface UpdateReportDraftRequest {
+    title: string;
+    period: string;
+    dateFrom?: string | null;
+    dateTo?: string | null;
+    blocksJson: string;
+    /** Base64-encoded row version from the last GET. */
+    rowVersion: string;
+}
+
 export interface AuditReviewDto {
     id: number;
     divisionCode: string;
@@ -504,6 +627,7 @@ export class AuditClient {
         status?: string | null,
         dateFrom?: string | null,
         dateTo?: string | null,
+        sectionFilter?: string | null,
         cancelToken?: CancelToken,
     ): Promise<AuditReportDto> {
         const params: Record<string, unknown> = {};
@@ -511,8 +635,25 @@ export class AuditClient {
         if (status) params['status'] = status;
         if (dateFrom) params['dateFrom'] = dateFrom;
         if (dateTo) params['dateTo'] = dateTo;
+        if (sectionFilter) params['sectionFilter'] = sectionFilter;
         return this.instance
             .get<AuditReportDto>(`${this.baseUrl}/v1/audits/report`, { params, cancelToken })
+            .then(r => r.data);
+    }
+
+    getSectionTrends(
+        divisionId?: number | null,
+        dateFrom?: string | null,
+        dateTo?: string | null,
+        cancelToken?: CancelToken,
+    ): Promise<SectionTrendsReportDto> {
+        const params: Record<string, unknown> = {};
+        if (divisionId != null) params['divisionId'] = divisionId;
+        if (dateFrom) params['dateFrom'] = dateFrom;
+        if (dateTo) params['dateTo'] = dateTo;
+
+        return this.instance
+            .get<SectionTrendsReportDto>(`${this.baseUrl}/v1/audits/section-trends`, { params, cancelToken })
             .then(r => r.data);
     }
 
@@ -646,5 +787,77 @@ export class AuditClient {
         return this.instance
             .put(`${this.baseUrl}/v1/admin/users/${userId}/audit-role`, { roleName }, { cancelToken })
             .then(() => undefined);
+    }
+
+    // ── Newsletter ─────────────────────────────────────────────────────────────
+
+    generateNewsletterSummary(
+        request: NewsletterAiSummaryRequest,
+        cancelToken?: CancelToken,
+    ): Promise<NewsletterAiSummaryResult> {
+        return this.instance
+            .post<NewsletterAiSummaryResult>(`${this.baseUrl}/v1/audits/newsletter/ai-summary`, request, { cancelToken })
+            .then(r => r.data);
+    }
+
+    sendNewsletter(
+        request: NewsletterSendRequest,
+        cancelToken?: CancelToken,
+    ): Promise<NewsletterSendResult> {
+        return this.instance
+            .post<NewsletterSendResult>(`${this.baseUrl}/v1/audits/newsletter/send`, request, { cancelToken })
+            .then(r => r.data);
+    }
+
+    // ── Report Drafts ─────────────────────────────────────────────────────────
+
+    getReportDrafts(divisionId?: number | null, cancelToken?: CancelToken): Promise<ReportDraftListItemDto[]> {
+        const params: Record<string, unknown> = {};
+        if (divisionId != null) params['divisionId'] = divisionId;
+        return this.instance
+            .get<ReportDraftListItemDto[]>(`${this.baseUrl}/v1/audits/report-drafts`, { params, cancelToken })
+            .then(r => r.data);
+    }
+
+    getReportDraft(id: number, cancelToken?: CancelToken): Promise<ReportDraftDto> {
+        return this.instance
+            .get<ReportDraftDto>(`${this.baseUrl}/v1/audits/report-drafts/${id}`, { cancelToken })
+            .then(r => r.data);
+    }
+
+    createReportDraft(request: CreateReportDraftRequest, cancelToken?: CancelToken): Promise<number> {
+        return this.instance
+            .post<number>(`${this.baseUrl}/v1/audits/report-drafts`, request, { cancelToken })
+            .then(r => r.data);
+    }
+
+    updateReportDraft(id: number, request: UpdateReportDraftRequest, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .put(`${this.baseUrl}/v1/audits/report-drafts/${id}`, request, { cancelToken })
+            .then(() => undefined);
+    }
+
+    deleteReportDraft(id: number, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .delete(`${this.baseUrl}/v1/audits/report-drafts/${id}`, { cancelToken })
+            .then(() => undefined);
+    }
+
+    // ── Newsletter Templates ──────────────────────────────────────────────────
+
+    getNewsletterTemplate(divisionId: number, cancelToken?: CancelToken): Promise<NewsletterTemplateDto | null> {
+        return this.instance
+            .get<NewsletterTemplateDto>(`${this.baseUrl}/v1/audits/newsletter-template`, { params: { divisionId }, cancelToken })
+            .then(r => r.data)
+            .catch(err => {
+                if (err?.response?.status === 404) return null;
+                throw err;
+            });
+    }
+
+    saveNewsletterTemplate(request: SaveNewsletterTemplateRequest, cancelToken?: CancelToken): Promise<NewsletterTemplateDto> {
+        return this.instance
+            .put<NewsletterTemplateDto>(`${this.baseUrl}/v1/audits/newsletter-template`, request, { cancelToken })
+            .then(r => r.data);
     }
 }

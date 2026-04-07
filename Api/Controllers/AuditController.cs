@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using Stronghold.AppDashboard.Api.Domain.Audit.Admin;
 using Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 using Stronghold.AppDashboard.Api.Domain.Audit.Divisions;
+using Stronghold.AppDashboard.Api.Domain.Audit.Newsletter;
+using Stronghold.AppDashboard.Api.Domain.Audit.ReportDrafts;
 using Stronghold.AppDashboard.Api.Domain.Audit.Templates;
 using Stronghold.AppDashboard.Api.Helpers;
 using Stronghold.AppDashboard.Api.Models.Audit;
@@ -87,7 +89,8 @@ public class AuditController : V1ControllerBase
         [FromQuery] int? divisionId,
         [FromQuery] string? status,
         [FromQuery] DateTime? dateFrom,
-        [FromQuery] DateTime? dateTo)
+        [FromQuery] DateTime? dateTo,
+        [FromQuery] string? sectionFilter)
     {
         return await TryExecuteAsync<ActionResult<AuditReportDto>>(
             async () =>
@@ -99,9 +102,33 @@ public class AuditController : V1ControllerBase
                     Status = status,
                     DateFrom = dateFrom,
                     DateTo = dateTo,
+                    SectionFilter = sectionFilter,
                 }));
             },
             ex => Error<AuditReportDto>(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("audits/section-trends")]
+    [ProducesResponseType(typeof(SectionTrendsReportDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<SectionTrendsReportDto>> GetSectionTrends(
+        [FromQuery] int? divisionId,
+        [FromQuery] DateTime? dateFrom,
+        [FromQuery] DateTime? dateTo)
+    {
+        return await TryExecuteAsync<ActionResult<SectionTrendsReportDto>>(
+            async () =>
+            {
+                await GetUser();
+                return Ok(await Mediator.Send(new GetSectionTrends
+                {
+                    DivisionId = divisionId,
+                    DateFrom = dateFrom,
+                    DateTo = dateTo,
+                }));
+            },
+            ex => Error<SectionTrendsReportDto>(ex)
         );
     }
 
@@ -682,6 +709,219 @@ public class AuditController : V1ControllerBase
                 return NoContent();
             },
             ex => Error(ex)
+        );
+    }
+
+    // ── Newsletter Templates ──────────────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("audits/newsletter-template")]
+    [ProducesResponseType(typeof(NewsletterTemplateDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<NewsletterTemplateDto>> GetNewsletterTemplate([FromQuery] int divisionId)
+    {
+        return await TryExecuteAsync<ActionResult<NewsletterTemplateDto>>(
+            async () =>
+            {
+                await GetUser();
+                var result = await Mediator.Send(new GetNewsletterTemplate { DivisionId = divisionId });
+                return result == null ? NotFound() : Ok(result);
+            },
+            ex => Error<NewsletterTemplateDto>(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPut("audits/newsletter-template")]
+    [ProducesResponseType(typeof(NewsletterTemplateDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<NewsletterTemplateDto>> SaveNewsletterTemplate([FromBody] SaveNewsletterTemplateRequest body)
+    {
+        return await TryExecuteAsync<ActionResult<NewsletterTemplateDto>>(
+            async () =>
+            {
+                var user = await GetUser();
+                var result = await Mediator.Send(new SaveNewsletterTemplate
+                {
+                    Payload = body,
+                    SavedBy = user.Email!,
+                });
+                return Ok(result);
+            },
+            ex => ex is ArgumentException
+                ? Task.FromResult<ActionResult<NewsletterTemplateDto>>(BadRequest(ex.Message))
+                : Error<NewsletterTemplateDto>(ex)
+        );
+    }
+
+    // ── Newsletter ─────────────────────────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPost("audits/newsletter/ai-summary")]
+    [ProducesResponseType(typeof(NewsletterAiSummaryResult), StatusCodes.Status200OK)]
+    public async Task<ActionResult<NewsletterAiSummaryResult>> GenerateNewsletterSummary(
+        [FromBody] GenerateNewsletterSummaryRequest body)
+    {
+        return await TryExecuteAsync<ActionResult<NewsletterAiSummaryResult>>(
+            async () =>
+            {
+                await GetUser();
+                var result = await Mediator.Send(new GenerateNewsletterSummary
+                {
+                    DivisionCode = body.DivisionCode,
+                    Quarter = body.Quarter,
+                    Year = body.Year,
+                    AvgScore = body.AvgScore,
+                    TotalAudits = body.TotalAudits,
+                    TotalNcs = body.TotalNcs,
+                    TopSections = body.TopSections
+                        .Select(s => new SectionNcItem { SectionName = s.SectionName, NcCount = s.NcCount })
+                        .ToList<SectionNcItem>(),
+                    OpenCaCount = body.OpenCaCount,
+                    OverdueCaCount = body.OverdueCaCount,
+                });
+                return Ok(result);
+            },
+            ex => Error<NewsletterAiSummaryResult>(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPost("audits/newsletter/send")]
+    [ProducesResponseType(typeof(NewsletterSendResult), StatusCodes.Status200OK)]
+    public async Task<ActionResult<NewsletterSendResult>> SendNewsletter(
+        [FromBody] SendNewsletterRequest body)
+    {
+        return await TryExecuteAsync<ActionResult<NewsletterSendResult>>(
+            async () =>
+            {
+                await GetUser();
+                var result = await Mediator.Send(new SendNewsletter
+                {
+                    DivisionId = body.DivisionId,
+                    Subject = body.Subject,
+                    HtmlBody = body.HtmlBody,
+                });
+                return Ok(result);
+            },
+            ex => Error<NewsletterSendResult>(ex)
+        );
+    }
+
+    // ── Report Drafts ──────────────────────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("audits/report-drafts")]
+    [ProducesResponseType(typeof(List<ReportDraftListItemDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<ReportDraftListItemDto>>> GetReportDrafts(
+        [FromQuery] int? divisionId)
+    {
+        return await TryExecuteAsync<ActionResult<List<ReportDraftListItemDto>>>(
+            async () =>
+            {
+                var user = await GetUser();
+                return Ok(await Mediator.Send(new GetReportDrafts
+                {
+                    DivisionId = divisionId,
+                    RequestedBy = user.Email!,
+                }));
+            },
+            ex => Error<List<ReportDraftListItemDto>>(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("audits/report-drafts/{id:int}")]
+    [ProducesResponseType(typeof(ReportDraftDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ReportDraftDto>> GetReportDraft([FromRoute] int id)
+    {
+        return await TryExecuteAsync<ActionResult<ReportDraftDto>>(
+            async () =>
+            {
+                var user = await GetUser();
+                var result = await Mediator.Send(new GetReportDraft
+                {
+                    DraftId = id,
+                    RequestedBy = user.Email!,
+                });
+                return result == null ? NotFound() : Ok(result);
+            },
+            ex => Error<ReportDraftDto>(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPost("audits/report-drafts")]
+    [ProducesResponseType(typeof(int), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<int>> CreateReportDraft([FromBody] CreateReportDraftRequest body)
+    {
+        return await TryExecuteAsync<ActionResult<int>>(
+            async () =>
+            {
+                var user = await GetUser();
+                var newId = await Mediator.Send(new CreateReportDraft
+                {
+                    Payload = body,
+                    CreatedBy = user.Email!,
+                });
+                return CreatedAtAction(nameof(GetReportDraft), new { id = newId }, newId);
+            },
+            ex => ex is ArgumentException
+                ? Task.FromResult<ActionResult<int>>(BadRequest(ex.Message))
+                : Error<int>(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPut("audits/report-drafts/{id:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateReportDraft([FromRoute] int id, [FromBody] UpdateReportDraftRequest body)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                var user = await GetUser();
+                await Mediator.Send(new UpdateReportDraft
+                {
+                    DraftId = id,
+                    Payload = body,
+                    UpdatedBy = user.Email!,
+                });
+                return NoContent();
+            },
+            ex => ex is ArgumentException
+                ? Task.FromResult<IActionResult>(BadRequest(ex.Message))
+                : ex is KeyNotFoundException
+                    ? Task.FromResult<IActionResult>(NotFound())
+                    : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpDelete("audits/report-drafts/{id:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteReportDraft([FromRoute] int id)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                var user = await GetUser();
+                await Mediator.Send(new DeleteReportDraft
+                {
+                    DraftId = id,
+                    DeletedBy = user.Email!,
+                });
+                return NoContent();
+            },
+            ex => ex is KeyNotFoundException
+                ? Task.FromResult<IActionResult>(NotFound())
+                : Error(ex)
         );
     }
 }
