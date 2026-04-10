@@ -26,16 +26,32 @@
 
             <!-- ── EMAIL ROUTING TAB ── -->
             <template v-else-if="activeTab === 'email'">
-                <div class="flex items-center justify-between mb-4">
-                    <p class="text-slate-400 text-sm">
-                        When an audit is submitted, all active recipients for that division receive a review email.
+                <!-- Toolbar -->
+                <div class="flex flex-wrap items-center gap-2 mb-4">
+                    <p class="text-slate-400 text-sm flex-1 min-w-0">
+                        Active recipients receive a review email when an audit is submitted for their division.
                     </p>
-                    <div class="flex gap-2">
+                    <div class="flex items-center gap-2 shrink-0">
+                        <select
+                            v-model="selectedDivisionCode"
+                            class="bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+                        >
+                            <option v-for="g in divisionGroups" :key="g.divisionCode" :value="g.divisionCode">
+                                {{ g.divisionName }}
+                            </option>
+                        </select>
+                        <button
+                            @click="addRow(activeDivisionGroup!)"
+                            :disabled="!activeDivisionGroup"
+                            class="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 rounded disabled:opacity-40"
+                        >
+                            <i class="pi pi-user-plus text-xs" /> Add Person
+                        </button>
                         <button
                             @click="deactivateAll"
                             :disabled="adminStore.saving"
                             class="px-3 py-1.5 text-sm bg-amber-700 hover:bg-amber-600 text-white rounded disabled:opacity-40"
-                            title="Uncheck all recipients — useful during testing to prevent real emails from going out"
+                            title="Uncheck all recipients — prevents real emails during testing"
                         >
                             Deactivate All
                         </button>
@@ -49,59 +65,123 @@
                     </div>
                 </div>
 
-                <div
-                    v-for="group in divisionGroups"
-                    :key="group.divisionCode"
-                    class="mb-5 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden"
-                >
-                    <div class="px-4 py-2 bg-slate-750 border-b border-slate-700 flex items-center justify-between">
-                        <span class="font-medium text-slate-200 text-sm">{{ group.divisionName }}</span>
-                        <button
-                            @click="addRow(group)"
-                            class="text-xs text-blue-400 hover:text-blue-300 pi pi-plus"
-                            title="Add recipient"
-                        />
-                    </div>
-
-                    <div class="divide-y divide-slate-700">
-                        <div
-                            v-for="(rule, idx) in group.rules"
-                            :key="idx"
-                            class="px-4 py-2 flex items-center gap-3"
-                        >
-                            <input
-                                v-model="rule.emailAddress"
-                                @input="isDirty = true"
-                                type="email"
-                                placeholder="email@example.com"
-                                class="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-400"
-                            />
-                            <label class="flex items-center gap-1.5 text-sm text-slate-400 cursor-pointer shrink-0">
-                                <input
-                                    v-model="rule.isActive"
-                                    @change="isDirty = true"
-                                    type="checkbox"
-                                    class="accent-blue-500"
-                                />
-                                Active
-                            </label>
-                            <button
-                                @click="removeRow(group, idx)"
-                                class="text-red-400 hover:text-red-300 pi pi-trash text-xs shrink-0"
-                                title="Remove"
-                            />
-                        </div>
-
-                        <div v-if="!group.rules.length" class="px-4 py-2 text-sm text-slate-500 italic">
-                            No recipients configured
-                        </div>
-                    </div>
+                <!-- Recipient table for selected division -->
+                <div v-if="activeDivisionGroup" class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-700 text-slate-400 text-xs uppercase tracking-wide">
+                                <th class="px-4 py-2 text-left">Name</th>
+                                <th class="px-4 py-2 text-left">Email</th>
+                                <th class="px-4 py-2 text-center w-24">Active</th>
+                                <th class="px-4 py-2 w-10" />
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-700/50">
+                            <tr
+                                v-for="(rule, idx) in activeDivisionGroup.rules"
+                                :key="idx"
+                                class="hover:bg-slate-700/30 transition-colors"
+                            >
+                                <td class="px-4 py-2 text-slate-200">
+                                    {{ rule.displayName || '—' }}
+                                </td>
+                                <td class="px-4 py-2 text-slate-400">{{ rule.emailAddress }}</td>
+                                <td class="px-4 py-2 text-center">
+                                    <input
+                                        v-model="rule.isActive"
+                                        @change="isDirty = true"
+                                        type="checkbox"
+                                        class="accent-blue-500 w-4 h-4"
+                                    />
+                                </td>
+                                <td class="px-4 py-2 text-center">
+                                    <button
+                                        @click="removeRow(activeDivisionGroup!, idx)"
+                                        class="text-red-400 hover:text-red-300 pi pi-trash text-xs"
+                                        title="Remove"
+                                    />
+                                </td>
+                            </tr>
+                            <tr v-if="!activeDivisionGroup.rules.length">
+                                <td colspan="4" class="px-4 py-6 text-center text-slate-500 italic text-sm">
+                                    No recipients configured for {{ activeDivisionGroup.divisionName }}.
+                                    <button @click="addRow(activeDivisionGroup!)" class="ml-2 text-blue-400 hover:text-blue-300 underline">Add one</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
 
                 <div v-if="!divisionGroups.length" class="text-slate-500 text-sm">
                     No divisions found.
                 </div>
             </template>
+
+            <!-- ── ADD RECIPIENT DIALOG ── -->
+            <div
+                v-if="addDialog.open"
+                class="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+                @click.self="closeAddDialog"
+            >
+                <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
+                    <h3 class="text-base font-semibold text-slate-100 mb-4">Add Recipient — {{ addDialog.divisionName }}</h3>
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">First Name</label>
+                                <input
+                                    v-model="addDialog.firstName"
+                                    @input="autoFillEmail"
+                                    type="text"
+                                    placeholder="Joseph"
+                                    class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Last Name</label>
+                                <input
+                                    v-model="addDialog.lastName"
+                                    @input="autoFillEmail"
+                                    type="text"
+                                    placeholder="Hilliard"
+                                    class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Company</label>
+                            <select
+                                v-model="addDialog.company"
+                                @change="autoFillEmail"
+                                class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+                            >
+                                <option value="">— Select Company —</option>
+                                <option v-for="c in COMPANIES" :key="c.name" :value="c.name">{{ c.name }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Email Address</label>
+                            <input
+                                v-model="addDialog.email"
+                                type="email"
+                                placeholder="firstname.lastname@company.com"
+                                class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                            />
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-2 mt-5">
+                        <button
+                            @click="closeAddDialog"
+                            class="px-4 py-1.5 text-sm text-slate-400 hover:text-slate-200"
+                        >Cancel</button>
+                        <button
+                            @click="confirmAddRow"
+                            :disabled="!addDialog.email.trim()"
+                            class="px-4 py-1.5 text-sm bg-blue-700 hover:bg-blue-600 text-white rounded disabled:opacity-40"
+                        >Add Recipient</button>
+                    </div>
+                </div>
+            </div>
 
             <!-- ── USER ROLES TAB ── -->
             <template v-else-if="activeTab === 'roles'">
@@ -160,7 +240,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import { useAdminStore } from '../../../stores/adminStore';
 import type { EmailRoutingRuleUpsertDto } from '@/apiclient/auditClient';
@@ -190,7 +270,24 @@ interface EditableRule {
     divisionId: number;
     emailAddress: string;
     isActive: boolean;
+    displayName?: string;
 }
+
+const COMPANIES: { name: string; domain: string }[] = [
+    { name: 'Stronghold Companies',          domain: 'thestrongholdcompanies.com' },
+    { name: 'Quanta Services',               domain: 'quantaservices.com' },
+    { name: 'Kinder Morgan',                 domain: 'kindermorgan.com' },
+    { name: 'Enterprise Products Partners',  domain: 'enterpriseproducts.com' },
+    { name: 'ExxonMobil',                    domain: 'exxonmobil.com' },
+    { name: 'Motiva Enterprises',            domain: 'motivaenterprises.com' },
+    { name: 'Marathon Petroleum',            domain: 'marathonpetroleum.com' },
+    { name: 'Valero Energy',                 domain: 'valero.com' },
+    { name: 'LyondellBasell',               domain: 'lyondellbasell.com' },
+    { name: 'Chevron Phillips Chemical',     domain: 'cpchem.com' },
+    { name: 'Plains All American Pipeline',  domain: 'plains.com' },
+    { name: 'INEOS',                         domain: 'ineos.com' },
+    { name: 'Huntsman Corporation',          domain: 'huntsman.com' },
+];
 
 interface DivisionGroup {
     divisionId: number;
@@ -201,6 +298,11 @@ interface DivisionGroup {
 
 const divisionGroups = ref<DivisionGroup[]>([]);
 const isDirty = ref(false);
+const selectedDivisionCode = ref<string>('');
+
+const activeDivisionGroup = computed(() =>
+    divisionGroups.value.find(g => g.divisionCode === selectedDivisionCode.value) ?? null
+);
 
 onMounted(async () => {
     await Promise.all([
@@ -226,9 +328,14 @@ function buildGroups() {
             divisionId: r.divisionId,
             emailAddress: r.emailAddress,
             isActive: r.isActive,
+            displayName: undefined,
         });
     }
     divisionGroups.value = Array.from(map.values()).sort((a, b) => a.divisionName.localeCompare(b.divisionName));
+    // Auto-select first division (or keep current selection if still valid)
+    if (!selectedDivisionCode.value || !divisionGroups.value.find(g => g.divisionCode === selectedDivisionCode.value)) {
+        selectedDivisionCode.value = divisionGroups.value[0]?.divisionCode ?? '';
+    }
     isDirty.value = false;
 }
 
@@ -241,9 +348,59 @@ function deactivateAll() {
     isDirty.value = true;
 }
 
+// ── Add Recipient Dialog ───────────────────────────────────────────────────────
+
+const addDialog = ref({
+    open: false,
+    targetGroup: null as DivisionGroup | null,
+    divisionName: '',
+    firstName: '',
+    lastName: '',
+    company: '',
+    email: '',
+});
+
 function addRow(group: DivisionGroup) {
-    group.rules.push({ divisionId: group.divisionId, emailAddress: '', isActive: true });
+    addDialog.value = {
+        open: true,
+        targetGroup: group,
+        divisionName: group.divisionName,
+        firstName: '',
+        lastName: '',
+        company: '',
+        email: '',
+    };
+}
+
+function autoFillEmail() {
+    const { firstName, lastName, company } = addDialog.value;
+    if (!firstName && !lastName) return;
+    const companyData = COMPANIES.find(c => c.name === company);
+    const domain = companyData?.domain ?? '';
+    const local = [firstName.toLowerCase(), lastName.toLowerCase()].filter(Boolean).join('.');
+    if (local && domain) {
+        addDialog.value.email = `${local}@${domain}`;
+    } else if (local) {
+        addDialog.value.email = `${local}@`;
+    }
+}
+
+function confirmAddRow() {
+    const { targetGroup, firstName, lastName, email } = addDialog.value;
+    if (!targetGroup || !email.trim()) return;
+    const displayName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || undefined;
+    targetGroup.rules.push({
+        divisionId: targetGroup.divisionId,
+        emailAddress: email.trim(),
+        isActive: true,
+        displayName,
+    });
     isDirty.value = true;
+    closeAddDialog();
+}
+
+function closeAddDialog() {
+    addDialog.value.open = false;
 }
 
 function removeRow(group: DivisionGroup, idx: number) {

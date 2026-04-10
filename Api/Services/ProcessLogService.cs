@@ -50,7 +50,15 @@ public class ProcessLogService : IProcessLogService
             LoggedAt = DateTime.UtcNow
         };
 
-        await _context.ProcessLogs.AddAsync(entry);
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.ProcessLogs.AddAsync(entry);
+            await _context.SaveChangesAsync();
+        }
+        catch
+        {
+            // Process log table may not exist in all database contexts — never fail the caller
+            _context.ChangeTracker.Clear();
+        }
     }
 }
