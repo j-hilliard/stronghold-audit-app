@@ -25,7 +25,52 @@
                 icon="pi pi-envelope"
                 @click="openEmailClient"
             />
+            <Button
+                v-if="review && (review.status === 'Submitted' || review.status === 'Closed')"
+                label="Reopen"
+                icon="pi pi-refresh"
+                severity="warning"
+                outlined
+                @click="showReopenDialog = true"
+            />
+            <Button
+                v-if="review && (review.status === 'Submitted' || review.status === 'Reopened')"
+                label="Close Audit"
+                icon="pi pi-check-circle"
+                severity="success"
+                @click="showCloseAuditDialog = true"
+            />
         </BasePageHeader>
+
+        <!-- Reopen Audit Dialog -->
+        <Dialog v-model:visible="showReopenDialog" modal header="Reopen Audit" :style="{ width: '420px' }">
+            <div class="space-y-3 py-2">
+                <p class="text-sm text-slate-300">This will set the audit back to <strong>Reopened</strong> so responses can be edited.</p>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Reason (optional)</label>
+                    <Textarea v-model="reopenReason" rows="3" class="w-full text-sm" placeholder="Reason for reopening…" autoResize />
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Cancel" severity="secondary" text @click="showReopenDialog = false" />
+                <Button label="Reopen" icon="pi pi-refresh" severity="warning" :loading="auditActionSaving" @click="submitReopen" />
+            </template>
+        </Dialog>
+
+        <!-- Close Audit Dialog -->
+        <Dialog v-model:visible="showCloseAuditDialog" modal header="Close Audit" :style="{ width: '420px' }">
+            <div class="space-y-3 py-2">
+                <p class="text-sm text-slate-300">Closing the audit marks it as <strong>Closed</strong>. All corrective actions should be resolved first.</p>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Closing Notes (optional)</label>
+                    <Textarea v-model="closeAuditNotes" rows="3" class="w-full text-sm" placeholder="Any final notes…" autoResize />
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Cancel" severity="secondary" text @click="showCloseAuditDialog = false" />
+                <Button label="Close Audit" icon="pi pi-check-circle" severity="success" :loading="auditActionSaving" @click="submitCloseAudit" />
+            </template>
+        </Dialog>
 
         <div v-if="store.reviewLoading" class="flex justify-center py-12">
             <ProgressSpinner />
@@ -329,7 +374,46 @@ function openAssignModal(item: AuditFindingDto) {
     showAssign.value = true;
 }
 
-// ── Close modal ───────────────────────────────────────────────────────────────
+// ── Reopen / Close audit ──────────────────────────────────────────────────────
+const showReopenDialog = ref(false);
+const showCloseAuditDialog = ref(false);
+const reopenReason = ref('');
+const closeAuditNotes = ref('');
+const auditActionSaving = ref(false);
+
+async function submitReopen() {
+    const id = Number(route.params.id);
+    auditActionSaving.value = true;
+    try {
+        await getClient().reopenAudit(id, reopenReason.value || null);
+        toast.add({ severity: 'warn', summary: 'Reopened', detail: 'Audit has been reopened.', life: 3000 });
+        showReopenDialog.value = false;
+        reopenReason.value = '';
+        await store.loadReview(id);
+    } catch (e: unknown) {
+        toast.add({ severity: 'error', summary: 'Error', detail: (e as Error)?.message ?? 'Failed to reopen.', life: 4000 });
+    } finally {
+        auditActionSaving.value = false;
+    }
+}
+
+async function submitCloseAudit() {
+    const id = Number(route.params.id);
+    auditActionSaving.value = true;
+    try {
+        await getClient().closeAudit(id, closeAuditNotes.value || null);
+        toast.add({ severity: 'success', summary: 'Closed', detail: 'Audit has been closed.', life: 3000 });
+        showCloseAuditDialog.value = false;
+        closeAuditNotes.value = '';
+        await store.loadReview(id);
+    } catch (e: unknown) {
+        toast.add({ severity: 'error', summary: 'Error', detail: (e as Error)?.message ?? 'Failed to close.', life: 4000 });
+    } finally {
+        auditActionSaving.value = false;
+    }
+}
+
+// ── Close CA modal ─────────────────────────────────────────────────────────────
 const showClose = ref(false);
 const closeTarget = ref<CorrectiveActionDto | null>(null);
 const closeForm = ref({ notes: '', completedDate: '' });

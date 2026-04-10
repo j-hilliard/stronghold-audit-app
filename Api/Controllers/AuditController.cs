@@ -11,6 +11,9 @@ using Stronghold.AppDashboard.Api.Models.Audit;
 
 namespace Stronghold.AppDashboard.Api.Controllers;
 
+public record ReopenAuditRequest(string? Reason);
+public record CloseAuditRequest(string? Notes);
+
 [Route(Constants.Routes.ApiTemplate)]
 public class AuditController : V1ControllerBase
 {
@@ -217,6 +220,44 @@ public class AuditController : V1ControllerBase
     }
 
     [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPost("audits/{id:int}/reopen")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ReopenAudit([FromRoute] int id, [FromBody] ReopenAuditRequest body)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                var user = await GetUser();
+                await Mediator.Send(new ReopenAudit { AuditId = id, ReopenedBy = user.Email!, Reason = body.Reason });
+                return NoContent();
+            },
+            ex => ex is InvalidOperationException
+                ? Task.FromResult<IActionResult>(BadRequest(ex.Message))
+                : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPost("audits/{id:int}/close")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CloseAudit([FromRoute] int id, [FromBody] CloseAuditRequest body)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                var user = await GetUser();
+                await Mediator.Send(new CloseAudit { AuditId = id, ClosedBy = user.Email!, Notes = body.Notes });
+                return NoContent();
+            },
+            ex => ex is InvalidOperationException
+                ? Task.FromResult<IActionResult>(BadRequest(ex.Message))
+                : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
     [HttpDelete("audits/{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -254,6 +295,23 @@ public class AuditController : V1ControllerBase
     }
 
     // ── Corrective Actions ────────────────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("audits/corrective-actions")]
+    [ProducesResponseType(typeof(List<CorrectiveActionListItemDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<CorrectiveActionListItemDto>>> GetCorrectiveActions(
+        [FromQuery] int? divisionId,
+        [FromQuery] string? status)
+    {
+        return await TryExecuteAsync<ActionResult<List<CorrectiveActionListItemDto>>>(
+            async () =>
+            {
+                await GetUser();
+                return Ok(await Mediator.Send(new GetCorrectiveActions { DivisionId = divisionId, Status = status }));
+            },
+            ex => Error<List<CorrectiveActionListItemDto>>(ex)
+        );
+    }
 
     [MapToApiVersion(Constants.ApiVersions.V1)]
     [HttpPost("audits/corrective-actions")]

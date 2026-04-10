@@ -279,6 +279,24 @@ export interface CorrectiveActionDto {
     createdAt: string;
 }
 
+export interface CorrectiveActionListItemDto {
+    id: number;
+    auditId: number;
+    divisionCode: string;
+    divisionName: string;
+    jobNumber?: string | null;
+    auditDate?: string | null;
+    description: string;
+    status: string;
+    assignedTo?: string | null;
+    dueDate?: string | null;
+    completedDate?: string | null;
+    isOverdue: boolean;
+    questionText: string;
+    sectionName: string;
+    createdAt: string;
+}
+
 export interface AssignCorrectiveActionRequest {
     findingId: number;
     description: string;
@@ -840,6 +858,31 @@ export class AuditClient {
     deleteReportDraft(id: number, cancelToken?: CancelToken): Promise<void> {
         return this.instance
             .delete(`${this.baseUrl}/v1/audits/report-drafts/${id}`, { cancelToken })
+            .then(() => undefined);
+    }
+
+    getCorrectiveActions(
+        divisionId?: number | null,
+        status?: string | null,
+        cancelToken?: CancelToken,
+    ): Promise<CorrectiveActionListItemDto[]> {
+        const params: Record<string, unknown> = {};
+        if (divisionId != null) params['divisionId'] = divisionId;
+        if (status) params['status'] = status;
+        return this.instance
+            .get<CorrectiveActionListItemDto[]>(`${this.baseUrl}/v1/audits/corrective-actions`, { params, cancelToken })
+            .then(r => r.data);
+    }
+
+    reopenAudit(id: number, reason?: string | null, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .post(`${this.baseUrl}/v1/audits/${id}/reopen`, { reason }, { cancelToken })
+            .then(() => undefined);
+    }
+
+    closeAudit(id: number, notes?: string | null, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .post(`${this.baseUrl}/v1/audits/${id}/close`, { notes }, { cancelToken })
             .then(() => undefined);
     }
 

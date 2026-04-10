@@ -53,6 +53,7 @@ export const apps = {
                 { label: 'Audits', icon: 'pi pi-fw pi-list', to: '/audit-management/audits' },
                 { label: 'New Audit', icon: 'pi pi-fw pi-plus', to: '/audit-management/audits/new' },
                 { label: 'Reports', icon: 'pi pi-fw pi-chart-bar', to: '/audit-management/reports' },
+                { label: 'Corrective Actions', icon: 'pi pi-fw pi-exclamation-circle', to: '/audit-management/corrective-actions' },
             ],
             admin: [
                 { label: 'Templates', icon: 'pi pi-fw pi-table', to: '/audit-management/admin/templates' },

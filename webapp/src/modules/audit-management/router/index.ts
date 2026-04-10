@@ -67,6 +67,18 @@ export const auditManagementRoutes = [
         },
     },
     {
+        path: 'corrective-actions',
+        name: 'audit-management-corrective-actions',
+        component: () => import('@/modules/audit-management/features/corrective-actions/views/CorrectiveActionsView.vue'),
+        meta: {
+            title: 'Corrective Actions',
+            breadcrumbItems: () => [
+                { label: 'Compliance Audit' },
+                { label: 'Corrective Actions' },
+            ],
+        },
+    },
+    {
         path: 'admin/templates',
         name: 'audit-management-templates',
         component: () => import('@/modules/audit-management/features/template-manager/views/TemplateManagerView.vue'),
