@@ -33,6 +33,31 @@ body {
     opacity: 1;
 }
 
+/* ── Page route transitions ──────────────────────────────────────────────────── */
+.page-enter-active {
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.page-leave-active {
+    transition: opacity 0.12s ease;
+}
+.page-enter-from {
+    opacity: 0;
+    transform: translateY(10px);
+}
+.page-leave-to {
+    opacity: 0;
+}
+
+/* ── Overdue pulse ring ───────────────────────────────────────────────────────── */
+@keyframes overdue-ring {
+    0%   { box-shadow: 0 0 0 0   rgba(239, 68, 68, 0.55); }
+    70%  { box-shadow: 0 0 0 7px rgba(239, 68, 68, 0);    }
+    100% { box-shadow: 0 0 0 0   rgba(239, 68, 68, 0);    }
+}
+.tag-overdue-pulse {
+    animation: overdue-ring 1.8s ease infinite;
+}
+
 .p-ink {
     display: none;
 }
@@ -87,21 +112,49 @@ body {
 
 /* PrimeVue buttons — brightness glow on hover */
 .p-button:not(:disabled) {
-    transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease !important;
+    transition: filter 0.15s ease, box-shadow 0.15s ease !important;
 }
 .p-button:not(:disabled):hover {
     filter: brightness(1.15);
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
-    transform: translateY(-1px);
+    box-shadow: 0 0 0 2px rgba(99, 179, 237, 0.35), 0 4px 16px rgba(99, 179, 237, 0.2);
 }
 .p-button:not(:disabled):active {
-    transform: translateY(0);
     filter: brightness(0.95);
+    box-shadow: none;
 }
 
-/* Nav sidebar menu links — smooth fill-in on hover */
+/* Nav sidebar menu links — smooth fill-in with left accent on hover */
 .menu-wrapper .layout-menu-container .layout-menu li > a {
-    transition: background-color 0.15s ease, color 0.15s ease !important;
+    transition: background-color 0.18s ease, color 0.18s ease, border-left-color 0.18s ease, box-shadow 0.18s ease !important;
+    border-left: 3px solid transparent;
+    padding-left: calc(1.25rem - 3px) !important;
+}
+.menu-wrapper .layout-menu-container .layout-menu li > a:hover {
+    background: rgba(99, 179, 237, 0.1) !important;
+    border-left-color: rgba(99, 179, 237, 0.55) !important;
+}
+.menu-wrapper .layout-menu-container .layout-menu li > a.active-route {
+    background: rgba(99, 179, 237, 0.16) !important;
+    border-left-color: #63b3ed !important;
+    color: #fff !important;
+}
+
+/* All DataTable rows — blue left-bar glow on hover */
+.p-datatable .p-datatable-tbody > tr {
+    transition: background-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+.p-datatable .p-datatable-tbody > tr:hover {
+    background: rgba(99, 179, 237, 0.07) !important;
+    box-shadow: inset 3px 0 0 rgba(99, 179, 237, 0.6) !important;
+    cursor: pointer;
+}
+
+/* All PrimeVue cards — subtle glow ring on hover */
+.p-card {
+    transition: box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+.p-card:hover {
+    box-shadow: 0 0 0 1px rgba(99, 179, 237, 0.2), 0 8px 24px rgba(0, 0, 0, 0.45) !important;
 }
 
 /* Clickable cards — glow on hover */
@@ -110,6 +163,17 @@ body {
 }
 .hover-card:hover {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Finding / warning cards in audit review */
+.finding-card, .warning-card {
+    transition: box-shadow 0.18s ease, border-color 0.18s ease !important;
+}
+.finding-card:hover {
+    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.45), 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+}
+.warning-card:hover {
+    box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.45), 0 4px 16px rgba(0, 0, 0, 0.4) !important;
 }
 
 .p-dropdown {
@@ -167,6 +231,92 @@ body {
     padding: 2px 1rem !important;
     background-color: transparent !important;
 }
+
+/* ── Topbar frosted glass ─────────────────────────────────────────────────────── */
+.layout-topbar.bg-slate-900 {
+    background: rgba(15, 23, 42, 0.85) !important;
+    backdrop-filter: blur(14px) saturate(1.4) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(1.4) !important;
+}
+
+/* ── Light theme overrides (toggled via html.theme-light class) ─────────────── */
+html.theme-light body {
+    background-color: #f1f5f9 !important;
+    color: #1e293b !important;
+}
+html.theme-light .layout-main {
+    background: linear-gradient(to bottom, #f1f5f9, #e2e8f0) !important;
+}
+html.theme-light .layout-menu-container,
+html.theme-light .menu-wrapper {
+    background: #ffffff !important;
+}
+html.theme-light .layout-topbar {
+    background: #ffffff !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+}
+html.theme-light .p-card {
+    background: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    color: #1e293b !important;
+}
+html.theme-light .p-card:hover {
+    box-shadow: 0 0 0 1px rgba(59,130,246,0.25), 0 8px 24px rgba(0,0,0,0.12) !important;
+}
+html.theme-light .p-datatable .p-datatable-thead > tr > th {
+    background: #f8fafc !important;
+    color: #475569 !important;
+    border-color: #e2e8f0 !important;
+}
+html.theme-light .p-datatable .p-datatable-tbody > tr {
+    background: #ffffff !important;
+    color: #1e293b !important;
+    border-color: #e2e8f0 !important;
+}
+html.theme-light .p-datatable .p-datatable-tbody > tr:nth-child(even) {
+    background: #f8fafc !important;
+}
+html.theme-light .p-datatable .p-datatable-tbody > tr:hover {
+    background: rgba(59, 130, 246, 0.06) !important;
+    box-shadow: inset 3px 0 0 rgba(59, 130, 246, 0.55) !important;
+}
+html.theme-light .p-dropdown,
+html.theme-light .p-inputtext,
+html.theme-light .p-textarea {
+    background: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    color: #1e293b !important;
+}
+html.theme-light .p-dropdown-panel { background: #ffffff !important; border-color: #cbd5e1 !important; }
+html.theme-light .p-dropdown-item { color: #1e293b !important; }
+html.theme-light .p-dropdown-item:hover { background: #f1f5f9 !important; }
+html.theme-light .p-dialog { background: #ffffff !important; border-color: #e2e8f0 !important; }
+html.theme-light .p-dialog-header { color: #1e293b !important; border-bottom-color: #e2e8f0 !important; }
+html.theme-light .p-dialog-footer { border-top-color: #e2e8f0 !important; }
+html.theme-light .text-slate-100,
+html.theme-light .text-slate-200,
+html.theme-light .text-slate-300 { color: #334155 !important; }
+html.theme-light .text-slate-400,
+html.theme-light .text-slate-500 { color: #64748b !important; }
+html.theme-light .text-white { color: #1e293b !important; }
+html.theme-light .bg-slate-800,
+html.theme-light .bg-slate-900 { background: #ffffff !important; }
+html.theme-light .bg-slate-700 { background: #f1f5f9 !important; }
+html.theme-light .border-slate-700 { border-color: #e2e8f0 !important; }
+html.theme-light .layout-menuitem-text { color: #334155 !important; }
+html.theme-light .layout-menuitem-icon { color: #64748b !important; }
+html.theme-light .menu-wrapper .layout-menu-container .layout-menu li > a:hover {
+    background: rgba(59, 130, 246, 0.08) !important;
+    border-left-color: rgba(59, 130, 246, 0.55) !important;
+}
+html.theme-light .menu-wrapper .layout-menu-container .layout-menu li > a.active-route {
+    background: rgba(59, 130, 246, 0.12) !important;
+    border-left-color: #3b82f6 !important;
+    color: #1d4ed8 !important;
+}
+html.theme-light .layout-menuitem-root-text { color: #94a3b8 !important; }
+html.theme-light .p-button.p-button-text { color: #334155 !important; }
+html.theme-light .p-tag { border: 1px solid currentColor; }
 
 /* ── Views that lock the layout to viewport height (only inner panel scrolls) ── */
 /* Screen-only: must NOT apply during print or it clips the print content. */

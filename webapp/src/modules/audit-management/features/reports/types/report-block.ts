@@ -21,7 +21,12 @@ export type BlockType =
     | 'narrative'
     | 'callout'
     | 'ca-table'
-    | 'image';
+    | 'image'
+    | 'column-row'
+    | 'divider'
+    | 'spacer'
+    | 'toc-sidebar'
+    | 'oval-callout';
 
 // ── Shared style model ────────────────────────────────────────────────────────
 // Editable via the property panel. Never written by the regeneration engine.
@@ -75,6 +80,22 @@ export interface CoverContent {
     primaryColor: string;
     /** preserved — sole source of truth for cover background image */
     backgroundImageUrl: string;
+    // ── Newsletter template fields (all preserved) ────────────────────────────
+    /** Small text rendered above the division name. e.g. "2022 Compliance" */
+    subtitle?: string;
+    /** Right-aligned text below the decorative rules. e.g. "A Year in Review" */
+    tagline?: string;
+    /**
+     * Color for the large division name display.
+     * Defaults to primaryColor if not set.
+     * Allows name to be a different accent color (e.g. crimson) while gradient stays navy.
+     */
+    nameAccentColor?: string;
+    /**
+     * When true (default), renders horizontal rule lines above and below the division name.
+     * Matches the decorative rule style in the physical newsletter template.
+     */
+    showDecorativeRules?: boolean;
 }
 
 export interface CoverBlock extends ReportBlockBase {
@@ -263,6 +284,92 @@ export interface ImageBlock extends ReportBlockBase {
     content: ImageContent;
 }
 
+// ── Column Row ────────────────────────────────────────────────────────────────
+
+export type ColumnRatio = '30/70' | '50/50' | '60/40' | '40/60' | '70/30';
+export type ColumnGap   = 'none' | 'sm' | 'md' | 'lg';
+
+export interface ColumnRowContent {
+    ratio: ColumnRatio;
+    gap: ColumnGap;
+    /** Blocks rendered in the left column. Cannot be column-row (no nesting). */
+    leftBlocks: ReportBlock[];
+    /** Blocks rendered in the right column. Cannot be column-row (no nesting). */
+    rightBlocks: ReportBlock[];
+}
+
+export interface ColumnRowBlock extends ReportBlockBase {
+    type: 'column-row';
+    content: ColumnRowContent;
+}
+
+// ── Divider ───────────────────────────────────────────────────────────────────
+
+export interface DividerContent {
+    thickness: 1 | 2 | 4;
+    variant: 'solid' | 'dashed' | 'dotted';
+    /** Hex color. Defaults to slate-600 (#475569) if empty. */
+    color?: string;
+    marginY: 'sm' | 'md' | 'lg';
+}
+
+export interface DividerBlock extends ReportBlockBase {
+    type: 'divider';
+    content: DividerContent;
+}
+
+// ── Spacer ────────────────────────────────────────────────────────────────────
+
+export interface SpacerContent {
+    /** xs=8px  sm=16px  md=32px  lg=48px  xl=64px */
+    height: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+}
+
+export interface SpacerBlock extends ReportBlockBase {
+    type: 'spacer';
+    content: SpacerContent;
+}
+
+// ── TOC Sidebar ───────────────────────────────────────────────────────────────
+
+export interface TocItem {
+    heading: string;
+    description?: string;
+}
+
+export interface TocSidebarContent {
+    /** e.g. "INSIDE" */
+    title: string;
+    items: TocItem[];
+    /** true = dark sidebar background (matches the physical newsletter template) */
+    darkBackground: boolean;
+}
+
+export interface TocSidebarBlock extends ReportBlockBase {
+    type: 'toc-sidebar';
+    content: TocSidebarContent;
+}
+
+// ── Oval Callout ──────────────────────────────────────────────────────────────
+
+export interface OvalCalloutContent {
+    /** Bold title e.g. "strong-hold" */
+    title: string;
+    /** Italic phonetic line e.g. "/'strôNG.hōld/ noun." */
+    phonetic?: string;
+    /** Body definition / quote text */
+    body: string;
+    /** Hex background. Defaults to dark navy (#1e3a5f) if empty. */
+    backgroundColor?: string;
+    /** Hex text color. Defaults to white if empty. */
+    textColor?: string;
+}
+
+export interface OvalCalloutBlock extends ReportBlockBase {
+    type: 'oval-callout';
+    content: OvalCalloutContent;
+}
+
 // ── Discriminated union ───────────────────────────────────────────────────────
 
 export type ReportBlock =
@@ -274,4 +381,9 @@ export type ReportBlock =
     | NarrativeBlock
     | CalloutBlock
     | CaTableBlock
-    | ImageBlock;
+    | ImageBlock
+    | ColumnRowBlock
+    | DividerBlock
+    | SpacerBlock
+    | TocSidebarBlock
+    | OvalCalloutBlock;

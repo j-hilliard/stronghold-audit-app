@@ -29,6 +29,33 @@ async function installComposerMocks(page: Page) {
     const trendUrls: string[] = [];
     const createBodies: Record<string, unknown>[] = [];
     const updateBodies: Record<string, unknown>[] = [];
+    const deletedDraftIds: number[] = [];
+    let draftList = [
+        {
+            id: 42,
+            divisionId: 1,
+            divisionCode: 'ETS',
+            title: 'ETS Q1 Newsletter',
+            period: 'Q1 2026',
+            dateFrom: '2026-01-01',
+            dateTo: '2026-03-31',
+            createdAt: '2026-04-01T12:00:00Z',
+            updatedAt: '2026-04-02T10:00:00Z',
+            createdBy: 'qa@stronghold.local',
+        },
+        {
+            id: 43,
+            divisionId: 1,
+            divisionCode: 'ETS',
+            title: 'ETS Q2 Draft',
+            period: 'Q2 2026',
+            dateFrom: '2026-04-01',
+            dateTo: '2026-06-30',
+            createdAt: '2026-04-03T12:00:00Z',
+            updatedAt: '2026-04-04T10:00:00Z',
+            createdBy: 'qa@stronghold.local',
+        },
+    ];
 
     await page.route(/\/v1\/divisions(\?.*)?$/i, async (route) => {
         return replyJson(route, [
@@ -157,24 +184,24 @@ async function installComposerMocks(page: Page) {
         return route.fulfill({ status: 405 });
     });
 
+    await page.route(/\/v1\/audits\/report-drafts\/(\d+)(\?.*)?$/i, async (route) => {
+        const method = route.request().method().toUpperCase();
+        const url = new URL(route.request().url());
+        const match = url.pathname.match(/\/v1\/audits\/report-drafts\/(\d+)/i);
+        const id = Number(match?.[1] ?? 0);
+        if (method === 'DELETE' && id > 0) {
+            deletedDraftIds.push(id);
+            draftList = draftList.filter(d => d.id !== id);
+            return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' } });
+        }
+        return route.fallback();
+    });
+
     await page.route(/\/v1\/audits\/report-drafts(\?.*)?$/i, async (route) => {
         const method = route.request().method().toUpperCase();
 
         if (method === 'GET') {
-            return replyJson(route, [
-                {
-                    id: 42,
-                    divisionId: 1,
-                    divisionCode: 'ETS',
-                    title: 'ETS Q1 Newsletter',
-                    period: 'Q1 2026',
-                    dateFrom: '2026-01-01',
-                    dateTo: '2026-03-31',
-                    createdAt: '2026-04-01T12:00:00Z',
-                    updatedAt: '2026-04-02T10:00:00Z',
-                    createdBy: 'qa@stronghold.local',
-                },
-            ]);
+            return replyJson(route, draftList);
         }
 
         if (method === 'POST') {
@@ -190,6 +217,7 @@ async function installComposerMocks(page: Page) {
         trendUrls: () => trendUrls,
         createBodies: () => createBodies,
         updateBodies: () => updateBodies,
+        deletedDraftIds: () => deletedDraftIds,
     };
 }
 
@@ -271,6 +299,67 @@ test.describe('Audit report composer contract (feature-gated)', () => {
         expect((barBlock?.content as { caption?: string })?.caption).toBe('Edited caption persists');
         expect((barBlock?.style as { backgroundColor?: string })?.backgroundColor).toBe('#123456');
         expect((narrativeBlock?.content as { text?: string })?.text).toBe('Manual narrative should persist after refresh');
+
+        expectNoRuntimeErrors(runtimeErrors);
+    });
+
+    test('manage drafts dialog can bulk-delete selected drafts', async ({ page, runtimeErrors }) => {
+        const state = await installComposerMocks(page);
+
+        await gotoAndStabilize(page, '/audit-management/reports/composer');
+        await expect(page.getByRole('heading', { name: 'Report Composer' })).toBeVisible();
+
+        await page.getByRole('button', { name: /Manage Drafts/i }).click();
+        const dialog = page.getByRole('dialog', { name: /Manage Drafts/i });
+        await expect(dialog).toBeVisible();
+        await expect(dialog.locator('tbody tr')).toHaveCount(2);
+
+        await dialog.locator('tbody tr').first().click();
+        const deleteButton = dialog.getByRole('button', { name: /Delete Selected \(1\)/i });
+        await expect(deleteButton).toBeVisible();
+
+        page.once('dialog', d => d.accept());
+        await deleteButton.click();
+
+        await expect.poll(() => state.deletedDraftIds().length).toBe(1);
+        await expect(dialog.locator('tbody tr')).toHaveCount(1);
+
+        expectNoRuntimeErrors(runtimeErrors);
+    });
+
+    test('print/export mounts print-root and preserves chart pixels as images', async ({ page, runtimeErrors }) => {
+        const state = await installComposerMocks(page);
+        void state;
+
+        await page.addInitScript(() => {
+            // @ts-expect-error test-only global
+            window.__printCalls = 0;
+            window.print = () => {
+                // @ts-expect-error test-only global
+                window.__printCalls += 1;
+            };
+        });
+
+        await gotoAndStabilize(page, '/audit-management/reports/composer');
+        await expect(page.getByRole('heading', { name: 'Report Composer' })).toBeVisible();
+
+        await page.locator('[data-testid="composer-filter-division"]').selectOption({ value: '1' });
+        await page.locator('[data-testid="composer-draft-select"]').selectOption({ value: '42' });
+        await expect(page.locator('[data-testid="composer-block-bar-1"] canvas').first()).toBeVisible();
+
+        await page.locator('[data-testid="composer-print"]').click();
+        const printRoot = page.locator('#print-root');
+        await expect(printRoot).toBeVisible();
+
+        // Converted charts should become <img data:image/png...> in print clone.
+        const printedChartImages = printRoot.locator('img[src^="data:image/png"]');
+        await expect(printedChartImages.first()).toBeVisible();
+
+        const printCalls = await page.evaluate(() => {
+            // @ts-expect-error test-only global
+            return window.__printCalls ?? 0;
+        });
+        expect(printCalls).toBeGreaterThan(0);
 
         expectNoRuntimeErrors(runtimeErrors);
     });

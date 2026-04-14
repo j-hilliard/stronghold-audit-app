@@ -40,20 +40,20 @@
 
         <!-- Summary KPI Cards -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
-                <div class="text-2xl font-bold text-white">{{ items.length }}</div>
+            <div class="kpi-card bg-slate-800 border border-slate-700 rounded-lg p-4">
+                <div class="text-2xl font-bold text-white">{{ displayTotal }}</div>
                 <div class="text-xs text-slate-400 mt-1">Total Actions</div>
             </div>
-            <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
-                <div class="text-2xl font-bold text-blue-400">{{ openCount }}</div>
+            <div class="kpi-card bg-slate-800 border border-slate-700 rounded-lg p-4">
+                <div class="text-2xl font-bold text-blue-400">{{ displayOpen }}</div>
                 <div class="text-xs text-slate-400 mt-1">Open</div>
             </div>
-            <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
-                <div class="text-2xl font-bold text-red-400">{{ overdueCount }}</div>
+            <div class="kpi-card bg-slate-800 border border-slate-700 rounded-lg p-4 kpi-card--danger">
+                <div class="text-2xl font-bold text-red-400">{{ displayOverdue }}</div>
                 <div class="text-xs text-slate-400 mt-1">Overdue</div>
             </div>
-            <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
-                <div class="text-2xl font-bold text-green-400">{{ closedCount }}</div>
+            <div class="kpi-card bg-slate-800 border border-slate-700 rounded-lg p-4">
+                <div class="text-2xl font-bold text-green-400">{{ displayClosed }}</div>
                 <div class="text-xs text-slate-400 mt-1">Closed</div>
             </div>
         </div>
@@ -70,6 +70,7 @@
             scroll-height="flex"
             class="text-sm"
             data-key="id"
+            @row-dblclick="(e) => goToAudit(e.data.auditId)"
         >
             <template #empty>
                 <div class="text-center text-slate-400 py-8">No corrective actions found.</div>
@@ -117,17 +118,17 @@
 
             <Column field="status" header="Status" sortable style="min-width:120px">
                 <template #body="{ data }">
-                    <Tag :value="data.status" :severity="statusSeverity(data)" />
+                    <Tag :value="data.status" :severity="statusSeverity(data)" :class="{ 'tag-overdue-pulse': data.isOverdue }" />
                 </template>
             </Column>
 
-            <Column header="Actions" style="min-width:120px; text-align:right" frozen align-frozen="right">
+            <Column header="" style="min-width:100px; text-align:right" frozen align-frozen="right">
                 <template #body="{ data }">
-                    <div class="flex gap-2 justify-end">
+                    <div class="ca-row-actions">
                         <Button
                             icon="pi pi-eye"
                             size="small"
-                            outlined
+                            text
                             v-tooltip.top="'View Audit'"
                             @click="goToAudit(data.auditId)"
                         />
@@ -136,7 +137,7 @@
                             icon="pi pi-check"
                             size="small"
                             severity="success"
-                            outlined
+                            text
                             v-tooltip.top="'Close Action'"
                             @click="openCloseDialog(data)"
                         />
@@ -189,7 +190,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import type { CorrectiveActionListItemDto } from '@/apiclient/auditClient';
@@ -231,6 +232,28 @@ const closeSaving = ref(false);
 const openCount = computed(() => items.value.filter(i => i.status === 'Open' || i.status === 'InProgress').length);
 const overdueCount = computed(() => items.value.filter(i => i.isOverdue).length);
 const closedCount = computed(() => items.value.filter(i => i.status === 'Closed').length);
+
+// ── Count-up animation ─────────────────────────────────────────────────────────
+function useCountUp(source: () => number, duration = 700) {
+    const display = ref(0);
+    watch(source, (to) => {
+        const from = display.value;
+        const start = performance.now();
+        function tick(now: number) {
+            const t = Math.min((now - start) / duration, 1);
+            const ease = 1 - Math.pow(1 - t, 3);
+            display.value = Math.round(from + (to - from) * ease);
+            if (t < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+    }, { immediate: true });
+    return display;
+}
+
+const displayTotal   = useCountUp(() => items.value.length);
+const displayOpen    = useCountUp(() => openCount.value);
+const displayOverdue = useCountUp(() => overdueCount.value);
+const displayClosed  = useCountUp(() => closedCount.value);
 
 // ── Methods ────────────────────────────────────────────────────────────────────
 async function load() {
@@ -317,5 +340,28 @@ onMounted(load);
     -webkit-line-clamp: 1;
     -webkit-box-orient: vertical;
     overflow: hidden;
+}
+
+.ca-row-actions {
+    display: flex;
+    gap: 2px;
+    justify-content: flex-end;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+:deep(tr:hover) .ca-row-actions {
+    opacity: 1;
+}
+
+.kpi-card {
+    transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    cursor: default;
+}
+.kpi-card:hover {
+    box-shadow: 0 0 0 1px rgba(99, 179, 237, 0.3), 0 8px 24px rgba(0, 0, 0, 0.4);
+    transform: translateY(-2px);
+}
+.kpi-card--danger:hover {
+    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.35), 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 </style>

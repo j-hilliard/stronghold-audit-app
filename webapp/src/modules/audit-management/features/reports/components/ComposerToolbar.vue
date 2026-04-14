@@ -20,6 +20,21 @@
                 <i class="pi pi-save text-xs" />
                 {{ saving ? 'Saving…' : isDirty ? 'Save Draft' : 'Saved' }}
             </button>
+            <!-- Undo / Redo -->
+            <div class="flex gap-1">
+                <button
+                    @click="$emit('undo')"
+                    :disabled="!canUndo"
+                    title="Undo (Ctrl+Z)"
+                    class="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-slate-300 text-xs rounded transition-colors"
+                ><i class="pi pi-undo text-xs" /> Undo</button>
+                <button
+                    @click="$emit('redo')"
+                    :disabled="!canRedo"
+                    title="Redo (Ctrl+Y)"
+                    class="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-slate-300 text-xs rounded transition-colors"
+                ><i class="pi pi-refresh text-xs" /> Redo</button>
+            </div>
             <button
                 @click="$emit('print')"
                 data-testid="composer-print"
@@ -27,6 +42,21 @@
             >
                 <i class="pi pi-print text-xs" /> Print / Export PDF
             </button>
+        </div>
+
+        <!-- Theme picker -->
+        <div class="px-3 pt-3 pb-2 border-b border-slate-700">
+            <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Theme</div>
+            <div class="flex items-center gap-1.5 flex-wrap">
+                <button
+                    v-for="theme in REPORT_THEMES"
+                    :key="theme.id"
+                    @click="$emit('apply-theme', theme.id)"
+                    :title="theme.name"
+                    class="w-6 h-6 rounded-full border-2 transition-all hover:scale-110"
+                    :style="{ background: theme.swatch, borderColor: activeThemeId === theme.id ? 'white' : 'transparent' }"
+                />
+            </div>
         </div>
 
         <!-- Block palette -->
@@ -145,6 +175,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import type { BlockType } from '../types/report-block';
+import { REPORT_THEMES } from '../composables/useReportThemes';
 
 const props = defineProps<{
     generating: boolean;
@@ -152,6 +183,9 @@ const props = defineProps<{
     isDirty: boolean;
     saveError: string | null;
     lastSavedAt: Date | null;
+    canUndo: boolean;
+    canRedo: boolean;
+    activeThemeId: string | null;
     /** Section names from the loaded trend data — populates the chart pickers */
     sections: string[];
     /** Sections that already have a chart-line block on the canvas */
@@ -164,6 +198,9 @@ const emit = defineEmits<{
     (e: 'generate'): void;
     (e: 'save'): void;
     (e: 'print'): void;
+    (e: 'undo'): void;
+    (e: 'redo'): void;
+    (e: 'apply-theme', themeId: string): void;
     (e: 'add-block', type: BlockType, sectionName?: string): void;
 }>();
 
@@ -187,10 +224,15 @@ const simplePalette: { type: BlockType; label: string; icon: string }[] = [
 
 // Palette items after the chart pickers
 const trailingPalette: { type: BlockType; label: string; icon: string }[] = [
-    { type: 'narrative', label: 'Narrative Text',      icon: 'pi pi-align-left' },
-    { type: 'callout',   label: 'Callout / Note',      icon: 'pi pi-info-circle' },
-    { type: 'ca-table',  label: 'Corrective Actions',  icon: 'pi pi-list' },
-    { type: 'image',     label: 'Image',                icon: 'pi pi-image' },
+    { type: 'narrative',    label: 'Narrative Text',      icon: 'pi pi-align-left' },
+    { type: 'callout',      label: 'Callout / Note',      icon: 'pi pi-info-circle' },
+    { type: 'ca-table',     label: 'Corrective Actions',  icon: 'pi pi-list' },
+    { type: 'image',        label: 'Image',                icon: 'pi pi-image' },
+    { type: 'column-row',   label: 'Two Column Row',      icon: 'pi pi-table' },
+    { type: 'toc-sidebar',  label: 'TOC / "Inside"',      icon: 'pi pi-bookmark' },
+    { type: 'oval-callout', label: 'Oval Callout',        icon: 'pi pi-circle' },
+    { type: 'divider',      label: 'Divider',             icon: 'pi pi-minus' },
+    { type: 'spacer',       label: 'Spacer',              icon: 'pi pi-arrows-v' },
 ];
 
 function relativeTime(date: Date): string {

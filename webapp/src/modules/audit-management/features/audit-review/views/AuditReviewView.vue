@@ -85,9 +85,26 @@
                 </template>
                 <template #content>
                     <div class="flex flex-wrap gap-6 items-center">
-                        <div class="text-center">
-                            <div :class="['text-5xl font-bold', scoreColor]">{{ scoreDisplay }}</div>
-                            <div class="text-xs text-slate-400 mt-1">Conformance Score</div>
+                        <!-- SVG score ring -->
+                        <div class="relative flex-shrink-0" style="width:100px;height:100px;">
+                            <svg width="100" height="100" viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(100,116,139,0.25)" stroke-width="9" />
+                                <circle
+                                    cx="50" cy="50" r="42"
+                                    fill="none"
+                                    :stroke="ringColor"
+                                    stroke-width="9"
+                                    stroke-linecap="round"
+                                    :stroke-dasharray="ringCircumference"
+                                    :stroke-dashoffset="ringDashoffset"
+                                    transform="rotate(-90 50 50)"
+                                    style="transition: stroke-dashoffset 1.1s cubic-bezier(0.4,0,0.2,1), stroke 0.5s ease"
+                                />
+                            </svg>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                <span :class="['text-lg font-bold leading-none', scoreColor]">{{ scoreDisplay }}</span>
+                                <span class="text-[9px] text-slate-400 mt-0.5 tracking-wide uppercase">Score</span>
+                            </div>
                         </div>
                         <div class="flex flex-wrap gap-3 flex-1">
                             <div class="flex flex-col items-center bg-emerald-900/50 border border-emerald-700 rounded-lg px-4 py-2 min-w-16">
@@ -494,6 +511,20 @@ const barColor = computed(() => {
     if (pct >= 90) return 'bg-emerald-500';
     if (pct >= 75) return 'bg-amber-500';
     return 'bg-red-500';
+});
+
+// ── Score ring ────────────────────────────────────────────────────────────────
+const ringCircumference = 2 * Math.PI * 42; // r=42
+const ringDashoffset = computed(() => {
+    const pct = review.value?.scorePercent ?? 0;
+    return ringCircumference - (pct / 100) * ringCircumference;
+});
+const ringColor = computed(() => {
+    const pct = review.value?.scorePercent;
+    if (pct == null) return '#475569';
+    if (pct >= 90) return '#34d399';
+    if (pct >= 75) return '#fbbf24';
+    return '#f87171';
 });
 
 function caSeverity(status: string): string {

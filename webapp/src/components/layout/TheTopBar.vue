@@ -14,6 +14,15 @@
                 </a>
                 <Breadcrumb :model="breadcrumbItems" class="ml-4" />
                 <ul class="layout-topbar-actions">
+                    <li class="topbar-item theme-toggle-item">
+                        <button
+                            class="theme-toggle-btn"
+                            :title="isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+                            @click="toggle"
+                        >
+                            <i :class="isDark ? 'pi pi-sun' : 'pi pi-moon'" />
+                        </button>
+                    </li>
                     <li class="topbar-item user-profile"
                         :class="{ 'active-topmenuitem': activeTopbarItem === 'profile' }">
                         <a
@@ -71,6 +80,9 @@ import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import logo from '@/assets/images/header-logo.svg';
 import { useUserStore } from '@/stores/userStore.ts';
+import { useTheme } from '@/composables/useTheme';
+
+const { isDark, toggle } = useTheme();
 
 defineProps<{ activeTopbarItem: string; }>();
 
@@ -103,5 +115,25 @@ function onTopbarItemClick(event: Event, item: string) {
     width: 100px;
     height: 100px;
     border-radius: 50%;
+}
+
+.theme-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+.theme-toggle-btn:hover {
+    background: rgba(99, 179, 237, 0.15);
+    color: #63b3ed;
+    transform: rotate(15deg) scale(1.1);
 }
 </style>

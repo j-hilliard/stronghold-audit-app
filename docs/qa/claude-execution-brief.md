@@ -27,6 +27,20 @@ Use this brief when handing implementation work to Claude.
 - Recurring NC insights and corrective action aging.
 - Report queries must be scope-aware.
 
+4. Report Composer UX Hardening
+- Keep left toolbar and right property panel persistently available during canvas scroll (desktop sticky rails).
+- Add rich text editing controls for narrative and commentary:
+  - font size, text color, bold, italic, underline, bullet/numbered list.
+- Preserve formatting across save/load/regenerate and print output.
+- Ensure keyboard accessibility for formatting controls and rail actions.
+
+5. Composer Layout Customization
+- Implement layout zones per page (not only a single vertical flow).
+- Support drag/drop + resize placement of blocks inside zones.
+- Support page layout presets plus per-page custom overrides.
+- Persist full layout schema in draft storage and restore accurately.
+- Enforce print-safe layout constraints and page-break behavior.
+
 ## Required Testability Hooks
 Claude should include these `data-testid` hooks to support QA contracts:
 - Template manager:
@@ -38,18 +52,67 @@ Claude should include these `data-testid` hooks to support QA contracts:
   - `report-filter-site`
   - `report-filter-from`
   - `report-filter-to`
+  - `report-filter-compare`
   - `kpi-total-audits`
   - `kpi-nc-count`
   - `kpi-warning-count`
   - `kpi-overdue-corrective-actions`
+  - `report-section-card-<slug>`
+  - `report-section-clear`
   - `report-grid-row`
+- Report Composer:
+  - `composer-filter-division`
+  - `composer-filter-from`
+  - `composer-filter-to`
+  - `composer-draft-title`
+  - `composer-draft-select`
+  - `composer-generate`
+  - `composer-save`
+  - `composer-print`
+  - `composer-toolbar-rail`
+  - `composer-properties-rail`
+  - `block-caption-input`
+  - `block-narrative-text`
+  - `block-style-font-size`
+  - `block-style-text-color`
+  - `block-style-bold`
+  - `block-style-italic`
+  - `block-style-underline`
+  - `block-style-bulleted-list`
+  - `block-style-numbered-list`
 
 ## QA Contract Suites To Pass
 - `tests/e2e/audit-template-admin-contract.spec.ts`
 - `tests/e2e/audit-kpi-reporting-contract.spec.ts`
+- `tests/e2e/audit-report-composer-contract.spec.ts`
 - `tests/e2e/audit-new-audit.spec.ts`
 - `tests/e2e/audit-navigation-stability.spec.ts`
 - `tests/e2e/audit-parity.spec.ts`
+- `tests/e2e/audit-live-navigation-stress.spec.ts`
+
+## Mandatory Acceptance Criteria (Do Not Skip)
+1. Sticky Rails
+- On desktop, scrolling a long report keeps both side rails visible and usable.
+- Toolbar actions and property edits are available without returning to top of page.
+
+2. Rich Text
+- User can apply font size, text color, bold/italic/underline, and bullet/numbered list.
+- Formatting persists after save/reload and after data regeneration.
+- Print/PDF preserves authored formatting.
+
+3. Layout Customization
+- User can place blocks into custom page regions (example: page 1 left-side panel).
+- Resized/repositioned blocks persist after save/reload.
+- Print preview honors custom layout without overlap/clipping.
+
+4. Reporting Interaction
+- Section KPI cards are clickable and apply scoped filtering.
+- Active section filter is visible and clearable.
+- Filter state survives refresh/back navigation.
+
+5. Regression Safety
+- No blank-screen navigation regressions.
+- No API 5xx during live navigation stress.
 
 ## Delivery Rule
 After each milestone Claude must provide:

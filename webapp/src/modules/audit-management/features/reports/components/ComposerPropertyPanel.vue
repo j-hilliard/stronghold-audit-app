@@ -35,6 +35,46 @@
                     </label>
                     <p v-if="block.content.backgroundImageUrl" class="text-xs text-slate-500 truncate">{{ block.content.backgroundImageUrl.slice(0, 40) }}…</p>
                 </div>
+                <!-- Newsletter layout fields -->
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Subtitle (above name)</label>
+                    <input type="text" :value="block.content.subtitle || ''"
+                        @input="updateContent({ ...block.content, subtitle: ($event.target as HTMLInputElement).value || undefined })"
+                        placeholder="e.g. 2024 Compliance"
+                        class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Tagline (below name)</label>
+                    <input type="text" :value="block.content.tagline || ''"
+                        @input="updateContent({ ...block.content, tagline: ($event.target as HTMLInputElement).value || undefined })"
+                        placeholder="e.g. A Year in Review"
+                        class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Name Accent Color</label>
+                    <div class="flex items-center gap-2">
+                        <input type="color" :value="block.content.nameAccentColor || '#f59e0b'"
+                            @input="updateContent({ ...block.content, nameAccentColor: ($event.target as HTMLInputElement).value })"
+                            class="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0" />
+                        <input type="text" :value="block.content.nameAccentColor || ''"
+                            @input="updateContent({ ...block.content, nameAccentColor: ($event.target as HTMLInputElement).value || undefined })"
+                            placeholder="#f59e0b"
+                            class="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500" />
+                        <button @click="updateContent({ ...block.content, nameAccentColor: undefined })"
+                            class="text-xs text-slate-500 hover:text-slate-300">Clear</button>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between">
+                    <label class="text-xs text-slate-400">Decorative Rules</label>
+                    <button
+                        @click="updateContent({ ...block.content, showDecorativeRules: !(block.content.showDecorativeRules !== false) })"
+                        class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none"
+                        :class="block.content.showDecorativeRules !== false ? 'bg-blue-600' : 'bg-slate-600'"
+                    >
+                        <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                            :class="block.content.showDecorativeRules !== false ? 'translate-x-4' : 'translate-x-1'" />
+                    </button>
+                </div>
             </template>
 
             <!-- Heading-specific -->
@@ -244,6 +284,178 @@
                 </div>
             </template>
 
+            <!-- Column Row -->
+            <template v-if="block.type === 'column-row'">
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Column Ratio</label>
+                    <div class="grid grid-cols-3 gap-1">
+                        <button v-for="r in ['50/50','60/40','40/60','70/30','30/70']" :key="r"
+                            @click="updateContent({ ...block.content, ratio: r })"
+                            :class="['px-1.5 py-1 rounded text-xs transition-colors', block.content.ratio === r ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600']">
+                            {{ r }}
+                        </button>
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Column Gap</label>
+                    <div class="flex gap-1">
+                        <button v-for="g in ['none','sm','md','lg']" :key="g"
+                            @click="updateContent({ ...block.content, gap: g })"
+                            :class="['flex-1 px-2 py-1 rounded text-xs transition-colors capitalize', block.content.gap === g ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600']">
+                            {{ g }}
+                        </button>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-500 italic">Use the + Add Block buttons inside each column to add content.</p>
+            </template>
+
+            <!-- Divider -->
+            <template v-if="block.type === 'divider'">
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Thickness</label>
+                    <div class="flex gap-1">
+                        <button v-for="t in [1, 2, 4]" :key="t"
+                            @click="updateContent({ ...block.content, thickness: t })"
+                            :class="['flex-1 px-2 py-1 rounded text-xs transition-colors', block.content.thickness === t ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600']">
+                            {{ t }}px
+                        </button>
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Style</label>
+                    <div class="flex gap-1">
+                        <button v-for="v in ['solid','dashed','dotted']" :key="v"
+                            @click="updateContent({ ...block.content, variant: v })"
+                            :class="['flex-1 px-2 py-1 rounded text-xs transition-colors capitalize', block.content.variant === v ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600']">
+                            {{ v }}
+                        </button>
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Color</label>
+                    <div class="flex items-center gap-2">
+                        <input type="color" :value="block.content.color || '#475569'"
+                            @input="updateContent({ ...block.content, color: ($event.target as HTMLInputElement).value })"
+                            class="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0" />
+                        <input type="text" :value="block.content.color || '#475569'"
+                            @input="updateContent({ ...block.content, color: ($event.target as HTMLInputElement).value })"
+                            class="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500" />
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Margin</label>
+                    <div class="flex gap-1">
+                        <button v-for="m in ['sm','md','lg']" :key="m"
+                            @click="updateContent({ ...block.content, marginY: m })"
+                            :class="['flex-1 px-2 py-1 rounded text-xs transition-colors capitalize', block.content.marginY === m ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600']">
+                            {{ m }}
+                        </button>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Spacer -->
+            <template v-if="block.type === 'spacer'">
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Height</label>
+                    <div class="grid grid-cols-5 gap-1">
+                        <button v-for="[k, px] in [['xs','8px'],['sm','16px'],['md','32px'],['lg','48px'],['xl','64px']]" :key="k"
+                            @click="updateContent({ ...block.content, height: k })"
+                            :class="['flex flex-col items-center px-1 py-1.5 rounded text-xs transition-colors', block.content.height === k ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600']">
+                            <span class="font-semibold">{{ k }}</span>
+                            <span class="text-[10px] opacity-70">{{ px }}</span>
+                        </button>
+                    </div>
+                </div>
+            </template>
+
+            <!-- TOC Sidebar -->
+            <template v-if="block.type === 'toc-sidebar'">
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Title</label>
+                    <input type="text" :value="block.content.title"
+                        @input="updateContent({ ...block.content, title: ($event.target as HTMLInputElement).value })"
+                        class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+                </div>
+                <div class="flex items-center justify-between">
+                    <label class="text-xs text-slate-400">Dark Background</label>
+                    <button
+                        @click="updateContent({ ...block.content, darkBackground: !block.content.darkBackground })"
+                        class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none"
+                        :class="block.content.darkBackground ? 'bg-blue-600' : 'bg-slate-600'"
+                    >
+                        <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                            :class="block.content.darkBackground ? 'translate-x-4' : 'translate-x-1'" />
+                    </button>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs text-slate-400 font-medium uppercase tracking-wide">Items</label>
+                        <button @click="addTocItem(block)"
+                            class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
+                            <i class="pi pi-plus text-xs" /> Add
+                        </button>
+                    </div>
+                    <div v-for="(item, i) in block.content.items" :key="i" class="bg-slate-900 rounded p-2 space-y-1">
+                        <input type="text" :value="item.heading"
+                            @input="updateTocItem(block, i, 'heading', ($event.target as HTMLInputElement).value)"
+                            placeholder="Section heading"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+                        <input type="text" :value="item.description || ''"
+                            @input="updateTocItem(block, i, 'description', ($event.target as HTMLInputElement).value)"
+                            placeholder="Short description (optional)"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+                        <button @click="removeTocItem(block, i)"
+                            class="text-xs text-red-400 hover:text-red-300">Remove</button>
+                    </div>
+                    <p v-if="!block.content.items.length" class="text-xs text-slate-500 italic">No items yet. Click Add.</p>
+                </div>
+            </template>
+
+            <!-- Oval Callout -->
+            <template v-if="block.type === 'oval-callout'">
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Title</label>
+                    <input type="text" :value="block.content.title"
+                        @input="updateContent({ ...block.content, title: ($event.target as HTMLInputElement).value })"
+                        class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Phonetic (optional)</label>
+                    <input type="text" :value="block.content.phonetic || ''"
+                        @input="updateContent({ ...block.content, phonetic: ($event.target as HTMLInputElement).value || undefined })"
+                        placeholder="/'strôNG.hōld/ noun."
+                        class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Body</label>
+                    <textarea :value="block.content.body" rows="3"
+                        @input="updateContent({ ...block.content, body: ($event.target as HTMLTextAreaElement).value })"
+                        class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500 resize-none" />
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Background Color</label>
+                    <div class="flex items-center gap-2">
+                        <input type="color" :value="block.content.backgroundColor || '#1e3a5f'"
+                            @input="updateContent({ ...block.content, backgroundColor: ($event.target as HTMLInputElement).value })"
+                            class="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0" />
+                        <input type="text" :value="block.content.backgroundColor || '#1e3a5f'"
+                            @input="updateContent({ ...block.content, backgroundColor: ($event.target as HTMLInputElement).value })"
+                            class="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500" />
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Text Color</label>
+                    <div class="flex items-center gap-2">
+                        <input type="color" :value="block.content.textColor || '#ffffff'"
+                            @input="updateContent({ ...block.content, textColor: ($event.target as HTMLInputElement).value })"
+                            class="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0" />
+                        <button @click="updateContent({ ...block.content, textColor: undefined })"
+                            class="text-xs text-slate-500 hover:text-slate-300">Clear</button>
+                    </div>
+                </div>
+            </template>
+
             <!-- Narrative lock indicator -->
             <template v-if="block.type === 'narrative'">
                 <div class="text-xs text-slate-400 space-y-1">
@@ -315,7 +527,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ReportBlock, BlockStyle, BlockType, KpiCard, KpiGridBlock, ImageContent } from '../types/report-block';
+import type { ReportBlock, BlockStyle, BlockType, KpiCard } from '../types/report-block';
 
 /** Convert a local file to a base64 data-URL so it can be stored in the draft. */
 function onImageUpload(event: Event, callback: (url: string) => void) {
@@ -394,17 +606,41 @@ function toggleAllCards(group: 'summary' | 'section', block: ReportBlock) {
     emit('update', { ...block, content: updated } as ReportBlock);
 }
 
+function addTocItem(block: ReportBlock) {
+    if (block.type !== 'toc-sidebar') return;
+    updateContent({ ...block.content, items: [...block.content.items, { heading: 'New Section', description: '' }] });
+}
+
+function removeTocItem(block: ReportBlock, index: number) {
+    if (block.type !== 'toc-sidebar') return;
+    const items = block.content.items.filter((_, i) => i !== index);
+    updateContent({ ...block.content, items });
+}
+
+function updateTocItem(block: ReportBlock, index: number, field: 'heading' | 'description', value: string) {
+    if (block.type !== 'toc-sidebar') return;
+    const items = block.content.items.map((item, i) =>
+        i === index ? { ...item, [field]: value || undefined } : item
+    );
+    updateContent({ ...block.content, items });
+}
+
 function blockLabel(type: BlockType): string {
     const labels: Record<BlockType, string> = {
-        'cover': 'Cover Page',
-        'heading': 'Heading',
-        'kpi-grid': 'KPI Cards',
-        'chart-bar': 'Bar Chart',
-        'chart-line': 'Trend Chart',
-        'narrative': 'Narrative',
-        'callout': 'Callout',
-        'ca-table': 'Corrective Actions',
-        'image': 'Image',
+        'cover':        'Cover Page',
+        'heading':      'Heading',
+        'kpi-grid':     'KPI Cards',
+        'chart-bar':    'Bar Chart',
+        'chart-line':   'Trend Chart',
+        'narrative':    'Narrative',
+        'callout':      'Callout',
+        'ca-table':     'Corrective Actions',
+        'image':        'Image',
+        'column-row':   'Two Column Row',
+        'divider':      'Divider',
+        'spacer':       'Spacer',
+        'toc-sidebar':  'TOC / Inside Panel',
+        'oval-callout': 'Oval Callout',
     };
     return labels[type] ?? type;
 }

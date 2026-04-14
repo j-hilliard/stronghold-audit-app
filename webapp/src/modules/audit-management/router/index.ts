@@ -2,7 +2,7 @@ import { apps } from '@/apps.ts';
 import { getErrorRoutes } from '@/router/errorRoutes.ts';
 
 export const auditManagementRoutes = [
-    { path: '', redirect: `/${apps.auditManagement.baseSlug}/audits` },
+    { path: '', redirect: `/${apps.auditManagement.baseSlug}/reports` },
     {
         path: 'audits',
         name: 'audit-management-dashboard',
@@ -59,10 +59,10 @@ export const auditManagementRoutes = [
         name: 'audit-management-reports',
         component: () => import('@/modules/audit-management/features/reports/views/ReportsView.vue'),
         meta: {
-            title: 'Reports',
+            title: 'Dashboard',
             breadcrumbItems: () => [
                 { label: 'Compliance Audit' },
-                { label: 'Reports' },
+                { label: 'Dashboard' },
             ],
         },
     },
@@ -112,7 +112,7 @@ export const auditManagementRoutes = [
             title: 'Newsletter Template Editor',
             breadcrumbItems: () => [
                 { label: 'Compliance Audit' },
-                { label: 'Reports', to: '/audit-management/reports' },
+                { label: 'Dashboard', to: '/audit-management/reports' },
                 { label: 'Newsletter Template Editor' },
             ],
         },
@@ -125,7 +125,7 @@ export const auditManagementRoutes = [
             title: 'Report Composer',
             breadcrumbItems: () => [
                 { label: 'Compliance Audit' },
-                { label: 'Reports', to: '/audit-management/reports' },
+                { label: 'Dashboard', to: '/audit-management/reports' },
                 { label: 'Report Composer' },
             ],
         },

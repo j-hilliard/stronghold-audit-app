@@ -32,6 +32,7 @@
             emptyMessage="No audits found."
             v-model:selection="selectedAudits"
             dataKey="id"
+            @row-dblclick="onRowDblClick"
         >
             <template #filters>
                 <Dropdown
@@ -105,13 +106,27 @@
                     <Tag :value="data.status" :severity="statusSeverity(data.status)" />
                 </template>
             </Column>
-            <Column header="Actions" style="width: 100px;">
+            <Column header="" style="width: 130px; text-align: right;">
                 <template #body="{ data }">
-                    <BaseButtonIconEdit @click="router.push(`/audit-management/audits/${data.id}`)" />
-                    <BaseButtonIconView
-                        v-if="data.status === 'Submitted' || data.status === 'Closed'"
-                        @click="router.push(`/audit-management/audits/${data.id}/review`)"
-                    />
+                    <div class="audit-row-actions">
+                        <Button
+                            icon="pi pi-pencil"
+                            label="Edit"
+                            size="small"
+                            text
+                            class="audit-action-btn"
+                            @click.stop="router.push(`/audit-management/audits/${data.id}`)"
+                        />
+                        <Button
+                            v-if="data.status !== 'Draft'"
+                            icon="pi pi-eye"
+                            label="View"
+                            size="small"
+                            text
+                            class="audit-action-btn"
+                            @click.stop="router.push(`/audit-management/audits/${data.id}/review`)"
+                        />
+                    </div>
                 </template>
             </Column>
         </BaseDataTable>
@@ -249,8 +264,18 @@ function statusSeverity(status: string): string {
     return map[status] ?? 'secondary';
 }
 
+function onRowDblClick(event: { data: AuditListItemDto }) {
+    const d = event.data;
+    if (d.status === 'Draft') {
+        router.push(`/audit-management/audits/${d.id}`);
+    } else {
+        router.push(`/audit-management/audits/${d.id}/review`);
+    }
+}
+
 function onBulkDelete() {
     const drafts = draftSelection.value;
+
     if (drafts.length === 0) return;
     const nonDraft = selectedAudits.value.length - drafts.length;
     const msg = nonDraft > 0
@@ -272,3 +297,22 @@ function onBulkDelete() {
     });
 }
 </script>
+
+<style scoped>
+.audit-row-actions {
+    display: flex;
+    gap: 2px;
+    justify-content: flex-end;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+:deep(tr:hover) .audit-row-actions {
+    opacity: 1;
+}
+
+:deep(.audit-action-btn) {
+    padding: 3px 8px !important;
+    font-size: 0.72rem !important;
+}
+</style>

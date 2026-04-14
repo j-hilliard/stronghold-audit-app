@@ -99,6 +99,44 @@ This document is the implementation baseline for:
 - Key events shall be logged (template publish, audit submit, corrective action updates, permission changes).
 - Logs must be queryable for QA validation.
 
+### R-013 Report Composer Persistent Side Rails
+- In Report Composer, the left toolbar and right property panel shall remain visible while the center canvas scrolls.
+- Desktop behavior shall use sticky side rails with independent vertical scrolling for each rail.
+- Users shall not be required to scroll to top/bottom to access block tools or property controls while editing long reports.
+- Mobile/tablet behavior may collapse rails into drawers, but desktop sticky behavior is mandatory.
+
+### R-014 Rich Text Authoring Controls
+- Report Composer text fields for narrative and commentary shall support rich text formatting:
+  - font size,
+  - text color,
+  - bold,
+  - italic,
+  - underline,
+  - bullet and numbered lists.
+- Rich text formatting shall be persisted in report drafts and preserved across regenerate/save/load cycles.
+- Rich text output shall render correctly in on-screen preview and print/PDF output.
+- Rich text storage shall be sanitized to prevent unsafe HTML/script injection.
+
+### R-015 Report Usability Baseline
+- Composer shall support long-form editing workflows with reduced friction:
+  - persistent toolbar and property access,
+  - clear visual dirty/saved state,
+  - reliable autosave feedback,
+  - keyboard-accessible formatting controls.
+- Report sections and KPI-driven content should remain explorable without losing current context when filters are changed.
+
+### R-016 Layout Customization Engine
+- Report Composer shall support customizable page layouts, not only fixed vertical block stacking.
+- Users shall be able to define custom page zones (for example, a left-side section on page 1 and independent right/main regions).
+- Layout zones shall support drag-and-drop placement and resize behavior for compatible blocks.
+- Layout configuration shall be saved per draft and restored exactly on reload.
+- Layout customization shall support:
+  - page templates (single-column, two-column, asymmetric, executive cover),
+  - per-page overrides,
+  - snap/grid alignment,
+  - print-safe bounds to avoid clipping in PDF output.
+- Layout controls shall include reset-to-template and undo/redo support for editing safety.
+
 ## Data Model Requirements
 - SQL Server/Azure SQL is the primary store.
 - Required core entities:
@@ -162,6 +200,8 @@ This document is the implementation baseline for:
 - KPI/reporting data accuracy and scope enforcement.
 - DB and logging checks for critical actions.
 - End-to-end workflow coverage.
+- Report Composer sticky rail behavior coverage (left and right rails remain available during long-canvas scroll).
+- Rich text formatting coverage (format apply, save, reload, regenerate, print parity).
 
 ### Required gates
 1. Pre-change baseline gate.

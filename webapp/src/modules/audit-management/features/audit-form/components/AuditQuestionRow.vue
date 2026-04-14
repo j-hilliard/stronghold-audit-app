@@ -1,7 +1,7 @@
 <template>
     <div
         :class="[
-            'border-b border-slate-700 last:border-b-0',
+            'question-row border-b border-slate-700 last:border-b-0',
             response.status === 'NonConforming' ? 'bg-red-950/40' : '',
             response.status === 'Warning' ? 'bg-amber-950/30' : '',
         ]"
@@ -154,5 +154,22 @@ function onStatusChange(newStatus: string | null) {
 .nc-expand-leave-from {
     opacity: 1;
     max-height: 300px;
+}
+
+.question-row {
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.question-row:hover {
+    background-color: rgba(99, 179, 237, 0.06);
+    box-shadow: inset 3px 0 0 rgba(99, 179, 237, 0.55);
+}
+/* Keep the red/amber tint on hover for NC/Warning rows, just brighten it */
+.question-row.bg-red-950\/40:hover {
+    background-color: rgba(127, 29, 29, 0.35) !important;
+    box-shadow: inset 3px 0 0 rgba(239, 68, 68, 0.5);
+}
+.question-row.bg-amber-950\/30:hover {
+    background-color: rgba(120, 53, 15, 0.3) !important;
+    box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.5);
 }
 </style>

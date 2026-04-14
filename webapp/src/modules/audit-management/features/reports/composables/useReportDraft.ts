@@ -7,11 +7,12 @@
  *
  * All other consumers work with ReportBlock[] — never raw JSON strings.
  */
-import { ref, watch } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useApiStore } from '@/stores/apiStore';
 import { AuditClient } from '@/apiclient/auditClient';
 import type { ReportDraftDto, CreateReportDraftRequest, UpdateReportDraftRequest } from '@/apiclient/auditClient';
-import type { ReportBlock } from '../types/report-block';
+import type { ReportBlock, ColumnRowBlock } from '../types/report-block';
+import { REPORT_THEMES } from './useReportThemes';
 
 export interface DraftMeta {
     id: number | null;
@@ -43,6 +44,47 @@ export function useReportDraft() {
     const saving = ref(false);
     const saveError = ref<string | null>(null);
     const lastSavedAt = ref<Date | null>(null);
+
+    // ── Undo/Redo history ─────────────────────────────────────────────────────
+    // History stores JSON snapshots so deep clones are cheap and exact.
+    // Cap at 30 entries so memory stays bounded.
+    const history = ref<string[]>([]);
+    const historyIndex = ref(-1);
+    let historyDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const canUndo = computed(() => historyIndex.value > 0);
+    const canRedo = computed(() => historyIndex.value < history.value.length - 1);
+
+    /** Snapshot the current blocks array into history BEFORE a mutation. */
+    function pushHistory() {
+        const snapshot = JSON.stringify(blocks.value);
+        // Truncate any redo future when a new action branches off
+        history.value = history.value.slice(0, historyIndex.value + 1);
+        history.value.push(snapshot);
+        if (history.value.length > 30) history.value.shift();
+        historyIndex.value = history.value.length - 1;
+    }
+
+    /** Debounced push — used for text edits to avoid a snapshot per keystroke. */
+    function pushHistoryDebounced() {
+        if (historyDebounceTimer) clearTimeout(historyDebounceTimer);
+        historyDebounceTimer = setTimeout(() => pushHistory(), 800);
+    }
+
+    function undo() {
+        if (!canUndo.value) return;
+        historyIndex.value--;
+        blocks.value = JSON.parse(history.value[historyIndex.value]);
+        isDirty.value = true;
+    }
+
+    function redo() {
+        if (!canRedo.value) return;
+        historyIndex.value++;
+        blocks.value = JSON.parse(history.value[historyIndex.value]);
+        isDirty.value = true;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -95,9 +137,9 @@ export function useReportDraft() {
         saveError.value = null;
 
         const client = getClient();
-        const blocksJson = serialize(blocks.value);
 
         try {
+            const blocksJson = serialize(blocks.value);
             if (meta.value.id === null) {
                 // Create
                 const req: CreateReportDraftRequest = {
@@ -165,17 +207,68 @@ export function useReportDraft() {
     /** Update a single block by id without triggering a full reload. */
     function updateBlock(updated: ReportBlock) {
         const idx = blocks.value.findIndex(b => b.id === updated.id);
-        if (idx >= 0) blocks.value[idx] = updated;
+        if (idx >= 0) {
+            pushHistoryDebounced();
+            blocks.value[idx] = updated;
+        }
     }
 
     /** Remove a block by id. */
     function removeBlock(id: string) {
+        try { pushHistory(); } catch { /* history skipped — mutation still proceeds */ }
         blocks.value = blocks.value.filter(b => b.id !== id);
     }
 
-    /** Replace all blocks (e.g. after regeneration). Preserves dirty flag. */
+    /** Replace all blocks (e.g. after regeneration or reorder). Saves a history snapshot. */
     function setBlocks(newBlocks: ReportBlock[]) {
+        try { pushHistory(); } catch { /* history skipped — mutation still proceeds */ }
         blocks.value = newBlocks;
+    }
+
+    /**
+     * Apply a named theme to all blocks in the draft.
+     * Sets BlockStyle on every block (including inner column blocks) and
+     * sets cover.primaryColor for cover blocks.
+     */
+    function applyTheme(themeId: string) {
+        const theme = REPORT_THEMES.find(t => t.id === themeId);
+        if (!theme) return;
+        pushHistory();
+
+        function applyToBlock(block: ReportBlock) {
+            // Cover: update primaryColor
+            if (block.type === 'cover') {
+                block.content.primaryColor = theme.coverPrimaryColor;
+            }
+            // Style update (skip cover — its bg comes from primaryColor, not blockStyle)
+            if (block.type !== 'cover') {
+                block.style = { ...block.style, ...theme.blockStyle };
+            }
+            // Recurse into column children
+            if (block.type === 'column-row') {
+                const col = block as ColumnRowBlock;
+                col.content.leftBlocks.forEach(applyToBlock);
+                col.content.rightBlocks.forEach(applyToBlock);
+            }
+        }
+
+        blocks.value = blocks.value.map(b => {
+            const clone = JSON.parse(JSON.stringify(b)) as ReportBlock;
+            applyToBlock(clone);
+            return clone;
+        });
+        isDirty.value = true;
+    }
+
+    /** Deep-clone a block and insert the copy directly below the original. */
+    function duplicateBlock(id: string) {
+        const idx = blocks.value.findIndex(b => b.id === id);
+        if (idx === -1) return;
+        pushHistory();
+        const clone = JSON.parse(JSON.stringify(blocks.value[idx])) as ReportBlock;
+        clone.id = crypto.randomUUID();
+        blocks.value.splice(idx + 1, 0, clone);
+        isDirty.value = true;
     }
 
     return {
@@ -185,6 +278,12 @@ export function useReportDraft() {
         saving,
         saveError,
         lastSavedAt,
+        // Undo/Redo
+        canUndo,
+        canRedo,
+        undo,
+        redo,
+        // CRUD
         loadDraft,
         save,
         scheduleAutosave,
@@ -192,5 +291,7 @@ export function useReportDraft() {
         updateBlock,
         removeBlock,
         setBlocks,
+        duplicateBlock,
+        applyTheme,
     };
 }

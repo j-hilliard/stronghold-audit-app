@@ -529,6 +529,16 @@ export function useReportEngine() {
             }
             case 'image':
                 return { id: uuid(), type: 'image', isEdited: false, style: DEFAULT_STYLE, content: { url: '', alt: '', caption: '', width: 'full' } } as import('../types/report-block').ImageBlock;
+            case 'column-row':
+                return { id: uuid(), type: 'column-row', isEdited: false, style: DEFAULT_STYLE, content: { ratio: '50/50', gap: 'md', leftBlocks: [], rightBlocks: [] } } as import('../types/report-block').ColumnRowBlock;
+            case 'divider':
+                return { id: uuid(), type: 'divider', isEdited: false, style: DEFAULT_STYLE, content: { thickness: 1, variant: 'solid', color: '#475569', marginY: 'md' } } as import('../types/report-block').DividerBlock;
+            case 'spacer':
+                return { id: uuid(), type: 'spacer', isEdited: false, style: DEFAULT_STYLE, content: { height: 'md' } } as import('../types/report-block').SpacerBlock;
+            case 'toc-sidebar':
+                return { id: uuid(), type: 'toc-sidebar', isEdited: false, style: DEFAULT_STYLE, content: { title: 'INSIDE', items: [], darkBackground: true } } as import('../types/report-block').TocSidebarBlock;
+            case 'oval-callout':
+                return { id: uuid(), type: 'oval-callout', isEdited: false, style: DEFAULT_STYLE, content: { title: 'strong-hold', phonetic: "/'strôNG.hōld/ noun.", body: 'A place where a particular cause or belief is strongly defended or upheld.', backgroundColor: '#1e3a5f', textColor: '#ffffff' } } as import('../types/report-block').OvalCalloutBlock;
         }
     }
 

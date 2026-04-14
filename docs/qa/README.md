@@ -13,6 +13,7 @@ This folder defines the QA-only operating model for the Stronghold Audit App.
 - `audit-form-source-of-truth.md`: Locked baseline from the original Audit Form files.
 - `claude-qa-delivery-plan.md`: Phase-by-phase execution plan for Claude implementation + QA enforcement.
 - `claude-execution-brief.md`: Implementation brief with required testability hooks and milestone outputs.
+- `claude-ticket-pack-reporting-composer.md`: Granular, ticket-by-ticket implementation and QA gate plan for Reports + Report Composer modernization.
 - `defect-handoffs/`: Time-stamped QA handoffs with reproducible failures and solution guidance.
 
 ## Requirements Baseline

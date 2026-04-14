@@ -163,12 +163,18 @@
                 :is-dirty="draft.isDirty.value"
                 :save-error="draft.saveError.value"
                 :last-saved-at="draft.lastSavedAt.value"
+                :can-undo="draft.canUndo.value"
+                :can-redo="draft.canRedo.value"
+                :active-theme-id="activeThemeId"
                 :sections="engine.sections.value"
                 :used-line-sections="usedLineSections"
                 :used-bar-sections="usedBarSections"
                 @generate="onGenerate"
                 @save="draft.save()"
                 @print="printReport"
+                @undo="draft.undo()"
+                @redo="draft.redo()"
+                @apply-theme="onApplyTheme"
                 @add-block="onAddBlock"
             />
 
@@ -179,6 +185,7 @@
                 @remove="draft.removeBlock($event)"
                 @move-up="onMoveUp"
                 @move-down="onMoveDown"
+                @duplicate="draft.duplicateBlock($event); draft.scheduleAutosave()"
                 @update-content="onUpdateContent"
                 @update-is-edited="onUpdateIsEdited"
                 @reorder="onReorder"
@@ -205,7 +212,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useApiStore } from '@/stores/apiStore';
 import { useUserStore } from '@/stores/userStore';
 import { AuditClient } from '@/apiclient/auditClient';
@@ -220,6 +227,7 @@ import { useReportEngine } from '../composables/useReportEngine';
 import { useReportDraft } from '../composables/useReportDraft';
 import type { ReportBlock } from '../types/report-block';
 import type { NewsletterTemplateDto } from '@/apiclient/auditClient';
+import { REPORT_THEMES } from '../composables/useReportThemes';
 
 const apiStore = useApiStore();
 const userStore = useUserStore();
@@ -251,6 +259,42 @@ const newsletterSaveError = ref<string | null>(null);
 const newsletterSavedAt = ref<Date | null>(null);
 
 const selectedBlockId = computed(() => selectedBlock.value?.id ?? null);
+
+// Active theme tracking (purely visual — highlights the active swatch)
+const activeThemeId = ref<string | null>(null);
+
+function onApplyTheme(themeId: string) {
+    draft.applyTheme(themeId);
+    activeThemeId.value = themeId;
+    draft.scheduleAutosave();
+}
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+function onKeyDown(e: KeyboardEvent) {
+    const target = e.target as HTMLElement;
+    const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+    if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); draft.undo(); return; }
+        if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); draft.redo(); return; }
+        if (e.key === 'd' && selectedBlock.value) {
+            e.preventDefault();
+            draft.duplicateBlock(selectedBlock.value.id);
+            draft.scheduleAutosave();
+            return;
+        }
+    }
+
+    if ((e.key === 'Delete' || e.key === 'Backspace') && !isTyping && selectedBlock.value) {
+        e.preventDefault();
+        draft.removeBlock(selectedBlock.value.id);
+        selectedBlock.value = null;
+        draft.scheduleAutosave();
+    }
+}
+
+onMounted(() => document.addEventListener('keydown', onKeyDown));
+onUnmounted(() => document.removeEventListener('keydown', onKeyDown));
 
 /**
  * Sections that already have at least one chart-line block on the canvas.
@@ -399,6 +443,11 @@ async function onAddBlock(type: ReportBlock['type'], sectionName?: string) {
     draft.blocks.value.push(newBlock);
     selectedBlock.value = newBlock;
     draft.scheduleAutosave();
+
+    // Scroll the new block into view after Vue flushes the DOM
+    await nextTick();
+    const el = document.querySelector(`[data-testid="composer-block-${newBlock.id}"]`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function onBlockUpdate(updated: ReportBlock) {
