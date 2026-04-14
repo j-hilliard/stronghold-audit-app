@@ -1,27 +1,24 @@
 <template>
-    <!-- BlockStyle.backgroundColor is intentionally unused here.
-         Visual identity comes from content.primaryColor and content.backgroundImageUrl. -->
     <div
         class="relative rounded-xl overflow-hidden flex flex-col justify-end print:rounded-none"
-        :style="bgStyle"
-        style="min-height: 220px;"
+        :style="[bgStyle, heightStyle]"
     >
-        <!-- dark overlay for readability over photo backgrounds -->
-        <div class="absolute inset-0 bg-black/40" />
+        <!-- Configurable dark overlay for readability -->
+        <div class="absolute inset-0" :style="overlayStyle" />
 
         <div class="relative z-10 p-8 print:p-10">
-            <!-- Optional subtitle line above the name -->
+            <!-- Optional subtitle above name -->
             <div v-if="content.subtitle" class="cover-subtitle">
                 {{ content.subtitle }}
             </div>
 
-            <!-- Decorative rule above name -->
+            <!-- Rule above name -->
             <div v-if="showRules" class="cover-rule" />
 
-            <!-- Main division name in accent color -->
+            <!-- Main division name -->
             <h1 class="cover-name" :style="nameStyle">{{ content.divisionName }}</h1>
 
-            <!-- Decorative rule below name + optional tagline on the right -->
+            <!-- Rule below name + optional tagline -->
             <div v-if="showRules" class="cover-rule-row">
                 <div class="cover-rule cover-rule--wide" />
                 <span v-if="content.tagline" class="cover-tagline">{{ content.tagline }}</span>
@@ -44,9 +41,23 @@ const props = defineProps<{
     style: BlockStyle;
 }>();
 
-const showRules = computed(() =>
-    props.content.showDecorativeRules !== false
-);
+const HEIGHT_MAP: Record<string, string> = {
+    xs:  '120px',
+    sm:  '180px',
+    md:  '220px',
+    lg:  '320px',
+    xl:  '420px',
+};
+
+const NAME_SIZE_MAP: Record<string, string> = {
+    sm:  '1.2rem',
+    md:  '1.8rem',
+    lg:  '2.4rem',
+    xl:  '3rem',
+    '2xl': '4rem',
+};
+
+const showRules = computed(() => props.content.showDecorativeRules !== false);
 
 const bgStyle = computed(() => {
     const image = props.content.backgroundImageUrl
@@ -55,9 +66,20 @@ const bgStyle = computed(() => {
     return `background: ${image}${props.content.primaryColor};`;
 });
 
+const heightStyle = computed(() => ({
+    minHeight: HEIGHT_MAP[props.content.coverHeight ?? 'md'] ?? '220px',
+}));
+
+const overlayStyle = computed(() => {
+    const opacity = (props.content.overlayOpacity ?? 40) / 100;
+    return { background: `rgba(0,0,0,${opacity})` };
+});
+
 const nameStyle = computed(() => {
     const color = props.content.nameAccentColor || props.style.accentColor || '#f59e0b';
-    return `color: ${color};`;
+    const size  = NAME_SIZE_MAP[props.content.nameSize ?? 'xl'] ?? '3rem';
+    const transform = props.content.nameTransform ?? 'uppercase';
+    return { color, fontSize: size, textTransform: transform };
 });
 </script>
 
@@ -71,12 +93,10 @@ const nameStyle = computed(() => {
 }
 
 .cover-name {
-    font-size: clamp(1.8rem, 5vw, 3rem);
     font-weight: 900;
     line-height: 1.1;
     letter-spacing: -0.01em;
     margin: 0;
-    text-transform: uppercase;
 }
 
 .cover-rule {

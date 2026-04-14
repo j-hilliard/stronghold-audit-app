@@ -11,8 +11,62 @@
 
             <!-- Cover-specific -->
             <template v-if="block.type === 'cover'">
+
+                <!-- ── Size & spacing ─────────────────────────────────────── -->
                 <div class="space-y-1">
-                    <label class="block text-xs text-slate-400">Primary Color</label>
+                    <label class="block text-xs text-slate-400">Block Height</label>
+                    <div class="grid grid-cols-5 gap-1">
+                        <button v-for="h in ['xs','sm','md','lg','xl']" :key="h"
+                            @click="updateContent({ ...block.content, coverHeight: h as any })"
+                            :class="['text-xs py-1 rounded border transition-colors',
+                                (block.content.coverHeight ?? 'md') === h
+                                    ? 'bg-blue-700 border-blue-500 text-white'
+                                    : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600']">
+                            {{ h.toUpperCase() }}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Name Size</label>
+                    <div class="grid grid-cols-5 gap-1">
+                        <button v-for="s in ['sm','md','lg','xl','2xl']" :key="s"
+                            @click="updateContent({ ...block.content, nameSize: s as any })"
+                            :class="['text-xs py-1 rounded border transition-colors',
+                                (block.content.nameSize ?? 'xl') === s
+                                    ? 'bg-blue-700 border-blue-500 text-white'
+                                    : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600']">
+                            {{ s }}
+                        </button>
+                    </div>
+                    <div class="text-xs text-slate-600">sm=19px · md=29px · lg=38px · xl=48px · 2xl=64px</div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Name Transform</label>
+                    <div class="flex gap-1">
+                        <button
+                            @click="updateContent({ ...block.content, nameTransform: 'uppercase' })"
+                            :class="['flex-1 text-xs py-1 rounded border transition-colors',
+                                (block.content.nameTransform ?? 'uppercase') === 'uppercase'
+                                    ? 'bg-blue-700 border-blue-500 text-white'
+                                    : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600']">
+                            UPPERCASE
+                        </button>
+                        <button
+                            @click="updateContent({ ...block.content, nameTransform: 'none' })"
+                            :class="['flex-1 text-xs py-1 rounded border transition-colors',
+                                block.content.nameTransform === 'none'
+                                    ? 'bg-blue-700 border-blue-500 text-white'
+                                    : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600']">
+                            As-Is
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ── Color & image ───────────────────────────────────────── -->
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Background Color</label>
                     <div class="flex items-center gap-2">
                         <input type="color" :value="block.content.primaryColor"
                             @input="updateCoverColor('primaryColor', ($event.target as HTMLInputElement).value)"
@@ -22,6 +76,36 @@
                             class="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500" />
                     </div>
                 </div>
+
+                <div class="space-y-1">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs text-slate-400">Overlay Darkness</label>
+                        <span class="text-xs text-slate-500">{{ block.content.overlayOpacity ?? 40 }}%</span>
+                    </div>
+                    <input type="range" min="0" max="80" step="5"
+                        :value="block.content.overlayOpacity ?? 40"
+                        @input="updateContent({ ...block.content, overlayOpacity: Number(($event.target as HTMLInputElement).value) })"
+                        class="w-full accent-blue-500" />
+                    <div class="flex justify-between text-xs text-slate-600">
+                        <span>None</span><span>Dark</span>
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Name Color</label>
+                    <div class="flex items-center gap-2">
+                        <input type="color" :value="block.content.nameAccentColor || '#f59e0b'"
+                            @input="updateContent({ ...block.content, nameAccentColor: ($event.target as HTMLInputElement).value })"
+                            class="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0" />
+                        <input type="text" :value="block.content.nameAccentColor || ''"
+                            @input="updateContent({ ...block.content, nameAccentColor: ($event.target as HTMLInputElement).value || undefined })"
+                            placeholder="#f59e0b"
+                            class="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500" />
+                        <button @click="updateContent({ ...block.content, nameAccentColor: undefined })"
+                            class="text-xs text-slate-500 hover:text-slate-300">Clear</button>
+                    </div>
+                </div>
+
                 <div class="space-y-1">
                     <label class="block text-xs text-slate-400">Background Image</label>
                     <input type="text" :value="block.content.backgroundImageUrl"
@@ -35,7 +119,8 @@
                     </label>
                     <p v-if="block.content.backgroundImageUrl" class="text-xs text-slate-500 truncate">{{ block.content.backgroundImageUrl.slice(0, 40) }}…</p>
                 </div>
-                <!-- Newsletter layout fields -->
+
+                <!-- ── Text content ────────────────────────────────────────── -->
                 <div class="space-y-1">
                     <label class="block text-xs text-slate-400">Subtitle (above name)</label>
                     <input type="text" :value="block.content.subtitle || ''"
@@ -43,6 +128,7 @@
                         placeholder="e.g. 2024 Compliance"
                         class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
                 </div>
+
                 <div class="space-y-1">
                     <label class="block text-xs text-slate-400">Tagline (below name)</label>
                     <input type="text" :value="block.content.tagline || ''"
@@ -50,31 +136,24 @@
                         placeholder="e.g. A Year in Review"
                         class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
                 </div>
-                <div class="space-y-1">
-                    <label class="block text-xs text-slate-400">Name Accent Color</label>
-                    <div class="flex items-center gap-2">
-                        <input type="color" :value="block.content.nameAccentColor || '#f59e0b'"
-                            @input="updateContent({ ...block.content, nameAccentColor: ($event.target as HTMLInputElement).value })"
-                            class="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0" />
-                        <input type="text" :value="block.content.nameAccentColor || ''"
-                            @input="updateContent({ ...block.content, nameAccentColor: ($event.target as HTMLInputElement).value || undefined })"
-                            placeholder="#f59e0b"
-                            class="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500" />
-                        <button @click="updateContent({ ...block.content, nameAccentColor: undefined })"
-                            class="text-xs text-slate-500 hover:text-slate-300">Clear</button>
+
+                <!-- ── Decorative lines (prominent toggle) ────────────────── -->
+                <div class="flex items-center justify-between py-2 px-3 rounded border"
+                    :class="block.content.showDecorativeRules !== false ? 'border-blue-700/50 bg-blue-900/20' : 'border-slate-700 bg-slate-700/30'">
+                    <div>
+                        <div class="text-xs font-medium text-slate-300">Decorative Lines</div>
+                        <div class="text-xs text-slate-500 mt-0.5">Horizontal rules above &amp; below name</div>
                     </div>
-                </div>
-                <div class="flex items-center justify-between">
-                    <label class="text-xs text-slate-400">Decorative Rules</label>
                     <button
                         @click="updateContent({ ...block.content, showDecorativeRules: !(block.content.showDecorativeRules !== false) })"
-                        class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none"
+                        class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none shrink-0 ml-3"
                         :class="block.content.showDecorativeRules !== false ? 'bg-blue-600' : 'bg-slate-600'"
                     >
                         <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
                             :class="block.content.showDecorativeRules !== false ? 'translate-x-4' : 'translate-x-1'" />
                     </button>
                 </div>
+
             </template>
 
             <!-- Heading-specific -->

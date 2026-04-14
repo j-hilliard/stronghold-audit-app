@@ -75,12 +75,20 @@ export interface CoverContent {
     preparedBy: string;
     /**
      * preserved — sole source of truth for the cover gradient color.
-     * Initialized from localStorage newsletter template on block creation.
      * BlockStyle.backgroundColor is intentionally NOT used for cover blocks.
      */
     primaryColor: string;
     /** preserved — sole source of truth for cover background image */
     backgroundImageUrl: string;
+    // ── Layout & sizing ────────────────────────────────────────────────────────
+    /** Block min-height preset. Default: 'md' (220px). */
+    coverHeight?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+    /** Division name font size. Default: 'xl'. */
+    nameSize?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+    /** Text transform for the division name. Default: 'uppercase'. */
+    nameTransform?: 'uppercase' | 'none';
+    /** Opacity of the black overlay (0–80). Default: 40. */
+    overlayOpacity?: number;
     // ── Newsletter template fields (all preserved) ────────────────────────────
     /** Small text rendered above the division name. e.g. "2022 Compliance" */
     subtitle?: string;
@@ -88,13 +96,12 @@ export interface CoverContent {
     tagline?: string;
     /**
      * Color for the large division name display.
-     * Defaults to primaryColor if not set.
-     * Allows name to be a different accent color (e.g. crimson) while gradient stays navy.
+     * Defaults to nameAccentColor → accentColor → amber (#f59e0b).
      */
     nameAccentColor?: string;
     /**
      * When true (default), renders horizontal rule lines above and below the division name.
-     * Matches the decorative rule style in the physical newsletter template.
+     * Set to false to remove the lines entirely.
      */
     showDecorativeRules?: boolean;
 }
