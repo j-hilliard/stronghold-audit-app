@@ -456,6 +456,35 @@
                 </div>
             </template>
 
+            <!-- Findings Category -->
+            <template v-if="block.type === 'findings-category'">
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Section Name</label>
+                    <input type="text" :value="block.content.sectionName"
+                        @input="updateContent({ ...block.content, sectionName: ($event.target as HTMLInputElement).value })"
+                        placeholder="e.g. Confined Space Procedures"
+                        class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-xs text-slate-400">Header Accent Color</label>
+                    <div class="flex items-center gap-2">
+                        <input type="color" :value="block.content.accentColor || '#862633'"
+                            @input="updateContent({ ...block.content, accentColor: ($event.target as HTMLInputElement).value })"
+                            class="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0" />
+                        <input type="text" :value="block.content.accentColor || '#862633'"
+                            @input="updateContent({ ...block.content, accentColor: ($event.target as HTMLInputElement).value })"
+                            class="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500" />
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" :checked="block.content.showExamplesLabel"
+                        @change="updateContent({ ...block.content, showExamplesLabel: ($event.target as HTMLInputElement).checked })"
+                        class="rounded" id="fc-show-examples" />
+                    <label for="fc-show-examples" class="text-xs text-slate-400 cursor-pointer">Show "Examples:" label</label>
+                </div>
+                <div class="text-xs text-slate-500">Edit findings directly on the canvas using the rich text toolbar.</div>
+            </template>
+
             <!-- Narrative lock indicator -->
             <template v-if="block.type === 'narrative'">
                 <div class="text-xs text-slate-400 space-y-1">
@@ -639,8 +668,9 @@ function blockLabel(type: BlockType): string {
         'column-row':   'Two Column Row',
         'divider':      'Divider',
         'spacer':       'Spacer',
-        'toc-sidebar':  'TOC / Inside Panel',
-        'oval-callout': 'Oval Callout',
+        'toc-sidebar':        'TOC / Inside Panel',
+        'oval-callout':       'Oval Callout',
+        'findings-category':  'Findings Category',
     };
     return labels[type] ?? type;
 }

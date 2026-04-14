@@ -186,8 +186,9 @@ const blockComponents: Record<BlockType, ReturnType<typeof defineAsyncComponent>
     'column-row':   defineAsyncComponent(() => import('./blocks/ColumnRowBlock.vue')),
     'divider':      defineAsyncComponent(() => import('./blocks/DividerBlock.vue')),
     'spacer':       defineAsyncComponent(() => import('./blocks/SpacerBlock.vue')),
-    'toc-sidebar':  defineAsyncComponent(() => import('./blocks/TocSidebarBlock.vue')),
-    'oval-callout': defineAsyncComponent(() => import('./blocks/OvalCalloutBlock.vue')),
+    'toc-sidebar':        defineAsyncComponent(() => import('./blocks/TocSidebarBlock.vue')),
+    'oval-callout':       defineAsyncComponent(() => import('./blocks/OvalCalloutBlock.vue')),
+    'findings-category':  defineAsyncComponent(() => import('./blocks/FindingsCategoryBlock.vue')),
 };
 
 function componentFor(type: BlockType) {

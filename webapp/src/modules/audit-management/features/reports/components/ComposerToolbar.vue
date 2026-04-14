@@ -150,6 +150,40 @@
                 </div>
             </div>
 
+            <!-- Findings Category — section picker -->
+            <div>
+                <button
+                    @click="toggle('findings')"
+                    class="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors"
+                    :class="openPicker === 'findings' ? 'bg-slate-700 text-white' : 'text-slate-300 hover:bg-slate-700'"
+                >
+                    <i class="pi pi-list text-xs text-slate-500 w-4" />
+                    <span class="flex-1">Findings Category</span>
+                    <i class="pi text-xs text-slate-500" :class="openPicker === 'findings' ? 'pi-chevron-up' : 'pi-chevron-down'" />
+                </button>
+                <div v-if="openPicker === 'findings'" class="ml-2 mt-1 space-y-px">
+                    <!-- Blank findings block -->
+                    <button
+                        @click="pick('findings-category', undefined)"
+                        class="w-full text-left flex items-center gap-1.5 px-2 py-1 rounded text-xs text-blue-300 hover:bg-slate-700 transition-colors"
+                    >
+                        <i class="pi pi-plus text-xs w-3" /> Blank
+                    </button>
+                    <div v-if="!sections.length" class="px-2 py-1 text-xs text-slate-600 italic">
+                        Generate first to load sections
+                    </div>
+                    <button
+                        v-for="section in sections"
+                        :key="section"
+                        @click="pick('findings-category', section)"
+                        class="w-full text-left flex items-center gap-1.5 px-2 py-1 rounded text-xs text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
+                    >
+                        <i class="pi pi-minus text-xs w-3" />
+                        <span class="truncate flex-1">{{ section }}</span>
+                    </button>
+                </div>
+            </div>
+
             <!-- Remaining simple blocks -->
             <button
                 v-for="item in trailingPalette"
@@ -204,9 +238,9 @@ const emit = defineEmits<{
     (e: 'add-block', type: BlockType, sectionName?: string): void;
 }>();
 
-const openPicker = ref<'bar' | 'line' | null>(null);
+const openPicker = ref<'bar' | 'line' | 'findings' | null>(null);
 
-function toggle(which: 'bar' | 'line') {
+function toggle(which: 'bar' | 'line' | 'findings') {
     openPicker.value = openPicker.value === which ? null : which;
 }
 

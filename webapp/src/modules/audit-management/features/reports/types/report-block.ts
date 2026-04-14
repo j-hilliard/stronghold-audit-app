@@ -26,7 +26,8 @@ export type BlockType =
     | 'divider'
     | 'spacer'
     | 'toc-sidebar'
-    | 'oval-callout';
+    | 'oval-callout'
+    | 'findings-category';
 
 // ── Shared style model ────────────────────────────────────────────────────────
 // Editable via the property panel. Never written by the regeneration engine.
@@ -215,7 +216,10 @@ export interface LineChartBlock extends ReportBlockBase {
 // ── Narrative ─────────────────────────────────────────────────────────────────
 
 export interface NarrativeContent {
-    /** regenerated if isEdited === false; preserved if isEdited === true */
+    /**
+     * HTML string (Tiptap output). Regenerated if isEdited === false;
+     * preserved if isEdited === true. Plain text is valid (renders as-is).
+     */
     text: string;
     /**
      * preserved — stored so "Regenerate ✨" can replay the same prompt context.
@@ -370,6 +374,37 @@ export interface OvalCalloutBlock extends ReportBlockBase {
     content: OvalCalloutContent;
 }
 
+// ── Findings Category ─────────────────────────────────────────────────────────
+// The dominant block type in the physical newsletters:
+//   [Section Name header]
+//   "Examples:"
+//   • Bulleted findings list (rich text)
+
+export interface FindingsCategoryContent {
+    /**
+     * Compliance section name. e.g. "Confined Space Procedures"
+     * Regenerated from section breakdown; preserved if isEdited === true.
+     */
+    sectionName: string;
+    /**
+     * Rich text HTML (Tiptap). Typically a bullet list of finding examples.
+     * Preserved across regeneration — never overwritten.
+     */
+    findings: string;
+    /** When true, renders the "Examples:" label above the list. Default: true. */
+    showExamplesLabel: boolean;
+    /**
+     * Accent color for the section header bar.
+     * Defaults to brandBurgundy (#862633) to match newsletter templates.
+     */
+    accentColor?: string;
+}
+
+export interface FindingsCategoryBlock extends ReportBlockBase {
+    type: 'findings-category';
+    content: FindingsCategoryContent;
+}
+
 // ── Discriminated union ───────────────────────────────────────────────────────
 
 export type ReportBlock =
@@ -386,4 +421,5 @@ export type ReportBlock =
     | DividerBlock
     | SpacerBlock
     | TocSidebarBlock
-    | OvalCalloutBlock;
+    | OvalCalloutBlock
+    | FindingsCategoryBlock;

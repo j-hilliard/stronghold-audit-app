@@ -4,7 +4,12 @@
             <i :class="iconClass" class="mt-0.5 shrink-0" />
             <div class="flex-1 space-y-1">
                 <div class="text-sm font-semibold" :class="titleClass">{{ content.title }}</div>
-                <div class="text-sm" :class="bodyClass">{{ content.body }}</div>
+                <RichTextEditor
+                    :model-value="content.body"
+                    placeholder="Add callout body text…"
+                    :class="['text-sm', bodyClass]"
+                    @update:model-value="(v) => $emit('update:content', { ...content, body: v })"
+                />
             </div>
         </div>
     </div>
@@ -13,10 +18,15 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { CalloutContent, BlockStyle } from '../../types/report-block';
+import RichTextEditor from '../RichTextEditor.vue';
 
 const props = defineProps<{
     content: CalloutContent;
     style: BlockStyle;
+}>();
+
+defineEmits<{
+    (e: 'update:content', content: CalloutContent): void;
 }>();
 
 const containerClass = computed(() => ({

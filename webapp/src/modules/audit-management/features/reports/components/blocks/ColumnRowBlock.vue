@@ -176,8 +176,9 @@ const blockComponents: Record<string, ReturnType<typeof defineAsyncComponent>> =
     'image':        defineAsyncComponent(() => import('./ImageBlock.vue')),
     'divider':      defineAsyncComponent(() => import('./DividerBlock.vue')),
     'spacer':       defineAsyncComponent(() => import('./SpacerBlock.vue')),
-    'toc-sidebar':  defineAsyncComponent(() => import('./TocSidebarBlock.vue')),
-    'oval-callout': defineAsyncComponent(() => import('./OvalCalloutBlock.vue')),
+    'toc-sidebar':        defineAsyncComponent(() => import('./TocSidebarBlock.vue')),
+    'oval-callout':       defineAsyncComponent(() => import('./OvalCalloutBlock.vue')),
+    'findings-category':  defineAsyncComponent(() => import('./FindingsCategoryBlock.vue')),
 };
 
 // ── Mini palette for the + Add Block picker ───────────────────────────────────
@@ -192,8 +193,9 @@ const miniPalette = [
     { type: 'kpi-grid',     label: 'KPI Cards',     icon: 'pi pi-th-large' },
     { type: 'toc-sidebar',  label: 'TOC / Inside',  icon: 'pi pi-bookmark' },
     { type: 'oval-callout', label: 'Oval Callout',  icon: 'pi pi-circle' },
-    { type: 'divider',      label: 'Divider',       icon: 'pi pi-minus' },
-    { type: 'spacer',       label: 'Spacer',        icon: 'pi pi-arrows-v' },
+    { type: 'divider',           label: 'Divider',          icon: 'pi pi-minus' },
+    { type: 'spacer',            label: 'Spacer',           icon: 'pi pi-arrows-v' },
+    { type: 'findings-category', label: 'Findings Category', icon: 'pi pi-list' },
 ];
 
 const showPickerLeft = ref(false);
@@ -266,7 +268,8 @@ function getDefaultContent(type: string): unknown {
         case 'divider':      return { thickness: 1, variant: 'solid', color: '#475569', marginY: 'md' };
         case 'spacer':       return { height: 'md' };
         case 'toc-sidebar':  return { title: 'INSIDE', items: [], darkBackground: true };
-        case 'oval-callout': return { title: 'strong-hold', phonetic: "/'strôNG.hōld/ noun.", body: 'A place where a particular cause or belief is strongly defended or upheld.', backgroundColor: '#1e3a5f', textColor: '#ffffff' };
+        case 'oval-callout':       return { title: 'strong-hold', phonetic: "/'strôNG.hōld/ noun.", body: 'A place where a particular cause or belief is strongly defended or upheld.', backgroundColor: '#1e3a5f', textColor: '#ffffff' };
+        case 'findings-category':  return { sectionName: 'Section Name', findings: '<ul><li>Example finding</li></ul>', showExamplesLabel: true, accentColor: '#862633' };
         case 'chart-bar':    return { title: 'Bar Chart', labels: [], datasets: [], caption: '' };
         case 'chart-line':   return { sectionName: '', title: 'Trend Chart', labels: [], datasets: [], caption: '', examples: '' };
         case 'kpi-grid':     return { cards: [], showComparison: false };

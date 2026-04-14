@@ -539,6 +539,16 @@ export function useReportEngine() {
                 return { id: uuid(), type: 'toc-sidebar', isEdited: false, style: DEFAULT_STYLE, content: { title: 'INSIDE', items: [], darkBackground: true } } as import('../types/report-block').TocSidebarBlock;
             case 'oval-callout':
                 return { id: uuid(), type: 'oval-callout', isEdited: false, style: DEFAULT_STYLE, content: { title: 'strong-hold', phonetic: "/'strôNG.hōld/ noun.", body: 'A place where a particular cause or belief is strongly defended or upheld.', backgroundColor: '#1e3a5f', textColor: '#ffffff' } } as import('../types/report-block').OvalCalloutBlock;
+            case 'findings-category':
+                return {
+                    id: uuid(), type: 'findings-category', isEdited: false, style: DEFAULT_STYLE,
+                    content: {
+                        sectionName: sectionName ?? 'Section Name',
+                        findings: '<ul><li>Example finding 1</li><li>Example finding 2</li></ul>',
+                        showExamplesLabel: true,
+                        accentColor: '#862633',
+                    },
+                } as import('../types/report-block').FindingsCategoryBlock;
         }
     }
 
