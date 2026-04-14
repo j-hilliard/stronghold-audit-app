@@ -30,13 +30,20 @@ const ovalStyle = computed(() => ({
     display: flex;
     justify-content: center;
     align-items: center;
+    /* Fill the block wrapper so oval scales with resize */
+    width: 100%;
+    height: 100%;
+    min-height: 200px;
     padding: 0.75rem;
+    box-sizing: border-box;
 }
 
 .oval-callout {
-    /* Fixed dimensions so border-radius: 50% always produces an ellipse */
-    width: 300px;
-    height: 200px;
+    /* Fill available space from wrapper — creates a true ellipse at any size */
+    width: 100%;
+    height: 100%;
+    min-width: 100px;
+    min-height: 80px;
     border-radius: 50%;
     display: flex;
     flex-direction: column;
@@ -46,6 +53,7 @@ const ovalStyle = computed(() => ({
     padding: 1.5rem 2.5rem;
     /* Clip overflowing text rather than expanding the box */
     overflow: hidden;
+    box-sizing: border-box;
 }
 
 .oval-title {

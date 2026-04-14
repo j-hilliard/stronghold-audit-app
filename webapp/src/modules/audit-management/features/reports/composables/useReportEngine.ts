@@ -20,7 +20,7 @@ import { useApiStore } from '@/stores/apiStore';
 import { AuditClient } from '@/apiclient/auditClient';
 import type { AuditReportDto, SectionTrendsReportDto } from '@/apiclient/auditClient';
 import type {
-    ReportBlock, BlockStyle,
+    ReportBlock, BlockStyle, BlockLayout,
     CoverBlock, HeadingBlock, KpiGridBlock,
     BarChartBlock, LineChartBlock, NarrativeBlock,
     CalloutBlock, CaTableBlock,
@@ -35,6 +35,43 @@ const COLORS = {
 };
 
 const DEFAULT_STYLE: BlockStyle = {};
+
+// ── Layout helpers ────────────────────────────────────────────────────────────
+
+/** Page content area: 794px total - 48px left - 48px right = 698px usable. */
+const PAGE_CONTENT_X = 40;
+const PAGE_CONTENT_W = 714;
+const BLOCK_GAP = 16;
+
+/** Estimated content heights for Y stacking in buildDefaultLayout. height: 0 = auto on canvas. */
+const EST_HEIGHT: Partial<Record<ReportBlock['type'], number>> = {
+    cover: 240,
+    heading: 56,
+    'kpi-grid': 320,
+    'chart-bar': 380,
+    'chart-line': 340,
+    narrative: 220,
+    callout: 120,
+    'ca-table': 220,
+    image: 300,
+    'toc-sidebar': 620,
+    'oval-callout': 250,
+    'findings-category': 220,
+    divider: 32,
+    spacer: 48,
+    'column-row': 400,
+};
+
+function makeLayout(y: number, type: ReportBlock['type'], zIndex = 1, overrides: Partial<BlockLayout> = {}): BlockLayout {
+    return { x: PAGE_CONTENT_X, y, width: PAGE_CONTENT_W, height: 0, zIndex, ...overrides };
+}
+
+/** Compute next available Y: max bottom edge of existing blocks + gap. */
+function nextAvailableY(existing: ReportBlock[]): number {
+    if (!existing.length) return 0;
+    const maxBottom = Math.max(...existing.map(b => b.layout.y + (b.layout.height || EST_HEIGHT[b.type] || 160)));
+    return maxBottom + BLOCK_GAP;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -66,7 +103,8 @@ function buildCover(
         id: existing?.id ?? uuid(),
         type: 'cover',
         isEdited: false,
-        style: existing?.style ?? DEFAULT_STYLE,
+        style: existing?.style ?? { ...DEFAULT_STYLE, padding: 'none' },
+        layout: existing?.layout ?? makeLayout(0, 'cover'),
         content: {
             // always regenerated
             divisionName,
@@ -175,6 +213,7 @@ function buildKpiGrid(
         type: 'kpi-grid',
         isEdited: false,
         style: existing?.style ?? DEFAULT_STYLE,
+        layout: existing?.layout ?? makeLayout(0, 'kpi-grid'),
         content: {
             cards: [...summaryCards, ...sectionCards],
             showComparison: existing?.content.showComparison ?? true,
@@ -207,6 +246,7 @@ function buildBarChart(
         type: 'chart-bar',
         isEdited: false,
         style: existing?.style ?? DEFAULT_STYLE,
+        layout: existing?.layout ?? makeLayout(0, 'chart-bar'),
         content: {
             title: existing?.content.title ?? 'Non-Conformances by Section — Division vs Company',
             labels: allSections,
@@ -237,6 +277,7 @@ function buildLineChart(
         type: 'chart-line',
         isEdited: false,
         style: existing?.style ?? DEFAULT_STYLE,
+        layout: existing?.layout ?? makeLayout(0, 'chart-line'),
         content: {
             sectionName,
             title: existing?.content.title ?? `${sectionName} — Findings per Audit`,
@@ -259,6 +300,7 @@ function buildNarrative(existingBlock?: ReportBlock): NarrativeBlock {
         type: 'narrative',
         isEdited: existing?.isEdited ?? false,
         style: existing?.style ?? DEFAULT_STYLE,
+        layout: existing?.layout ?? makeLayout(0, 'narrative'),
         content: {
             text: existing?.isEdited ? (existing.content.text ?? '') : '',
             aiPromptContext: existing?.isEdited ? existing.content.aiPromptContext : undefined,
@@ -284,6 +326,7 @@ function buildCaTable(report: AuditReportDto, existingBlock?: ReportBlock): CaTa
         type: 'ca-table',
         isEdited: false,
         style: existing?.style ?? DEFAULT_STYLE,
+        layout: existing?.layout ?? makeLayout(0, 'ca-table'),
         content: { rows },
     };
 }
@@ -299,36 +342,47 @@ function buildDefaultLayout(
     period: string,
     preparedBy: string,
 ): ReportBlock[] {
-    const blocks: ReportBlock[] = [];
+    const built: ReportBlock[] = [];
+    let y = 0;
 
-    blocks.push(buildCover(divisionCode, divisionName, period, preparedBy));
-    blocks.push({
+    function push(block: ReportBlock) {
+        const h = EST_HEIGHT[block.type] ?? 160;
+        block.layout = makeLayout(y, block.type);
+        y += h + BLOCK_GAP;
+        built.push(block);
+    }
+
+    push(buildCover(divisionCode, divisionName, period, preparedBy));
+    push({
         id: uuid(), type: 'heading', isEdited: false, style: DEFAULT_STYLE,
+        layout: makeLayout(0, 'heading'),
         content: { text: 'Performance at a Glance', level: 2 },
     } as HeadingBlock);
-    blocks.push(buildKpiGrid(report, companyReport, trends));
-    blocks.push(buildBarChart(report, companyReport, trends));
+    push(buildKpiGrid(report, companyReport, trends));
+    push(buildBarChart(report, companyReport, trends));
 
     // One line chart per section — ALL sections, matching the legacy newsletter format
     for (const section of trends.sections) {
-        blocks.push(buildLineChart(section.sectionName, trends, divisionCode));
+        push(buildLineChart(section.sectionName, trends, divisionCode));
     }
 
-    blocks.push({
+    push({
         id: uuid(), type: 'heading', isEdited: false, style: DEFAULT_STYLE,
+        layout: makeLayout(0, 'heading'),
         content: { text: 'Narrative Summary', level: 2 },
     } as HeadingBlock);
-    blocks.push(buildNarrative());
+    push(buildNarrative());
 
     if (report.openCorrectiveActions.length > 0) {
-        blocks.push({
+        push({
             id: uuid(), type: 'heading', isEdited: false, style: DEFAULT_STYLE,
+            layout: makeLayout(0, 'heading'),
             content: { text: 'Open Corrective Actions', level: 2 },
         } as HeadingBlock);
-        blocks.push(buildCaTable(report));
+        push(buildCaTable(report));
     }
 
-    return blocks;
+    return built;
 }
 
 // ── Merge engine — regenerates data, preserves annotation/style, syncs charts ──
@@ -471,21 +525,24 @@ export function useReportEngine() {
         period: string,
         preparedBy: string,
         sectionName?: string,
+        existingBlocks: ReportBlock[] = [],
     ): Promise<ReportBlock> {
         const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
+        const y = nextAvailableY(existingBlocks);
+        const layout = makeLayout(y, type);
 
         switch (type) {
             case 'cover':
-                return buildCover(divisionCode, '', period, preparedBy);
+                return { ...buildCover(divisionCode, '', period, preparedBy), layout };
             case 'heading':
-                return { id: uuid(), type: 'heading', isEdited: false, style: DEFAULT_STYLE, content: { text: 'New Section', level: 2 } } as HeadingBlock;
+                return { id: uuid(), type: 'heading', isEdited: false, style: DEFAULT_STYLE, layout, content: { text: 'New Section', level: 2 } } as HeadingBlock;
             case 'kpi-grid': {
                 const [report, companyReport, trends] = await Promise.all([
                     client.getAuditReport(divisionId),
                     client.getAuditReport(null),
                     client.getSectionTrends(divisionId, null, null),
                 ]);
-                return buildKpiGrid(report, companyReport, trends);
+                return { ...buildKpiGrid(report, companyReport, trends), layout };
             }
             case 'chart-bar': {
                 const [report, companyReport, trends] = await Promise.all([
@@ -494,11 +551,10 @@ export function useReportEngine() {
                     client.getSectionTrends(divisionId, null, null),
                 ]);
                 if (sectionName) {
-                    // Single-section bar: Division vs Company for this section only
                     const divCount = report.sectionBreakdown.find(s => s.sectionName === sectionName)?.ncCount ?? 0;
                     const coCount = companyReport.sectionBreakdown.find(s => s.sectionName === sectionName)?.ncCount ?? 0;
                     return {
-                        id: uuid(), type: 'chart-bar', isEdited: false, style: DEFAULT_STYLE,
+                        id: uuid(), type: 'chart-bar', isEdited: false, style: DEFAULT_STYLE, layout,
                         content: {
                             title: `${sectionName} — Division vs Company`,
                             labels: ['Division', 'Company'],
@@ -510,38 +566,37 @@ export function useReportEngine() {
                         },
                     } as BarChartBlock;
                 }
-                return buildBarChart(report, companyReport, trends);
+                return { ...buildBarChart(report, companyReport, trends), layout };
             }
             case 'chart-line': {
                 const trends = await client.getSectionTrends(divisionId, null, null);
-                // Update available sections list whenever we fetch trends
                 sections.value = trends.sections.map(s => s.sectionName);
                 const name = sectionName ?? trends.sections[0]?.sectionName ?? 'Section';
-                return buildLineChart(name, trends, divisionCode);
+                return { ...buildLineChart(name, trends, divisionCode), layout };
             }
             case 'narrative':
-                return buildNarrative();
+                return { ...buildNarrative(), layout };
             case 'callout':
-                return { id: uuid(), type: 'callout', isEdited: false, style: DEFAULT_STYLE, content: { title: 'Note', body: '', variant: 'info' } } as CalloutBlock;
+                return { id: uuid(), type: 'callout', isEdited: false, style: DEFAULT_STYLE, layout, content: { title: 'Note', body: '', variant: 'info' } } as CalloutBlock;
             case 'ca-table': {
                 const report = await client.getAuditReport(divisionId);
-                return buildCaTable(report);
+                return { ...buildCaTable(report), layout };
             }
             case 'image':
-                return { id: uuid(), type: 'image', isEdited: false, style: DEFAULT_STYLE, content: { url: '', alt: '', caption: '', width: 'full' } } as import('../types/report-block').ImageBlock;
+                return { id: uuid(), type: 'image', isEdited: false, style: DEFAULT_STYLE, layout, content: { url: '', alt: '', caption: '', width: 'full' } } as import('../types/report-block').ImageBlock;
             case 'column-row':
-                return { id: uuid(), type: 'column-row', isEdited: false, style: DEFAULT_STYLE, content: { ratio: '50/50', gap: 'md', leftBlocks: [], rightBlocks: [] } } as import('../types/report-block').ColumnRowBlock;
+                return { id: uuid(), type: 'column-row', isEdited: false, style: DEFAULT_STYLE, layout, content: { ratio: '50/50', gap: 'md', leftBlocks: [], rightBlocks: [] } } as import('../types/report-block').ColumnRowBlock;
             case 'divider':
-                return { id: uuid(), type: 'divider', isEdited: false, style: DEFAULT_STYLE, content: { thickness: 1, variant: 'solid', color: '#475569', marginY: 'md' } } as import('../types/report-block').DividerBlock;
+                return { id: uuid(), type: 'divider', isEdited: false, style: DEFAULT_STYLE, layout, content: { thickness: 1, variant: 'solid', color: '#475569', marginY: 'md' } } as import('../types/report-block').DividerBlock;
             case 'spacer':
-                return { id: uuid(), type: 'spacer', isEdited: false, style: DEFAULT_STYLE, content: { height: 'md' } } as import('../types/report-block').SpacerBlock;
+                return { id: uuid(), type: 'spacer', isEdited: false, style: DEFAULT_STYLE, layout, content: { height: 'md' } } as import('../types/report-block').SpacerBlock;
             case 'toc-sidebar':
-                return { id: uuid(), type: 'toc-sidebar', isEdited: false, style: DEFAULT_STYLE, content: { title: 'INSIDE', items: [], darkBackground: true } } as import('../types/report-block').TocSidebarBlock;
+                return { id: uuid(), type: 'toc-sidebar', isEdited: false, style: DEFAULT_STYLE, layout, content: { title: 'INSIDE', items: [], darkBackground: true } } as import('../types/report-block').TocSidebarBlock;
             case 'oval-callout':
-                return { id: uuid(), type: 'oval-callout', isEdited: false, style: DEFAULT_STYLE, content: { title: 'strong-hold', phonetic: "/'strôNG.hōld/ noun.", body: 'A place where a particular cause or belief is strongly defended or upheld.', backgroundColor: '#1e3a5f', textColor: '#ffffff' } } as import('../types/report-block').OvalCalloutBlock;
+                return { id: uuid(), type: 'oval-callout', isEdited: false, style: DEFAULT_STYLE, layout, content: { title: 'strong-hold', phonetic: "/'strôNG.hōld/ noun.", body: 'A place where a particular cause or belief is strongly defended or upheld.', backgroundColor: '#1e3a5f', textColor: '#ffffff' } } as import('../types/report-block').OvalCalloutBlock;
             case 'findings-category':
                 return {
-                    id: uuid(), type: 'findings-category', isEdited: false, style: DEFAULT_STYLE,
+                    id: uuid(), type: 'findings-category', isEdited: false, style: DEFAULT_STYLE, layout,
                     content: {
                         sectionName: sectionName ?? 'Section Name',
                         findings: '<ul><li>Example finding 1</li><li>Example finding 2</li></ul>',

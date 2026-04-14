@@ -1,8 +1,15 @@
 <template>
     <div class="fc-block">
-        <!-- Section name header bar -->
+        <!-- Section name header bar — click to rename inline -->
         <div class="fc-header" :style="headerStyle">
-            <span class="fc-section-name">{{ content.sectionName || 'Section Name' }}</span>
+            <span
+                ref="nameEl"
+                contenteditable="true"
+                spellcheck="false"
+                class="fc-section-name outline-none cursor-text"
+                @blur="onNameBlur"
+                @keydown.enter.prevent="(nameEl as HTMLElement)?.blur()"
+            />
         </div>
 
         <!-- "Examples:" label -->
@@ -22,7 +29,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import type { FindingsCategoryContent, BlockStyle } from '../../types/report-block';
 import RichTextEditor from '../RichTextEditor.vue';
 
@@ -38,6 +45,22 @@ const emit = defineEmits<{
 }>();
 
 const isFocused = ref(false);
+const nameEl = ref<HTMLElement | null>(null);
+
+function syncName() {
+    if (!nameEl.value || document.activeElement === nameEl.value) return;
+    const text = props.content.sectionName || 'Section Name';
+    if (nameEl.value.innerText !== text) nameEl.value.innerText = text;
+}
+onMounted(() => nextTick(syncName));
+watch(() => props.content.sectionName, () => nextTick(syncName));
+
+function onNameBlur(e: FocusEvent) {
+    const text = (e.target as HTMLElement).innerText.trim();
+    if (text !== props.content.sectionName) {
+        emit('update:content', { ...props.content, sectionName: text });
+    }
+}
 
 const headerStyle = computed(() => ({
     backgroundColor: props.content.accentColor || '#862633',

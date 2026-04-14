@@ -188,7 +188,7 @@
                 @duplicate="draft.duplicateBlock($event); draft.scheduleAutosave()"
                 @update-content="onUpdateContent"
                 @update-is-edited="onUpdateIsEdited"
-                @reorder="onReorder"
+                @update-layout="onUpdateLayout"
             />
 
             <NewsletterSettingsPanel
@@ -206,6 +206,8 @@
                 v-if="!(reportType === 'newsletter' && showNewsletterSettings)"
                 :block="selectedBlock"
                 @update="onBlockUpdate"
+                @bring-forward="draft.bringForward($event); draft.scheduleAutosave()"
+                @send-backward="draft.sendBackward($event); draft.scheduleAutosave()"
             />
         </div>
     </div>
@@ -439,6 +441,7 @@ async function onAddBlock(type: ReportBlock['type'], sectionName?: string) {
         draft.meta.value.period,
         userStore.userAccountInfo?.name ?? 'Stronghold',
         sectionName,
+        draft.blocks.value,
     );
     draft.blocks.value.push(newBlock);
     selectedBlock.value = newBlock;
@@ -471,6 +474,16 @@ function onUpdateIsEdited(id: string, value: boolean) {
     const updated = { ...block, isEdited: value };
     draft.updateBlock(updated);
     if (selectedBlock.value?.id === id) selectedBlock.value = updated;
+}
+
+function onUpdateLayout(id: string, layout: Partial<import('../types/report-block').BlockLayout>) {
+    draft.updateLayout(id, layout);
+    // Keep selectedBlock in sync so the property panel shows current coords
+    if (selectedBlock.value?.id === id) {
+        const found = draft.blocks.value.find(b => b.id === id);
+        if (found) selectedBlock.value = found;
+    }
+    draft.scheduleAutosave();
 }
 
 function onMoveUp(id: string) {

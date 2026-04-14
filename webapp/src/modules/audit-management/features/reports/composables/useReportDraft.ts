@@ -11,7 +11,7 @@ import { ref, computed, watch } from 'vue';
 import { useApiStore } from '@/stores/apiStore';
 import { AuditClient } from '@/apiclient/auditClient';
 import type { ReportDraftDto, CreateReportDraftRequest, UpdateReportDraftRequest } from '@/apiclient/auditClient';
-import type { ReportBlock, ColumnRowBlock } from '../types/report-block';
+import type { ReportBlock, BlockLayout, ColumnRowBlock } from '../types/report-block';
 import { REPORT_THEMES } from './useReportThemes';
 
 export interface DraftMeta {
@@ -95,11 +95,41 @@ export function useReportDraft() {
         return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
     }
 
+    /**
+     * Back-fill layout for any block loaded from an old draft that predates
+     * the free-form canvas. Assigns a stacked default layout preserving the
+     * original top-to-bottom order.
+     */
+    /** Back-fill layout for a single block. cumulativeY is passed in from the caller. */
+    function ensureLayout(block: ReportBlock, index: number, cumulativeY = 0): ReportBlock {
+        if (block.layout) return block;
+        return {
+            ...block,
+            layout: { x: 40, y: cumulativeY, width: 714, height: 0, zIndex: index + 1 },
+        };
+    }
+
     /** Deserialize blocksJson from the API into typed ReportBlock[]. */
     function deserialize(json: string): ReportBlock[] {
         try {
             const parsed = JSON.parse(json);
-            return Array.isArray(parsed) ? (parsed as ReportBlock[]) : [];
+            if (!Array.isArray(parsed)) return [];
+            const blocks = parsed as ReportBlock[];
+            // Compute cumulative Y so blocks stack correctly (not overlapping)
+            let cumulativeY = 0;
+            return blocks.map((b, i) => {
+                const block = ensureLayout(b, i, cumulativeY);
+                // Advance Y by this block's estimated height (or its stored height if set)
+                const EST: Partial<Record<ReportBlock['type'], number>> = {
+                    cover: 240, heading: 56, 'kpi-grid': 320, 'chart-bar': 380,
+                    'chart-line': 340, narrative: 220, callout: 120, 'ca-table': 220,
+                    image: 300, 'toc-sidebar': 620, 'oval-callout': 250,
+                    'findings-category': 220, divider: 32, spacer: 48, 'column-row': 400,
+                };
+                const h = block.layout.height > 0 ? block.layout.height : (EST[b.type] ?? 160);
+                cumulativeY = block.layout.y + h + 16;
+                return block;
+            });
         } catch {
             return [];
         }
@@ -213,6 +243,42 @@ export function useReportDraft() {
         }
     }
 
+    /**
+     * Update layout fields for a block — kept separate from updateBlock so
+     * drag/resize operations don't flood the text-edit debounce history.
+     */
+    function updateLayout(id: string, layout: Partial<BlockLayout>) {
+        const idx = blocks.value.findIndex(b => b.id === id);
+        if (idx < 0) return;
+        pushHistoryDebounced();
+        blocks.value[idx] = {
+            ...blocks.value[idx],
+            layout: { ...blocks.value[idx].layout, ...layout },
+        };
+    }
+
+    function bringForward(id: string) {
+        const block = blocks.value.find(b => b.id === id);
+        if (!block) return;
+        const maxZ = Math.max(...blocks.value.map(b => b.layout?.zIndex ?? 1));
+        updateLayout(id, { zIndex: Math.min((block.layout?.zIndex ?? 1) + 1, maxZ + 1) });
+    }
+
+    function sendBackward(id: string) {
+        const block = blocks.value.find(b => b.id === id);
+        if (!block) return;
+        updateLayout(id, { zIndex: Math.max((block.layout?.zIndex ?? 1) - 1, 1) });
+    }
+
+    function bringToFront(id: string) {
+        const maxZ = Math.max(...blocks.value.map(b => b.layout?.zIndex ?? 1));
+        updateLayout(id, { zIndex: maxZ + 1 });
+    }
+
+    function sendToBack(id: string) {
+        updateLayout(id, { zIndex: 1 });
+    }
+
     /** Remove a block by id. */
     function removeBlock(id: string) {
         try { pushHistory(); } catch { /* history skipped — mutation still proceeds */ }
@@ -235,14 +301,15 @@ export function useReportDraft() {
         if (!theme) return;
         pushHistory();
 
+        const t = theme; // narrowed non-null after the guard above
         function applyToBlock(block: ReportBlock) {
             // Cover: update primaryColor
             if (block.type === 'cover') {
-                block.content.primaryColor = theme.coverPrimaryColor;
+                block.content.primaryColor = t.coverPrimaryColor;
             }
             // Style update (skip cover — its bg comes from primaryColor, not blockStyle)
             if (block.type !== 'cover') {
-                block.style = { ...block.style, ...theme.blockStyle };
+                block.style = { ...block.style, ...t.blockStyle };
             }
             // Recurse into column children
             if (block.type === 'column-row') {
@@ -289,9 +356,15 @@ export function useReportDraft() {
         scheduleAutosave,
         deleteDraft,
         updateBlock,
+        updateLayout,
         removeBlock,
         setBlocks,
         duplicateBlock,
         applyTheme,
+        // Z-order
+        bringForward,
+        sendBackward,
+        bringToFront,
+        sendToBack,
     };
 }

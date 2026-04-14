@@ -3,12 +3,20 @@
         <div class="flex items-start gap-2">
             <i :class="iconClass" class="mt-0.5 shrink-0" />
             <div class="flex-1 space-y-1">
-                <div class="text-sm font-semibold" :class="titleClass">{{ content.title }}</div>
+                <div
+                    ref="titleEl"
+                    contenteditable="true"
+                    spellcheck="false"
+                    class="text-sm font-semibold outline-none cursor-text"
+                    :class="titleClass"
+                    @blur="onTitleBlur"
+                    @keydown.enter.prevent="(titleEl as HTMLElement)?.blur()"
+                />
                 <RichTextEditor
                     :model-value="content.body"
                     placeholder="Add callout body text…"
                     :class="['text-sm', bodyClass]"
-                    @update:model-value="(v) => $emit('update:content', { ...content, body: v })"
+                    @update:model-value="(v) => emit('update:content', { ...props.content, body: v })"
                 />
             </div>
         </div>
@@ -16,7 +24,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, onMounted, watch, nextTick } from 'vue';
 import type { CalloutContent, BlockStyle } from '../../types/report-block';
 import RichTextEditor from '../RichTextEditor.vue';
 
@@ -25,9 +33,23 @@ const props = defineProps<{
     style: BlockStyle;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
     (e: 'update:content', content: CalloutContent): void;
 }>();
+
+const titleEl = ref<HTMLElement | null>(null);
+
+function syncTitle() {
+    if (!titleEl.value || document.activeElement === titleEl.value) return;
+    if (titleEl.value.innerText !== props.content.title) titleEl.value.innerText = props.content.title;
+}
+onMounted(() => nextTick(syncTitle));
+watch(() => props.content.title, () => nextTick(syncTitle));
+
+function onTitleBlur(e: FocusEvent) {
+    const text = (e.target as HTMLElement).innerText.trim();
+    if (text !== props.content.title) emit('update:content', { ...props.content, title: text });
+}
 
 const containerClass = computed(() => ({
     'bg-blue-900/20 border-blue-500': props.content.variant === 'info',

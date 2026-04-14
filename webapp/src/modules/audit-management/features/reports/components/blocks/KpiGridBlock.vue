@@ -6,7 +6,7 @@
             <span class="text-xs text-slate-400 font-medium uppercase tracking-wide">Company</span>
         </div>
 
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr))">
             <div
                 v-for="card in enabledCards"
                 :key="card.label"

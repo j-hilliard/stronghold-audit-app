@@ -173,6 +173,29 @@
                         <option value="3">H3 — Small</option>
                     </select>
                 </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="space-y-1">
+                        <label class="block text-xs text-slate-400">Font Size (px)</label>
+                        <input type="number" min="8" max="120" step="1"
+                            :value="block.content.fontSize || ''"
+                            placeholder="auto"
+                            @change="updateContent({ ...block.content, fontSize: ($event.target as HTMLInputElement).value ? Number(($event.target as HTMLInputElement).value) : undefined })"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none" />
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-xs text-slate-400">Weight</label>
+                        <select :value="block.content.fontWeight || 600"
+                            @change="updateContent({ ...block.content, fontWeight: Number(($event.target as HTMLSelectElement).value) as any })"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none">
+                            <option value="400">Regular</option>
+                            <option value="500">Medium</option>
+                            <option value="600">Semibold</option>
+                            <option value="700">Bold</option>
+                            <option value="800">Extra Bold</option>
+                            <option value="900">Black</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="space-y-1">
                     <label class="block text-xs text-slate-400">Background Image</label>
                     <input type="text" :value="block.content.backgroundImageUrl || ''"
@@ -630,12 +653,60 @@
                     </select>
                 </div>
             </div>
+
+            <!-- ── Position & Size (all blocks) ─────────────────────────── -->
+            <div class="pt-3 border-t border-slate-700 space-y-3">
+                <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Position &amp; Size</div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="space-y-1">
+                        <label class="block text-xs text-slate-400">X</label>
+                        <input type="number" :value="block.layout?.x ?? 40"
+                            @change="updateLayout({ x: +($event.target as HTMLInputElement).value })"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none" />
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-xs text-slate-400">Y</label>
+                        <input type="number" :value="block.layout?.y ?? 0"
+                            @change="updateLayout({ y: +($event.target as HTMLInputElement).value })"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none" />
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-xs text-slate-400">Width</label>
+                        <input type="number" :value="block.layout?.width ?? 714"
+                            @change="updateLayout({ width: +($event.target as HTMLInputElement).value })"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none" />
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-xs text-slate-400">Height</label>
+                        <input type="number" :value="block.layout?.height ?? 0" placeholder="auto"
+                            @change="updateLayout({ height: +($event.target as HTMLInputElement).value })"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none" />
+                    </div>
+                </div>
+                <div class="flex gap-1">
+                    <button @click="$emit('bring-forward', block.id)" class="flex-1 text-xs py-1 bg-slate-700 hover:bg-slate-600 rounded text-slate-300 border border-slate-600">↑ Forward</button>
+                    <button @click="$emit('send-backward', block.id)" class="flex-1 text-xs py-1 bg-slate-700 hover:bg-slate-600 rounded text-slate-300 border border-slate-600">↓ Back</button>
+                </div>
+                <button
+                    @click="updateLayout({ width: 714, height: 0, x: 40 })"
+                    class="w-full text-xs py-1 bg-slate-700 hover:bg-slate-600 rounded text-slate-400 hover:text-slate-200 border border-slate-600 transition-colors"
+                    title="Reset to full-width auto-height"
+                >
+                    Reset Size &amp; Position
+                </button>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" :checked="block.layout?.locked ?? false"
+                        @change="updateLayout({ locked: ($event.target as HTMLInputElement).checked })"
+                        class="rounded" />
+                    <span class="text-xs text-slate-400">Lock position</span>
+                </label>
+            </div>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import type { ReportBlock, BlockStyle, BlockType, KpiCard } from '../types/report-block';
+import type { ReportBlock, BlockStyle, BlockLayout, BlockType, KpiCard } from '../types/report-block';
 
 /** Convert a local file to a base64 data-URL so it can be stored in the draft. */
 function onImageUpload(event: Event, callback: (url: string) => void) {
@@ -654,7 +725,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     (e: 'update', block: ReportBlock): void;
+    (e: 'bring-forward', id: string): void;
+    (e: 'send-backward', id: string): void;
 }>();
+
+function updateLayout(layout: Partial<BlockLayout>) {
+    if (!props.block) return;
+    emit('update', { ...props.block, layout: { ...props.block.layout, ...layout } as BlockLayout });
+}
 
 function updateContent(content: unknown) {
     if (!props.block) return;

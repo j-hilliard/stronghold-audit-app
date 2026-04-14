@@ -254,6 +254,7 @@ function addBlock(side: 'left' | 'right', type: string) {
         type: type as ReportBlock['type'],
         isEdited: false,
         style: {},
+        layout: { x: 0, y: 0, width: 0, height: 0, zIndex: 1 }, // inner block — layout unused by canvas
         content: getDefaultContent(type),
     } as ReportBlock;
     emit('update:content', { ...props.content, [key]: [...props.content[key], newBlock] });

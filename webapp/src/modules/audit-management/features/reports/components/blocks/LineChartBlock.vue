@@ -1,16 +1,16 @@
 <template>
-    <div class="space-y-2">
-        <div class="text-sm font-semibold text-slate-200">{{ content.title }}</div>
-        <div v-if="content.labels.length">
-            <Chart type="line" :data="chartData" :options="chartOptions" style="height: 220px;" />
+    <div class="flex flex-col gap-2" style="height: 100%; min-height: 320px;">
+        <div class="text-sm font-semibold text-slate-200 flex-shrink-0">{{ content.title }}</div>
+        <div v-if="content.labels.length" class="flex-1 min-h-0" style="min-height: 160px;">
+            <Chart type="line" :data="chartData" :options="chartOptions" style="height: 100%; width: 100%;" />
         </div>
-        <div v-else class="flex items-center justify-center h-28 text-slate-500 text-sm">
+        <div v-else class="flex-1 flex items-center justify-center text-slate-500 text-sm">
             No trend data available
         </div>
         <p v-if="content.caption" class="text-xs text-slate-400 italic">{{ content.caption }}</p>
 
         <!-- Examples / Findings box — matches the legacy newsletter "Examples:" sections -->
-        <div class="mt-3 border-t border-slate-700/60 pt-3">
+        <div class="flex-shrink-0 mt-3 border-t border-slate-700/60 pt-3">
             <div class="flex items-center gap-2 mb-1">
                 <span class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Examples</span>
                 <button

@@ -41,6 +41,28 @@ export interface BlockStyle {
     padding?: 'none' | 'sm' | 'md' | 'lg';
 }
 
+// ── Free-form layout model ────────────────────────────────────────────────────
+// Controls position and size on the absolute-positioned canvas.
+// Persisted in BlocksJson — never touched by the regeneration engine.
+
+export interface BlockLayout {
+    /** px from left edge of the page (794px wide). */
+    x: number;
+    /** px from top edge of the page. */
+    y: number;
+    /** px width. Minimum: 80. */
+    width: number;
+    /**
+     * px height. 0 = auto (content-driven).
+     * Becomes fixed when user drags the resize handle.
+     */
+    height: number;
+    /** Stacking order. Higher = on top. */
+    zIndex: number;
+    /** When true, drag-to-move is disabled for this block. */
+    locked?: boolean;
+}
+
 // ── Shared base ───────────────────────────────────────────────────────────────
 
 export interface ReportBlockBase {
@@ -55,6 +77,12 @@ export interface ReportBlockBase {
     isEdited: boolean;
     /** Always persisted, never touched by the regeneration engine. */
     style: BlockStyle;
+    /**
+     * Free-form position and size on the canvas.
+     * Required on all blocks. Missing layout is back-filled by ensureLayout()
+     * in useReportDraft.ts when deserializing old drafts.
+     */
+    layout: BlockLayout;
     /**
      * true = block is part of a locked newsletter layout.
      * Newsletter blocks can be styled but not reordered or deleted.
@@ -121,6 +149,10 @@ export interface HeadingContent {
     backgroundImageUrl?: string;
     /** preserved — 0–80 opacity of the dark overlay on the banner; default 50 */
     overlayOpacity?: number;
+    /** preserved — explicit font size override (px). When set, overrides the level-based size. */
+    fontSize?: number;
+    /** preserved — font weight override. Default: 600 (semibold). */
+    fontWeight?: 400 | 500 | 600 | 700 | 800 | 900;
 }
 
 export interface HeadingBlock extends ReportBlockBase {
@@ -374,6 +406,10 @@ export interface OvalCalloutContent {
     backgroundColor?: string;
     /** Hex text color. Defaults to white if empty. */
     textColor?: string;
+    /** Oval width in px. Default: 300. */
+    ovalWidth?: number;
+    /** Oval height in px. Default: 200. */
+    ovalHeight?: number;
 }
 
 export interface OvalCalloutBlock extends ReportBlockBase {
