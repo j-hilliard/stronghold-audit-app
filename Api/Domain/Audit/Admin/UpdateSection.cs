@@ -47,6 +47,9 @@ public class UpdateSectionHandler : IRequestHandler<UpdateSection, Unit>
 
         section.Name = request.Payload.Name.Trim();
         section.IsRequired = request.Payload.IsRequired;
+        section.Weight = request.Payload.Weight;
+        section.IsOptional = request.Payload.IsOptional;
+        section.OptionalGroupKey = request.Payload.OptionalGroupKey?.Trim();
         section.ReportingCategoryId = request.Payload.ReportingCategoryId;
         section.UpdatedAt = now;
         section.UpdatedBy = request.UpdatedBy;

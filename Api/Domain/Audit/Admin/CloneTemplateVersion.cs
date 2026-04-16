@@ -8,7 +8,8 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Admin;
 
-[AllowedAuthorizationRole(AuthorizationRole.Administrator)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
 public class CloneTemplateVersion : IRequest<int>
 {
     public int VersionId { get; set; }

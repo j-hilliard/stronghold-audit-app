@@ -9,7 +9,8 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Newsletter;
 
-[AllowedAuthorizationRole(AuthorizationRole.AuthenticatedUser)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
 public class SaveNewsletterTemplate : IRequest<NewsletterTemplateDto>
 {
     public SaveNewsletterTemplateRequest Payload { get; set; } = null!;

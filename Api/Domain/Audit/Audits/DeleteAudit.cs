@@ -7,7 +7,9 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
-[AllowedAuthorizationRole(AuthorizationRole.AuthenticatedUser)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.AuditManager, AuthorizationRole.TemplateAdmin,
+    AuthorizationRole.Administrator)]
 public class DeleteAudit : IRequest<Unit>
 {
     public int AuditId { get; set; }

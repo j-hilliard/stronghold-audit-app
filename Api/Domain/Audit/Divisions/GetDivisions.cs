@@ -7,7 +7,11 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Divisions;
 
-[AllowedAuthorizationRole(AuthorizationRole.AuthenticatedUser)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
+    AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.ReadOnlyViewer,
+    AuthorizationRole.ExecutiveViewer, AuthorizationRole.TemplateAdmin,
+    AuthorizationRole.Administrator)]
 public class GetDivisions : IRequest<List<DivisionDto>> { }
 
 public class GetDivisionsHandler : IRequestHandler<GetDivisions, List<DivisionDto>>

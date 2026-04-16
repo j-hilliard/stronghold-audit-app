@@ -21,20 +21,36 @@ export interface DivisionDto {
 export interface TemplateQuestionDto {
     /** AuditVersionQuestion.Id */
     versionQuestionId: number;
-    /** AuditQuestion.Id â€” stored on AuditResponse */
+    /** AuditQuestion.Id — stored on AuditResponse */
     questionId: number;
     questionText: string;
     displayOrder: number;
     allowNA: boolean;
     requireCommentOnNC: boolean;
     isScoreable: boolean;
+    /** When true, a NonConforming answer causes the entire audit to auto-fail */
+    isLifeCritical: boolean;
 }
 
 export interface TemplateSectionDto {
     id: number;
     name: string;
     displayOrder: number;
+    /** When true, only shown when explicitly enabled at audit creation */
+    isOptional: boolean;
+    /** Groups optional sections toggled together (e.g. “RADIOGRAPHY”) */
+    optionalGroupKey?: string | null;
     questions: TemplateQuestionDto[];
+}
+
+export interface LogicRuleDto {
+    id: number;
+    triggerVersionQuestionId: number;
+    /** "NonConforming" | "Conforming" | "Warning" | "NA" | "AnyAnswer" */
+    triggerResponse: string;
+    /** "HideSection" | "ShowSection" */
+    action: string;
+    targetSectionId?: number | null;
 }
 
 export interface TemplateDto {
@@ -45,6 +61,8 @@ export interface TemplateDto {
     /** "JobSite" | "Facility" */
     auditType: string;
     sections: TemplateSectionDto[];
+    /** Section-level skip-logic rules evaluated client-side */
+    logicRules: LogicRuleDto[];
 }
 
 export interface AuditHeaderDto {
@@ -104,6 +122,8 @@ export interface AuditDetailDto {
     submittedAt?: string | null;
     header?: AuditHeaderDto | null;
     responses: AuditResponseDto[];
+    /** Optional section group keys that were enabled at audit creation (immutable). */
+    enabledOptionalGroupKeys: string[];
 }
 
 export interface AuditListItemDto {
@@ -177,6 +197,7 @@ export interface DraftQuestionDto {
     responseTypeId?: number | null;
     responseTypeCode?: string | null;
     weight: number;
+    isLifeCritical: boolean;
 }
 
 export interface DraftSectionDto {
@@ -185,6 +206,9 @@ export interface DraftSectionDto {
     sectionCode?: string | null;
     displayOrder: number;
     isRequired: boolean;
+    weight: number;
+    isOptional: boolean;
+    optionalGroupKey?: string | null;
     reportingCategoryId?: number | null;
     reportingCategoryName?: string | null;
     questions: DraftQuestionDto[];
@@ -254,12 +278,36 @@ export interface CopySectionRequest {
 
 export interface AddSectionRequest {
     name: string;
+    weight?: number;
+    isOptional?: boolean;
+    optionalGroupKey?: string | null;
 }
 
 export interface UpdateSectionRequest {
     name: string;
     isRequired: boolean;
+    weight: number;
+    isOptional: boolean;
+    optionalGroupKey?: string | null;
     reportingCategoryId?: number | null;
+}
+
+export interface UpdateQuestionRequest {
+    questionText: string;
+    weight: number;
+    isLifeCritical: boolean;
+    allowNA: boolean;
+    requireCommentOnNC: boolean;
+    isScoreable: boolean;
+}
+
+export interface QuestionWeightItem {
+    versionQuestionId: number;
+    weight: number;
+}
+
+export interface BatchUpdateQuestionWeightsRequest {
+    weights: QuestionWeightItem[];
 }
 
 export interface ReorderSectionsRequest {
@@ -479,6 +527,17 @@ export interface UpdateReportDraftRequest {
     rowVersion: string;
 }
 
+// ── Attachments ──────────────────────────────────────────────────────────────
+
+export interface AuditAttachmentDto {
+    id: number;
+    fileName: string;
+    uploadedBy: string;
+    uploadedAt: string;
+    fileSizeBytes: number;
+    downloadUrl: string;
+}
+
 export interface AuditReviewDto {
     id: number;
     divisionCode: string;
@@ -493,6 +552,12 @@ export interface AuditReviewDto {
     unansweredCount: number;
     /** Null if no scored items answered */
     scorePercent?: number | null;
+    /** True when at least one life-critical question was answered NonConforming — entire audit auto-fails */
+    hasLifeCriticalFailure: boolean;
+    /** Question texts of life-critical NC responses */
+    lifeCriticalFailures: string[];
+    /** AI-generated plain-language summary, null when not available */
+    aiSummary?: string | null;
     nonConformingItems: AuditFindingDto[];
     warningItems: ReviewResponseItemDto[];
     sections: ReviewSectionDto[];
@@ -579,9 +644,9 @@ export class AuditClient {
 
     // â”€â”€ Audits â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    createAudit(divisionId: number, cancelToken?: CancelToken): Promise<number> {
+    createAudit(divisionId: number, enabledOptionalGroupKeys: string[] = [], cancelToken?: CancelToken): Promise<number> {
         return this.instance
-            .post<number>(`${this.baseUrl}/v1/audits`, { divisionId }, { cancelToken })
+            .post<number>(`${this.baseUrl}/v1/audits`, { divisionId, enabledOptionalGroupKeys }, { cancelToken })
             .then(r => r.data);
     }
 
@@ -709,9 +774,16 @@ export class AuditClient {
             .then(r => r.data);
     }
 
-    updateQuestion(draftId: number, versionQuestionId: number, questionText: string, cancelToken?: CancelToken): Promise<void> {
+    updateQuestion(draftId: number, versionQuestionId: number, request: UpdateQuestionRequest, cancelToken?: CancelToken): Promise<void> {
         return this.instance
-            .put(`${this.baseUrl}/v1/admin/versions/${draftId}/questions/${versionQuestionId}`, { questionText }, { cancelToken })
+            .put(`${this.baseUrl}/v1/admin/versions/${draftId}/questions/${versionQuestionId}`, request, { cancelToken })
+            .then(() => undefined);
+    }
+
+    batchUpdateQuestionWeights(draftId: number, weights: QuestionWeightItem[], cancelToken?: CancelToken): Promise<void> {
+        const request: BatchUpdateQuestionWeightsRequest = { weights };
+        return this.instance
+            .put(`${this.baseUrl}/v1/admin/versions/${draftId}/questions/weights`, request, { cancelToken })
             .then(() => undefined);
     }
 
@@ -902,5 +974,71 @@ export class AuditClient {
         return this.instance
             .put<NewsletterTemplateDto>(`${this.baseUrl}/v1/audits/newsletter-template`, request, { cancelToken })
             .then(r => r.data);
+    }
+
+    // ── Attachments ───────────────────────────────────────────────────────────
+
+    getAttachments(auditId: number, cancelToken?: CancelToken): Promise<AuditAttachmentDto[]> {
+        return this.instance
+            .get<AuditAttachmentDto[]>(`${this.baseUrl}/v1/audits/${auditId}/attachments`, { cancelToken })
+            .then(r => r.data);
+    }
+
+    uploadAttachment(auditId: number, file: File, cancelToken?: CancelToken): Promise<AuditAttachmentDto> {
+        const form = new FormData();
+        form.append('file', file, file.name);
+        return this.instance
+            .post<AuditAttachmentDto>(`${this.baseUrl}/v1/audits/${auditId}/attachments`, form, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                cancelToken,
+            })
+            .then(r => r.data);
+    }
+
+    downloadAttachment(auditId: number, attachmentId: number, cancelToken?: CancelToken): Promise<{ blob: Blob; fileName: string }> {
+        return this.instance
+            .get(`${this.baseUrl}/v1/audits/${auditId}/attachments/${attachmentId}/download`, {
+                responseType: 'blob',
+                cancelToken,
+            })
+            .then(r => {
+                const disposition: string = r.headers['content-disposition'] ?? '';
+                const match = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^;"'\n]+)["']?/i);
+                const fileName = match ? decodeURIComponent(match[1].trim()) : `attachment-${attachmentId}`;
+                return { blob: r.data as Blob, fileName };
+            });
+    }
+
+    deleteAttachment(auditId: number, attachmentId: number, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .delete(`${this.baseUrl}/v1/audits/${auditId}/attachments/${attachmentId}`, { cancelToken })
+            .then(() => undefined);
+    }
+
+    // ── Logic rules ───────────────────────────────────────────────────────────
+
+    getLogicRules(templateVersionId: number, cancelToken?: CancelToken): Promise<LogicRuleDto[]> {
+        return this.instance
+            .get<LogicRuleDto[]>(`${this.baseUrl}/v1/admin/templates/${templateVersionId}/logic-rules`, { cancelToken })
+            .then(r => r.data);
+    }
+
+    upsertLogicRule(rule: {
+        id?: number | null;
+        templateVersionId: number;
+        triggerVersionQuestionId: number;
+        triggerResponse: string;
+        action: string;
+        targetSectionId?: number | null;
+    }, cancelToken?: CancelToken): Promise<LogicRuleDto> {
+        return this.instance
+            .put<LogicRuleDto>(`${this.baseUrl}/v1/admin/templates/logic-rules`, rule, { cancelToken })
+            .then(r => r.data);
+    }
+
+    deleteLogicRule(id: number, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .delete(`${this.baseUrl}/v1/admin/templates/logic-rules/${id}`, { cancelToken })
+            .then(() => undefined);
     }
 }

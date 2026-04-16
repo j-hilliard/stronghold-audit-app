@@ -39,6 +39,13 @@ public class AuditQuestion : AuditableEntity
     /// <summary>Default scoring weight. Per-version override available on AuditVersionQuestion.</summary>
     public decimal Weight { get; set; } = 1.0m;
 
+    /// <summary>
+    /// When true, a NonConforming response to this question causes the entire audit to fail
+    /// regardless of overall score — used for questions where a violation could cause death or
+    /// serious injury (e.g., fall protection, lockout/tagout).
+    /// </summary>
+    public bool IsLifeCritical { get; set; } = false;
+
     /// <summary>True when admin removes this from active templates. Never set IsDeleted = true on questions.</summary>
     public bool IsArchived { get; set; }
     public DateTime? ArchivedAt { get; set; }

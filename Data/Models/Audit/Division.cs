@@ -16,6 +16,12 @@ public class Division : AuditableEntity
 
     public bool IsActive { get; set; } = true;
 
+    /// <summary>
+    /// Minimum compliance target score (0–100). Null = no target set.
+    /// Dashboard shows red/green indicator vs. this target.
+    /// </summary>
+    public decimal? ScoreTarget { get; set; }
+
     // Navigation
     public ICollection<AuditTemplate> Templates { get; set; } = new List<AuditTemplate>();
     public ICollection<EmailRoutingRule> EmailRoutingRules { get; set; } = new List<EmailRoutingRule>();

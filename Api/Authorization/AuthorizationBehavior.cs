@@ -9,6 +9,23 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Authorization;
 
+/// <summary>Cached entry stored per user — avoids DB round trips on every request.</summary>
+internal sealed record UserAuthCacheEntry(int UserId, List<string> Roles, List<int> DivisionIds);
+
+/// <summary>
+/// Roles that bypass the division-scope filter — these users see all divisions.
+/// </summary>
+internal static class GlobalAuditRoles
+{
+    public static readonly HashSet<string> Names = new(StringComparer.OrdinalIgnoreCase)
+    {
+        AuthorizationRoles.Administrator,
+        AuthorizationRoles.TemplateAdmin,
+        AuthorizationRoles.AuditManager,
+        AuthorizationRoles.ExecutiveViewer,
+    };
+}
+
 public class AuthorizationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : notnull
 {
@@ -19,6 +36,7 @@ public class AuthorizationBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
     private readonly ILogger<AuthorizationBehavior<TRequest, TResponse>> _logger;
     private readonly AzureAdHelper _azureAdHeler;
     private readonly IWebHostEnvironment _env;
+    private readonly IAuditUserContext _auditUserContext;
 
     public AuthorizationBehavior(
         IMapper mapper,
@@ -27,7 +45,8 @@ public class AuthorizationBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
         AppDbContext appDbContext,
         IHttpContextAccessor httpContextAccessor,
         ILogger<AuthorizationBehavior<TRequest, TResponse>> logger,
-        IWebHostEnvironment env
+        IWebHostEnvironment env,
+        IAuditUserContext auditUserContext
     )
     {
         _mapper = mapper;
@@ -37,6 +56,7 @@ public class AuthorizationBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
         _httpContextAccessor = httpContextAccessor;
         _logger = logger;
         _env = env;
+        _auditUserContext = auditUserContext;
     }
 
     public async Task<TResponse> Handle(
@@ -72,106 +92,91 @@ public class AuthorizationBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
             throw new UnauthorizedAccessException("User ID not valid");
         }
 
-        var cacheKey = $"UserRoles_{azureAdObjectId}";
-        if (!_cache.TryGetValue(cacheKey, out List<string>? roles) || roles == null)
+        // ── Resolve roles + division scope (60-min memory cache per user) ──────
+        var cacheKey = $"AuditAuth_{azureAdObjectId}";
+        if (!_cache.TryGetValue(cacheKey, out UserAuthCacheEntry? authEntry) || authEntry == null)
         {
-            if (roles == null || roles.Count == 0) // no previously cached roles were found for this user so load them from database and cache them
+            // Ensure the user account exists in the database
+            var existingUser = await _appDbContext.Users.FirstOrDefaultAsync(
+                u => u.AzureAdObjectId == guidAzureAdObjectId,
+                cancellationToken
+            );
+            if (existingUser == null)
             {
-                // lets first check if the user who is logged in has a user account saved in the sql database
-                var existingUser = await _appDbContext.Users.FirstOrDefaultAsync(
-                    u => u.AzureAdObjectId == guidAzureAdObjectId,
-                    cancellationToken
-                );
-                if (existingUser == null)
+                var adUserInfo = await _azureAdHeler.GetAdUserInfoByObjectIdAsync(guidAzureAdObjectId);
+                if (adUserInfo != null && adUserInfo.AzureAdObjectId == guidAzureAdObjectId)
                 {
-                    // no existing user account is saved in sql so lets create one and save it.  We will also add the user to the user role as well.
-
-
-                    var adUserInfo = await _azureAdHeler.GetAdUserInfoByObjectIdAsync(
-                        guidAzureAdObjectId
-                    );
-                    if (
-                        adUserInfo != null
-                        && adUserInfo.AzureAdObjectId != null
-                        && adUserInfo.AzureAdObjectId == guidAzureAdObjectId
-                    )
+                    var newUser = new User
                     {
-                        var newUser = new User
-                        {
-                            AzureAdObjectId = guidAzureAdObjectId,
-                            FirstName = adUserInfo.FirstName,
-                            LastName = adUserInfo.LastName,
-                            Email = adUserInfo.Email,
-                            Company = adUserInfo.Company,
-                            Department = adUserInfo.Department,
-                            Title = adUserInfo.Title,
-                            Active = true,
-                            CreatedOn = DateTime.UtcNow,
-                            LastLogin = DateTime.UtcNow,
-                        };
+                        AzureAdObjectId = guidAzureAdObjectId,
+                        FirstName = adUserInfo.FirstName,
+                        LastName = adUserInfo.LastName,
+                        Email = adUserInfo.Email,
+                        Company = adUserInfo.Company,
+                        Department = adUserInfo.Department,
+                        Title = adUserInfo.Title,
+                        Active = true,
+                        CreatedOn = DateTime.UtcNow,
+                        LastLogin = DateTime.UtcNow,
+                    };
 
-                        var user = _mapper.Map<Data.Models.User>(newUser);
-                        await _appDbContext.Users.AddAsync(user, cancellationToken);
-                        await _appDbContext.SaveChangesAsync(cancellationToken);
+                    var user = _mapper.Map<Data.Models.User>(newUser);
+                    await _appDbContext.Users.AddAsync(user, cancellationToken);
+                    await _appDbContext.SaveChangesAsync(cancellationToken);
 
-                        if (user.UserId > 0)
+                    if (user.UserId > 0)
+                    {
+                        var defaultRole = await _appDbContext.Roles.FirstOrDefaultAsync(
+                            r => r.Name == AuthorizationRoles.User,
+                            cancellationToken
+                        );
+                        if (defaultRole != null)
                         {
-                            // adding user to the user role
-                            var userRole = await _appDbContext.Roles.FirstOrDefaultAsync(
-                                r => r.Name == AuthorizationRoles.User,
+                            await _appDbContext.UserRoles.AddAsync(
+                                _mapper.Map<Data.Models.UserRole>(new UserRole
+                                {
+                                    UserId = user.UserId,
+                                    RoleId = defaultRole.RoleId,
+                                }),
                                 cancellationToken
                             );
-                            if (userRole != null)
-                            {
-                                var newUserRole = new UserRole();
-                                newUserRole.UserId = user.UserId;
-                                newUserRole.RoleId = userRole.RoleId;
-
-                                await _appDbContext.UserRoles.AddAsync(
-                                    _mapper.Map<Data.Models.UserRole>(newUserRole),
-                                    cancellationToken
-                                );
-                                await _appDbContext.SaveChangesAsync(cancellationToken);
-                            }
+                            await _appDbContext.SaveChangesAsync(cancellationToken);
                         }
                     }
-                    ;
                 }
-
-                // user has exsting account in the database so lets query which roles they are in and cache them
-                /* roles = await _appDbContext.UserRoles
-                .Where(ur => ur.User.AzureAdObjectId == guidAzureAdObjectId)
-                .Select(ur => ur.Role.Name)
-                .ToListAsync(cancellationToken); */
-
-
-                var currentUser = await _appDbContext
-                    .Users.Where(user => user.AzureAdObjectId == new Guid(azureAdObjectId))
-                    .FirstOrDefaultAsync(cancellationToken);
-                if (currentUser == null)
-                {
-                    throw new UnauthorizedAccessException("User not found in the database");
-                }
-
-                roles = _appDbContext
-                    .UserRoles.Where(userRole => userRole.UserId == currentUser.UserId)
-                    .Select(userRole => userRole.Role.Name) // Select the Role object
-                    .ToList();
-
-                if (!roles.Contains(AuthorizationRoles.User)) // lets check if the user has the default User level role assigned, if not then we will add it as default level access.
-                    roles.Add(AuthorizationRoles.User); // Add the user role as a default role for all users.
-
-                var cacheOptions = new MemoryCacheEntryOptions().SetAbsoluteExpiration(
-                    TimeSpan.FromMinutes(60)
-                );
-                _cache.Set(cacheKey, roles, cacheOptions);
             }
+
+            var currentUser = await _appDbContext.Users
+                .Where(u => u.AzureAdObjectId == guidAzureAdObjectId)
+                .Select(u => new { u.UserId })
+                .FirstOrDefaultAsync(cancellationToken);
+            if (currentUser == null)
+                throw new UnauthorizedAccessException("User not found in the database");
+
+            var roles = await _appDbContext.UserRoles
+                .Where(ur => ur.UserId == currentUser.UserId)
+                .Select(ur => ur.Role.Name)
+                .ToListAsync(cancellationToken);
+
+            if (!roles.Contains(AuthorizationRoles.User))
+                roles.Add(AuthorizationRoles.User);
+
+            // Load division scope (empty list = all divisions allowed for scoped roles)
+            var divisionIds = await _appDbContext.UserDivisions
+                .Where(ud => ud.UserId == currentUser.UserId)
+                .Select(ud => ud.DivisionId)
+                .ToListAsync(cancellationToken);
+
+            authEntry = new UserAuthCacheEntry(currentUser.UserId, roles, divisionIds);
+            _cache.Set(cacheKey, authEntry, new MemoryCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromMinutes(60)));
         }
+
+        // Populate the scoped IAuditUserContext for this request
+        var isGlobal = authEntry.Roles.Any(r => GlobalAuditRoles.Names.Contains(r));
+        _auditUserContext.Initialize(authEntry.UserId, isGlobal, authEntry.DivisionIds);
 
         if (request == null)
-        {
             throw new ArgumentNullException(nameof(request), "Request cannot be null");
-        }
 
         var attribute =
             Attribute.GetCustomAttribute(request.GetType(), typeof(AllowedAuthorizationRole))
@@ -183,7 +188,7 @@ public class AuthorizationBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
             );
         }
 
-        if (attribute.IsAllowed(roles))
+        if (attribute.IsAllowed(authEntry.Roles))
         {
             return await next();
         }

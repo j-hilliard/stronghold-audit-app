@@ -34,6 +34,9 @@ public class AuditDetailDto
     public DateTime? SubmittedAt { get; set; }
     public AuditHeaderDto? Header { get; set; }
     public List<AuditResponseDto> Responses { get; set; } = new();
+
+    /// <summary>Optional section group keys enabled at creation (immutable).</summary>
+    public List<string> EnabledOptionalGroupKeys { get; set; } = new();
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
@@ -80,6 +83,12 @@ public class AuditResponseDto
 public class CreateAuditRequest
 {
     public int DivisionId { get; set; }
+
+    /// <summary>
+    /// Optional section groups to enable for this audit (e.g. ["RADIOGRAPHY", "ROPE_ACCESS"]).
+    /// Sections whose OptionalGroupKey matches are included; unmatched optional sections are excluded.
+    /// </summary>
+    public List<string> EnabledOptionalGroupKeys { get; set; } = new();
 }
 
 // ── Save request ──────────────────────────────────────────────────────────────
@@ -117,6 +126,27 @@ public class AuditReviewDto
 
     /// <summary>Conforming / (Conforming + NonConforming + Warning) * 100. Null if no scored items.</summary>
     public double? ScorePercent { get; set; }
+
+    /// <summary>
+    /// True if any Life Critical question was answered NonConforming.
+    /// When true the audit is considered an automatic fail regardless of score.
+    /// </summary>
+    public bool HasLifeCriticalFailure { get; set; }
+
+    /// <summary>Question texts for every life-critical NC in this audit.</summary>
+    public List<string> LifeCriticalFailures { get; set; } = new();
+
+    /// <summary>AI-generated plain-language summary, null when not available.</summary>
+    public string? AiSummary { get; set; }
+
+    /// <summary>Average score across the last 10 submitted audits for this division. Null if insufficient data.</summary>
+    public double? DivisionAvgScore { get; set; }
+
+    /// <summary>Division compliance target (0–100), null if not set by admin.</summary>
+    public decimal? DivisionScoreTarget { get; set; }
+
+    /// <summary>IDs of questions that are repeat findings (NonConforming in 2+ of the last 180 days).</summary>
+    public List<int> RepeatFindingQuestionIds { get; set; } = new();
 
     public List<AuditFindingDto> NonConformingItems { get; set; } = new();
     /// <summary>Warning responses (not corrected on-site) — from Responses, not Findings</summary>

@@ -9,7 +9,8 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Admin;
 
-[AllowedAuthorizationRole(AuthorizationRole.Administrator)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
 public class UpdateEmailRouting : IRequest<Unit>
 {
     public UpdateEmailRoutingRequest Payload { get; set; } = null!;

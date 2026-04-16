@@ -15,6 +15,42 @@
                 @click="exportCsv"
             />
             <Button
+                v-if="report"
+                label="Quarterly Excel"
+                icon="pi pi-file-excel"
+                severity="secondary"
+                outlined
+                size="small"
+                :loading="exportingQs"
+                @click="exportQuarterlySummary"
+            />
+            <Button
+                v-if="report"
+                label="NCR Excel"
+                icon="pi pi-file-excel"
+                severity="secondary"
+                outlined
+                size="small"
+                :loading="exportingNcr"
+                @click="exportNcrReport"
+            />
+            <Button
+                label="By Employee"
+                icon="pi pi-users"
+                severity="secondary"
+                outlined
+                size="small"
+                @click="router.push('/audit-management/reports/by-employee')"
+            />
+            <Button
+                label="Generate PDF"
+                icon="pi pi-file-pdf"
+                severity="secondary"
+                outlined
+                size="small"
+                @click="router.push('/audit-management/reports/gallery')"
+            />
+            <Button
                 label="Report Composer"
                 icon="pi pi-file-edit"
                 severity="secondary"
@@ -283,7 +319,10 @@
             <Card v-if="divisionStats.length > 1 && !hidden.divisionChart">
                 <template #title>
                     <div class="flex items-center justify-between w-full">
-                        <span class="text-base font-semibold text-white">Conformance by Division</span>
+                        <div class="flex flex-col min-w-0">
+                            <span class="text-base font-semibold text-white">Conformance by Division</span>
+                            <span v-if="activeFilterDesc" class="text-xs text-slate-400 mt-0.5">{{ activeFilterDesc }}</span>
+                        </div>
                         <div class="flex items-center gap-1">
                             <button @click.stop="hideSection('divisionChart')" class="section-collapse-btn" title="Hide section"><i class="pi pi-eye-slash" /></button>
                             <button @click.stop="toggleSection('divisionChart')" class="section-collapse-btn">
@@ -308,7 +347,10 @@
             <Card v-if="report.trend.length > 0 && !hidden.conformanceTrend">
                 <template #title>
                     <div class="flex items-center justify-between w-full">
-                        <span class="text-base font-semibold text-white">Conformance Trend (Last 12 Weeks)</span>
+                        <div class="flex flex-col min-w-0">
+                            <span class="text-base font-semibold text-white">{{ trendChartTitle }}</span>
+                            <span v-if="activeFilterDesc" class="text-xs text-slate-400 mt-0.5">{{ activeFilterDesc }}</span>
+                        </div>
                         <div class="flex items-center gap-2">
                             <div class="flex rounded overflow-hidden border border-slate-600 text-xs">
                                 <button
@@ -336,7 +378,10 @@
             <Card v-if="(report.sectionBreakdown?.length ?? 0) > 0 && !hidden.ncSection">
                 <template #title>
                     <div class="flex items-center justify-between w-full">
-                        <span class="text-base font-semibold text-white">Non-Conformances by Section</span>
+                        <div class="flex flex-col min-w-0">
+                            <span class="text-base font-semibold text-white">Non-Conformances by Section</span>
+                            <span v-if="activeFilterDesc" class="text-xs text-slate-400 mt-0.5">{{ activeFilterDesc }}</span>
+                        </div>
                         <div class="flex items-center gap-2">
                             <div class="flex rounded overflow-hidden border border-slate-600 text-xs">
                                 <button
@@ -370,7 +415,10 @@
             <Card v-if="locationStats.length >= 2 && !hidden.topLocations">
                 <template #title>
                     <div class="flex items-center justify-between w-full">
-                        <span class="text-base font-semibold text-white">Top Locations by Non-Conformances</span>
+                        <div class="flex flex-col min-w-0">
+                            <span class="text-base font-semibold text-white">Top Locations by Non-Conformances</span>
+                            <span v-if="activeFilterDesc" class="text-xs text-slate-400 mt-0.5">{{ activeFilterDesc }}</span>
+                        </div>
                         <div class="flex items-center gap-1">
                             <button @click.stop="hideSection('topLocations')" class="section-collapse-btn" title="Hide section"><i class="pi pi-eye-slash" /></button>
                             <button @click.stop="toggleSection('topLocations')" class="section-collapse-btn">
@@ -473,7 +521,10 @@
             <Card v-if="quarterlyTrendData.length > 1 && !hidden.quarterlyTrend">
                 <template #title>
                     <div class="flex items-center justify-between w-full">
-                        <span class="text-base font-semibold text-white">Quarterly Conformance Trend</span>
+                        <div class="flex flex-col min-w-0">
+                            <span class="text-base font-semibold text-white">Quarterly Conformance Trend</span>
+                            <span v-if="activeFilterDesc" class="text-xs text-slate-400 mt-0.5">{{ activeFilterDesc }}</span>
+                        </div>
                         <div class="flex items-center gap-2">
                             <div class="flex rounded overflow-hidden border border-slate-600 text-xs">
                                 <button
@@ -676,6 +727,8 @@ const apiStore = useApiStore();
 
 const loading = ref(false);
 const report = ref<AuditReportDto | null>(null);
+const exportingQs = ref(false);
+const exportingNcr = ref(false);
 const filterDivisionId = ref<number | null>(null);
 const filterStatus = ref<string | null>(null);
 const filterDateFrom = ref<Date | null>(null);
@@ -823,6 +876,46 @@ const compareLabel = computed(() => {
     return store.divisions.find(d => d.id === compareAgainst.value)?.code ?? 'Compare';
 });
 
+// ── Week label formatter: "2025-W42" → "Oct W42 '25" ─────────────────────────
+function formatWeek(isoWeek: string): string {
+    const [yearStr, wStr] = isoWeek.split('-W');
+    const year = +yearStr, w = +wStr;
+    // ISO week 1 always contains Jan 4 — find Monday of target week from that anchor
+    const jan4 = new Date(year, 0, 4);
+    const mondayW1 = new Date(jan4);
+    mondayW1.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+    const mondayOfWeek = new Date(mondayW1);
+    mondayOfWeek.setDate(mondayW1.getDate() + (w - 1) * 7);
+    const month = mondayOfWeek.toLocaleString('en-US', { month: 'short' });
+    return `${month} W${w} '${String(year).slice(-2)}`;
+}
+
+// ── Dynamic trend chart title ─────────────────────────────────────────────────
+const trendChartTitle = computed(() => {
+    const parts: string[] = [];
+    if (filterDivisionId.value)
+        parts.push(store.divisions.find(d => d.id === filterDivisionId.value)?.code ?? '');
+    if (filterSection.value) parts.push(filterSection.value);
+    const ctx = parts.length ? `${parts.join(' · ')} — ` : '';
+    const period = (filterDateFrom.value || filterDateTo.value) ? 'Filtered Period' : 'Last 12 Weeks';
+    return `${ctx}Conformance Trend (${period})`;
+});
+
+// ── Active filter description for chart subtitles ─────────────────────────────
+const activeFilterDesc = computed(() => {
+    const parts: string[] = [];
+    if (filterDivisionId.value)
+        parts.push(store.divisions.find(d => d.id === filterDivisionId.value)?.code ?? '');
+    if (filterSection.value) parts.push(`Section: ${filterSection.value}`);
+    if (filterDateFrom.value || filterDateTo.value) {
+        const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const from = filterDateFrom.value ? fmt(filterDateFrom.value) : '';
+        const to   = filterDateTo.value   ? fmt(filterDateTo.value)   : '';
+        parts.push(from && to ? `${from} – ${to}` : from ? `From ${from}` : `To ${to}`);
+    }
+    return parts.join(' · ');
+});
+
 async function loadCompareReport() {
     if (!compareAgainst.value) { compareReport.value = null; return; }
     // Comparing "All Divisions" against "Company Average" would load identical data — skip
@@ -912,6 +1005,39 @@ function exportCsv() {
     a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
+}
+
+// ── Excel exports ─────────────────────────────────────────────────────────────
+
+async function downloadExcel(endpoint: string, fileName: string, loadingRef: { value: boolean }) {
+    loadingRef.value = true;
+    try {
+        const params: Record<string, string> = {};
+        if (filterDivisionId.value) params.divisionId = String(filterDivisionId.value);
+        if (filterDateFrom.value) params.dateFrom = filterDateFrom.value.toISOString();
+        if (filterDateTo.value) params.dateTo = filterDateTo.value.toISOString();
+        const res = await apiStore.api.get(endpoint, { params, responseType: 'blob' });
+        const blobUrl = URL.createObjectURL(new Blob([res.data], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }));
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileName;
+        link.click();
+        URL.revokeObjectURL(blobUrl);
+    } finally {
+        loadingRef.value = false;
+    }
+}
+
+function exportQuarterlySummary() {
+    const divCode = store.divisions.find(d => d.id === filterDivisionId.value)?.code ?? 'all';
+    downloadExcel('/v1/audits/export/quarterly-summary', `quarterly-summary-${divCode}.xlsx`, exportingQs);
+}
+
+function exportNcrReport() {
+    const divCode = store.divisions.find(d => d.id === filterDivisionId.value)?.code ?? 'all';
+    downloadExcel('/v1/audits/export/ncr-report', `ncr-report-${divCode}.xlsx`, exportingNcr);
 }
 
 // ── Item 5: Open quarterly summary ────────────────────────────────────────────
@@ -1069,7 +1195,7 @@ const chartData = computed(() => {
 
     if (!compareReport.value) {
         return {
-            labels: primary.map(p => p.week),
+            labels: primary.map(p => formatWeek(p.week)),
             datasets: [{
                 label: primaryLabel.value,
                 data: primary.map(p => p.avgScore),
@@ -1086,7 +1212,7 @@ const chartData = computed(() => {
 
     const allWeeks = [...new Set([...primary.map(p => p.week), ...compare.map(p => p.week)])].sort();
     return {
-        labels: allWeeks,
+        labels: allWeeks.map(formatWeek),
         datasets: [
             {
                 label: primaryLabel.value,

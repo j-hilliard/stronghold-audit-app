@@ -1,3 +1,5 @@
+import { useUserStore } from '@/stores/userStore';
+
 export const apps = {
     billingPacketRequestSystem: {
         baseSlug: 'billing-packet-request-system',
@@ -52,12 +54,15 @@ export const apps = {
             user: [
                 { label: 'Dashboard',          icon: 'pi pi-fw pi-chart-bar',         to: '/audit-management/reports' },
                 { label: 'Audits',             icon: 'pi pi-fw pi-list',               to: '/audit-management/audits' },
-                { label: 'New Audit',          icon: 'pi pi-fw pi-plus',               to: '/audit-management/audits/new' },
+                { label: 'New Audit',          icon: 'pi pi-fw pi-plus',               to: '/audit-management/audits/new',
+                  visible: () => useUserStore().canCreateAudit },
                 { label: 'Corrective Actions', icon: 'pi pi-fw pi-exclamation-circle', to: '/audit-management/corrective-actions' },
             ],
             admin: [
-                { label: 'Templates', icon: 'pi pi-fw pi-table', to: '/audit-management/admin/templates' },
-                { label: 'Email Routing', icon: 'pi pi-fw pi-envelope', to: '/audit-management/admin/settings' },
+                { label: 'Templates',  icon: 'pi pi-fw pi-table',   to: '/audit-management/admin/templates',
+                  visible: () => useUserStore().canAccessAdminTemplates },
+                { label: 'Settings',   icon: 'pi pi-fw pi-cog',     to: '/audit-management/admin/settings',
+                  visible: () => useUserStore().canAccessAdminTemplates },
             ],
         },
     } as App,

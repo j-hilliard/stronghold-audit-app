@@ -21,7 +21,11 @@ export const useAppStore = defineStore('app', () => {
     const menu = computed(() => {
         const routes = [{ label: currentApp.value.name, items: currentApp.value.menu.user }];
 
-        if (userStore.isAdmin && currentApp.value.menu.admin.length) {
+        // Show admin section for system Administrators AND TemplateAdmins in the audit module
+        const showAdmin = userStore.isAdmin ||
+            (currentApp.value.name === 'Compliance Audit' && userStore.canAccessAdminTemplates);
+
+        if (showAdmin && currentApp.value.menu.admin.length) {
             routes.push({ label: 'Administration', items: currentApp.value.menu.admin });
         }
 

@@ -130,5 +130,44 @@ export const auditManagementRoutes = [
             ],
         },
     },
+    {
+        path: 'reports/gallery',
+        name: 'audit-management-report-gallery',
+        component: () => import('@/modules/audit-management/features/reports/views/ReportGalleryView.vue'),
+        meta: {
+            title: 'Generate Report',
+            breadcrumbItems: () => [
+                { label: 'Compliance Audit' },
+                { label: 'Dashboard', to: '/audit-management/reports' },
+                { label: 'Generate Report' },
+            ],
+        },
+    },
+    {
+        path: 'reports/scheduled',
+        name: 'audit-management-report-scheduled',
+        component: () => import('@/modules/audit-management/features/reports/views/ScheduledReportsView.vue'),
+        meta: {
+            title: 'Scheduled Reports',
+            breadcrumbItems: () => [
+                { label: 'Compliance Audit' },
+                { label: 'Dashboard', to: '/audit-management/reports' },
+                { label: 'Scheduled Reports' },
+            ],
+        },
+    },
+    {
+        path: 'reports/by-employee',
+        name: 'audit-management-report-by-employee',
+        component: () => import('@/modules/audit-management/features/reports/views/AuditsByEmployeeView.vue'),
+        meta: {
+            title: 'Audits by Employee',
+            breadcrumbItems: () => [
+                { label: 'Compliance Audit' },
+                { label: 'Dashboard', to: '/audit-management/reports' },
+                { label: 'Audits by Employee' },
+            ],
+        },
+    },
     ...getErrorRoutes(apps.auditManagement),
 ];

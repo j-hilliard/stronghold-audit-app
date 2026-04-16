@@ -29,6 +29,14 @@
                 />
             </div>
             <Button
+                icon="pi pi-file-excel"
+                label="Export Excel"
+                outlined
+                size="small"
+                :loading="exportingXlsx"
+                @click="exportExcel"
+            />
+            <Button
                 icon="pi pi-refresh"
                 label="Refresh"
                 outlined
@@ -207,6 +215,7 @@ function getClient() {
 
 // ── State ──────────────────────────────────────────────────────────────────────
 const loading = ref(false);
+const exportingXlsx = ref(false);
 const items = ref<CorrectiveActionListItemDto[]>([]);
 const filterDivisionId = ref<number | null>(null);
 const filterStatus = ref<string | null>(null);
@@ -320,6 +329,29 @@ async function submitClose() {
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
 onMounted(load);
+
+// ── Excel export ───────────────────────────────────────────────────────────────
+async function exportExcel() {
+    exportingXlsx.value = true;
+    try {
+        const params: Record<string, string> = {};
+        if (filterDivisionId.value) params.divisionId = String(filterDivisionId.value);
+        const res = await apiStore.api.get('/v1/corrective-actions/export', {
+            params,
+            responseType: 'blob',
+        });
+        const blobUrl = URL.createObjectURL(new Blob([res.data], {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }));
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = 'corrective-actions.xlsx';
+        link.click();
+        URL.revokeObjectURL(blobUrl);
+    } finally {
+        exportingXlsx.value = false;
+    }
+}
 </script>
 
 <style scoped>

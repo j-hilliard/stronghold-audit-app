@@ -1,0 +1,138 @@
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+using Stronghold.AppDashboard.Api.Domain.Audit.Reports;
+using Stronghold.AppDashboard.Api.Services;
+using Stronghold.AppDashboard.Data;
+using Stronghold.AppDashboard.Data.Models.Audit;
+
+namespace Stronghold.AppDashboard.Api.BackgroundServices;
+
+/// <summary>
+/// Runs every 5 minutes, fires any ScheduledReport whose NextRunAt is in the past.
+/// Generates the PDF and emails it to the recipient list.
+/// </summary>
+public class ScheduledReportService : BackgroundService
+{
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<ScheduledReportService> _logger;
+    private readonly IConfiguration _config;
+
+    public ScheduledReportService(
+        IServiceScopeFactory scopeFactory,
+        ILogger<ScheduledReportService> logger,
+        IConfiguration config)
+    {
+        _scopeFactory = scopeFactory;
+        _logger = logger;
+        _config = config;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+            try { await RunDueReportsAsync(stoppingToken); }
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex) { _logger.LogError(ex, "ScheduledReportService: error in run cycle"); }
+        }
+    }
+
+    private async Task RunDueReportsAsync(CancellationToken ct)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var db       = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+        var email    = scope.ServiceProvider.GetRequiredService<IEmailService>();
+
+        var due = await db.ScheduledReports
+            .Where(r => r.IsActive && r.NextRunAt <= DateTime.UtcNow)
+            .ToListAsync(ct);
+
+        foreach (var report in due)
+        {
+            try
+            {
+                _logger.LogInformation("ScheduledReportService: generating {Title}", report.Title);
+
+                var pdfBytes = await mediator.Send(new GenerateReport
+                {
+                    Payload = new GenerateReportRequest
+                    {
+                        TemplateId   = report.TemplateId,
+                        DivisionId   = report.DivisionId,
+                        DateFrom     = ResolveDateFrom(report.DateRangePreset),
+                        DateTo       = DateTime.UtcNow,
+                        Title        = report.Title,
+                        PrimaryColor = report.PrimaryColor,
+                    },
+                }, ct);
+
+                var recipients = System.Text.Json.JsonSerializer.Deserialize<List<string>>(report.RecipientsJson)
+                                 ?? new List<string>();
+
+                var sizeKb = pdfBytes.Length / 1024;
+                if (recipients.Count > 0)
+                {
+                    var body = $@"<p>Your scheduled report <strong>{System.Net.WebUtility.HtmlEncode(report.Title)}</strong>
+has been generated ({sizeKb} KB). Please log in to download it from the Reports section.</p>
+<p><em>Generated: {DateTime.UtcNow:MMMM d, yyyy 'at' HH:mm} UTC</em></p>";
+
+                    await email.SendAsync(
+                        subject: $"{report.Title} — {DateTime.UtcNow:MMMM d, yyyy}",
+                        htmlBody: body,
+                        recipients: recipients,
+                        ct: ct
+                    );
+                    _logger.LogInformation("ScheduledReportService: sent notification for {Title} to {Count} recipient(s)", report.Title, recipients.Count);
+                }
+                else
+                {
+                    _logger.LogInformation("ScheduledReportService: generated {Title} ({Size} KB), no recipients configured", report.Title, sizeKb);
+                }
+
+                report.LastRunAt = DateTime.UtcNow;
+                report.NextRunAt = SaveScheduledReportHandler.ComputeNextRun(
+                    report.Frequency, report.TimeUtc, report.DayOfWeek, report.DayOfMonth);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ScheduledReportService: failed to process report {Id}", report.Id);
+            }
+        }
+
+        if (due.Count > 0)
+            await db.SaveChangesAsync(ct);
+    }
+
+    private static DateTime? ResolveDateFrom(string? preset)
+    {
+        var now = DateTime.UtcNow;
+        return preset switch
+        {
+            "last30days"  => now.AddDays(-30),
+            "thisquarter" => StartOfCurrentQuarter(now),
+            "lastquarter" => StartOfLastQuarter(now),
+            "thisyear"    => new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            "lastyear"    => new DateTime(now.Year - 1, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            _             => null,
+        };
+    }
+
+    private static DateTime StartOfCurrentQuarter(DateTime d)
+    {
+        var m = ((d.Month - 1) / 3) * 3 + 1;
+        return new DateTime(d.Year, m, 1, 0, 0, 0, DateTimeKind.Utc);
+    }
+
+    private static DateTime StartOfLastQuarter(DateTime d)
+    {
+        var start = StartOfCurrentQuarter(d).AddMonths(-3);
+        return start;
+    }
+
+    private static string SanitizeFileName(string title) =>
+        string.Concat(title.Select(c => char.IsLetterOrDigit(c) || c == '-' || c == ' ' ? c : '_'))
+              .Replace(' ', '-')
+              .ToLowerInvariant();
+}

@@ -6,9 +6,11 @@ import {
     AuditClient,
     type DivisionDto,
     type TemplateDto,
+    type TemplateSectionDto,
     type AuditHeaderDto,
     type AuditListItemDto,
     type AuditReviewDto,
+    type LogicRuleDto,
 } from '@/apiclient/auditClient';
 
 // ── Local types ───────────────────────────────────────────────────────────────
@@ -77,6 +79,9 @@ export const useAuditStore = defineStore('audit', () => {
     const auditId = ref<number | null>(null);
     const auditStatus = ref<string>('Draft');
 
+    /** Optional section group keys enabled at audit creation. Null = audit not yet loaded. */
+    const enabledOptionalGroupKeys = ref<string[]>([]);
+
     const header = ref<AuditHeaderDto>({});
     // Keyed by questionId
     const responses = ref<Map<number, ResponseState>>(new Map());
@@ -109,6 +114,55 @@ export const useAuditStore = defineStore('audit', () => {
     const isSubmitted = computed(() =>
         auditStatus.value === 'Submitted' || auditStatus.value === 'Closed',
     );
+
+    /**
+     * Template sections visible for this audit.
+     * Non-optional sections are always shown unless hidden by a logic rule.
+     * Optional sections are shown when their group key is enabled AND not hidden by a logic rule.
+     *
+     * Logic rule evaluation (section-level):
+     *   - "HideSection" fires when triggerVersionQuestionId's current response matches triggerResponse
+     *   - "ShowSection" fires when triggerVersionQuestionId's current response matches triggerResponse
+     *   - Rules are additive: any matching HideSection hides the section; any matching ShowSection shows it
+     *   - HideSection takes precedence over ShowSection when both fire
+     */
+    const visibleSections = computed((): TemplateSectionDto[] => {
+        if (!template.value) return [];
+        const enabledKeys = enabledOptionalGroupKeys.value;
+        const rules: LogicRuleDto[] = template.value.logicRules ?? [];
+
+        // Compute which sections are hidden/force-shown by logic rules
+        const hiddenByRule = new Set<number>();
+        const shownByRule  = new Set<number>();
+
+        for (const rule of rules) {
+            if (!rule.targetSectionId) continue;
+            // Find the current response status for this trigger question
+            const respState = responses.value.get(rule.triggerVersionQuestionId);
+            const currentStatus = respState?.status ?? null;
+
+            const fires = rule.triggerResponse === 'AnyAnswer'
+                ? currentStatus !== null
+                : currentStatus === rule.triggerResponse;
+
+            if (fires) {
+                if (rule.action === 'HideSection') hiddenByRule.add(rule.targetSectionId);
+                else if (rule.action === 'ShowSection') shownByRule.add(rule.targetSectionId);
+            }
+        }
+
+        return template.value.sections.filter(s => {
+            // Logic rule hide takes absolute priority
+            if (hiddenByRule.has(s.id)) return false;
+
+            // Optional section visibility
+            if (s.isOptional && s.optionalGroupKey) {
+                if (!enabledKeys.includes(s.optionalGroupKey) && !shownByRule.has(s.id)) return false;
+            }
+
+            return true;
+        });
+    });
 
     // ── Private helpers ────────────────────────────────────────────────────────
 
@@ -147,9 +201,13 @@ export const useAuditStore = defineStore('audit', () => {
         isDirty.value = true;
     }
 
-    // Initialize responses from a loaded template (preserves existing responses)
-    function initResponsesFromTemplate(tpl: TemplateDto) {
+    // Initialize responses from a loaded template (only visible sections; preserves existing responses)
+    function initResponsesFromTemplate(tpl: TemplateDto, enabledKeys: string[]) {
         for (const section of tpl.sections) {
+            // Skip optional sections whose group is not enabled
+            if (section.isOptional && section.optionalGroupKey && !enabledKeys.includes(section.optionalGroupKey)) {
+                continue;
+            }
             for (const q of section.questions) {
                 if (!responses.value.has(q.questionId)) {
                     responses.value.set(q.questionId, {
@@ -213,10 +271,10 @@ export const useAuditStore = defineStore('audit', () => {
         }
     }
 
-    async function createAudit(divisionId: number): Promise<number | null> {
+    async function createAudit(divisionId: number, enabledKeys: string[] = []): Promise<number | null> {
         saving.value = true;
         try {
-            const created = await getClient().createAudit(divisionId);
+            const created = await getClient().createAudit(divisionId, enabledKeys);
 
             // Defensive handling: API contract may return either an ID or a detail DTO.
             if (typeof created === 'number' && Number.isFinite(created) && created > 0) {
@@ -251,9 +309,10 @@ export const useAuditStore = defineStore('audit', () => {
             auditStatus.value = audit.status;
             header.value = audit.header ?? {};
             template.value = tpl;
+            enabledOptionalGroupKeys.value = audit.enabledOptionalGroupKeys ?? [];
 
-            // Seed response map from template (all questions)
-            initResponsesFromTemplate(tpl);
+            // Seed response map from template (visible sections only)
+            initResponsesFromTemplate(tpl, enabledOptionalGroupKeys.value);
 
             // Overwrite with saved server responses
             for (const r of audit.responses) {
@@ -439,6 +498,7 @@ export const useAuditStore = defineStore('audit', () => {
         auditId.value = null;
         auditStatus.value = 'Draft';
         template.value = null;
+        enabledOptionalGroupKeys.value = [];
         header.value = {};
         responses.value = new Map();
         isDirty.value = false;
@@ -472,6 +532,8 @@ export const useAuditStore = defineStore('audit', () => {
         allResponses,
         score,
         isSubmitted,
+        visibleSections,
+        enabledOptionalGroupKeys,
         // Actions
         loadDivisions,
         createAudit,

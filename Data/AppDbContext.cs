@@ -38,6 +38,12 @@ public class AppDbContext : DbContext
     public DbSet<UserDivision> UserDivisions { get; set; } = null!;
     public DbSet<ReportDraft> ReportDrafts { get; set; } = null!;
     public DbSet<NewsletterTemplate> NewsletterTemplates { get; set; } = null!;
+    public DbSet<ReviewGroupMember> ReviewGroupMembers { get; set; } = null!;
+    public DbSet<CaNotificationLog> CaNotificationLogs { get; set; } = null!;
+    public DbSet<AuditEnabledSection> AuditEnabledSections { get; set; } = null!;
+    public DbSet<ScheduledReport> ScheduledReports { get; set; } = null!;
+    public DbSet<QuestionLogicRule> QuestionLogicRules { get; set; } = null!;
+    public DbSet<FindingPhoto> FindingPhotos { get; set; } = null!;
 
     // Safety schema
     public DbSet<IncidentReport> IncidentReports { get; set; } = null!;
@@ -374,6 +380,8 @@ public class AppDbContext : DbContext
             b.HasKey(e => e.Id);
             b.Property(e => e.Name).IsRequired().HasMaxLength(200);
             b.Property(e => e.SectionCode).HasMaxLength(50);
+            b.Property(e => e.OptionalGroupKey).HasMaxLength(100);
+            b.Property(e => e.Weight).HasColumnType("decimal(8,4)");
             b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
             b.Property(e => e.UpdatedBy).HasMaxLength(200);
             b.Property(e => e.DeletedBy).HasMaxLength(200);
@@ -474,6 +482,8 @@ public class AppDbContext : DbContext
             b.Property(e => e.Comment).HasMaxLength(2000);
             b.Property(e => e.SectionNameSnapshot).HasMaxLength(200);
             b.Property(e => e.ReportingCategorySnapshot).HasMaxLength(100);
+            b.Property(e => e.QuestionWeightSnapshot).HasColumnType("decimal(8,4)");
+            b.Property(e => e.SectionWeightSnapshot).HasColumnType("decimal(8,4)");
             b.Property(e => e.CorrectiveActionDueDate)
                 .HasConversion(
                     v => v.HasValue ? v.Value.ToDateTime(TimeOnly.MinValue) : (DateTime?)null,
@@ -657,6 +667,84 @@ public class AppDbContext : DbContext
             b.HasOne(e => e.Division).WithMany().HasForeignKey(e => e.DivisionId).OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(e => new { e.DivisionId, e.IsDefault, e.IsDeleted });
             b.HasQueryFilter(e => !e.IsDeleted);
+        });
+
+        modelBuilder.Entity<ReviewGroupMember>(b =>
+        {
+            b.ToTable("ReviewGroupMember", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            b.Property(e => e.Email).IsRequired().HasMaxLength(200);
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.UpdatedBy).HasMaxLength(200);
+            b.Property(e => e.DeletedBy).HasMaxLength(200);
+            b.HasIndex(e => e.Email).IsUnique().HasFilter("[IsDeleted] = 0");
+            b.HasQueryFilter(e => !e.IsDeleted);
+        });
+
+        modelBuilder.Entity<CaNotificationLog>(b =>
+        {
+            b.ToTable("CaNotificationLog", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.NotificationType).IsRequired().HasMaxLength(20);
+            b.Property(e => e.Recipient).IsRequired().HasMaxLength(200);
+            b.HasOne(e => e.CorrectiveAction).WithMany().HasForeignKey(e => e.CorrectiveActionId).OnDelete(DeleteBehavior.Cascade);
+            // Deduplication index: one log entry per CA + type per calendar day
+            b.HasIndex(e => new { e.CorrectiveActionId, e.NotificationType, e.SentAt });
+        });
+
+        modelBuilder.Entity<AuditEnabledSection>(b =>
+        {
+            b.ToTable("AuditEnabledSection", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.OptionalGroupKey).IsRequired().HasMaxLength(100);
+            b.HasOne(e => e.Audit).WithMany(a => a.EnabledSections).HasForeignKey(e => e.AuditId).OnDelete(DeleteBehavior.Cascade);
+            b.HasIndex(e => e.AuditId);
+            // One entry per group key per audit
+            b.HasIndex(e => new { e.AuditId, e.OptionalGroupKey }).IsUnique();
+        });
+
+        modelBuilder.Entity<ScheduledReport>(b =>
+        {
+            b.ToTable("ScheduledReport", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.TemplateId).IsRequired().HasMaxLength(50);
+            b.Property(e => e.Title).IsRequired().HasMaxLength(200);
+            b.Property(e => e.Frequency).IsRequired().HasMaxLength(20);
+            b.Property(e => e.TimeUtc).IsRequired().HasMaxLength(10);
+            b.Property(e => e.DateRangePreset).HasMaxLength(50);
+            b.Property(e => e.PrimaryColor).HasMaxLength(20);
+            b.Property(e => e.ScoreThreshold).HasColumnType("decimal(5,2)");
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.HasOne(e => e.Division).WithMany().HasForeignKey(e => e.DivisionId).OnDelete(DeleteBehavior.Restrict).IsRequired(false);
+            b.HasIndex(e => new { e.IsActive, e.NextRunAt });
+            b.HasCheckConstraint("CK_ScheduledReport_Frequency", "[Frequency] IN ('Daily', 'Weekly', 'Monthly', 'Quarterly')");
+        });
+
+        modelBuilder.Entity<QuestionLogicRule>(b =>
+        {
+            b.ToTable("QuestionLogicRule", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.TriggerResponse).IsRequired().HasMaxLength(50);
+            b.Property(e => e.Action).IsRequired().HasMaxLength(50);
+            b.HasOne(e => e.TemplateVersion).WithMany().HasForeignKey(e => e.TemplateVersionId).OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(e => e.TriggerVersionQuestion).WithMany().HasForeignKey(e => e.TriggerVersionQuestionId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne(e => e.TargetSection).WithMany().HasForeignKey(e => e.TargetSectionId).OnDelete(DeleteBehavior.Restrict).IsRequired(false);
+            b.HasIndex(e => e.TemplateVersionId);
+            b.HasCheckConstraint("CK_QuestionLogicRule_Action", "[Action] IN ('HideSection', 'ShowSection')");
+        });
+
+        modelBuilder.Entity<FindingPhoto>(b =>
+        {
+            b.ToTable("FindingPhoto", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.FileName).IsRequired().HasMaxLength(500);
+            b.Property(e => e.FilePath).IsRequired().HasMaxLength(1000);
+            b.Property(e => e.UploadedBy).IsRequired().HasMaxLength(256);
+            b.Property(e => e.Caption).HasMaxLength(500);
+            b.HasOne(e => e.Audit).WithMany().HasForeignKey(e => e.AuditId).OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(e => e.Question).WithMany().HasForeignKey(e => e.QuestionId).OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(e => new { e.AuditId, e.QuestionId });
         });
     }
 

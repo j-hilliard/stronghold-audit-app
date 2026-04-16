@@ -9,7 +9,9 @@ using System.Text.Json;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Newsletter;
 
-[AllowedAuthorizationRole(AuthorizationRole.AuthenticatedUser)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
+    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
 public class GenerateNewsletterSummary : IRequest<NewsletterAiSummaryResult>
 {
     public string DivisionCode { get; set; } = null!;

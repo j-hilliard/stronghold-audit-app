@@ -34,6 +34,24 @@ public class AuditResponse : AuditableEntity
     /// <summary>Display order of the question within its section at time of audit</summary>
     public int? SortOrderSnapshot { get; set; }
 
+    /// <summary>
+    /// Effective question weight at time of save (AuditVersionQuestion.Weight ?? AuditQuestion.Weight).
+    /// Snapshotted so historical scores stay deterministic even if weights change later.
+    /// </summary>
+    public decimal QuestionWeightSnapshot { get; set; } = 1.0m;
+
+    /// <summary>
+    /// Section weight (AuditSection.Weight) at time of save.
+    /// Snapshotted alongside QuestionWeightSnapshot for the same reason.
+    /// </summary>
+    public decimal SectionWeightSnapshot { get; set; } = 1.0m;
+
+    /// <summary>
+    /// Whether the question was marked IsLifeCritical at the time of save.
+    /// Snapshotted so the fail flag stays stable even if the template is changed later.
+    /// </summary>
+    public bool IsLifeCriticalSnapshot { get; set; } = false;
+
     /// <summary>"Conforming" | "NonConforming" | "Warning" | "NA"</summary>
     public string? Status { get; set; }
 

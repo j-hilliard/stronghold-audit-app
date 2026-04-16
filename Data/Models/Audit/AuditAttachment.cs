@@ -13,6 +13,7 @@ public class AuditAttachment : AuditableEntity
     /// <summary>Azure Blob Storage path — populated in Phase 2+ when blob storage is configured</summary>
     public string? BlobPath { get; set; }
 
+    public long FileSizeBytes { get; set; }
     public DateTime UploadedAt { get; set; }
     public string UploadedBy { get; set; } = null!;
 

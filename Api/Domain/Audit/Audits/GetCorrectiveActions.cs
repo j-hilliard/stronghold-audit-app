@@ -6,7 +6,11 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
-[AllowedAuthorizationRole(AuthorizationRole.AuthenticatedUser)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
+    AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.ReadOnlyViewer,
+    AuthorizationRole.ExecutiveViewer, AuthorizationRole.TemplateAdmin,
+    AuthorizationRole.Administrator)]
 public class GetCorrectiveActions : IRequest<List<CorrectiveActionListItemDto>>
 {
     public int? DivisionId { get; set; }
@@ -35,10 +39,12 @@ public class CorrectiveActionListItemDto
 public class GetCorrectiveActionsHandler : IRequestHandler<GetCorrectiveActions, List<CorrectiveActionListItemDto>>
 {
     private readonly AppDbContext _context;
+    private readonly IAuditUserContext _userContext;
 
-    public GetCorrectiveActionsHandler(AppDbContext context)
+    public GetCorrectiveActionsHandler(AppDbContext context, IAuditUserContext userContext)
     {
         _context = context;
+        _userContext = userContext;
     }
 
     public async Task<List<CorrectiveActionListItemDto>> Handle(GetCorrectiveActions request, CancellationToken cancellationToken)
@@ -54,6 +60,10 @@ public class GetCorrectiveActionsHandler : IRequestHandler<GetCorrectiveActions,
                     .ThenInclude(a => a.Header)
             .AsNoTracking()
             .AsQueryable();
+
+        // Division scope: scoped users only see their assigned divisions
+        if (!_userContext.IsGlobal && _userContext.AllowedDivisionIds is { Count: > 0 } allowed)
+            query = query.Where(ca => allowed.Contains(ca.Finding.Audit.DivisionId));
 
         if (request.DivisionId.HasValue)
             query = query.Where(ca => ca.Finding.Audit.DivisionId == request.DivisionId.Value);

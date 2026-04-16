@@ -1,5 +1,6 @@
 import { apps } from '@/apps.ts';
 import { useAppStore } from '@/stores/appStore.ts';
+import { useUserStore } from '@/stores/userStore.ts';
 import { createRouter, createWebHistory } from 'vue-router';
 import { billingPacketRoutes } from '@/modules/billing-packet-request-system/router';
 import { strongholdBizAppsSuiteRoutes } from '@/modules/stronghold-biz-apps-suite/router';
@@ -70,12 +71,34 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
     NProgress.start();
+
+    // Trim trailing slashes
     if (to.path !== '/' && to.path.endsWith('/')) {
-        const trimmedPath = to.path.slice(0, -1);
-        next({ path: trimmedPath, query: to.query, hash: to.hash });
-    } else {
-        next();
+        next({ path: to.path.slice(0, -1), query: to.query, hash: to.hash });
+        return;
     }
+
+    // Audit module route guards
+    if (to.path.startsWith('/audit-management')) {
+        const userStore = useUserStore();
+
+        // Only check if user data is loaded (skip during initial auth hydration)
+        if (userStore.isAuthenticated) {
+            const isAdminRoute = to.path.includes('/admin/');
+
+            if (isAdminRoute && !userStore.canAccessAdminTemplates) {
+                next({ path: '/audit-management/audits' });
+                return;
+            }
+
+            if (to.path.includes('/audits/new') && !userStore.canCreateAudit) {
+                next({ path: '/audit-management/audits' });
+                return;
+            }
+        }
+    }
+
+    next();
 });
 
 router.afterEach((to) => {

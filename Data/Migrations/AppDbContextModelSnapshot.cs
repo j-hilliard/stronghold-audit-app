@@ -106,6 +106,9 @@ namespace Stronghold.AppDashboard.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AiSummary")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("AuditType")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -203,6 +206,9 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -226,6 +232,32 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.HasIndex("AuditId");
 
                     b.ToTable("AuditAttachment", "audit");
+                });
+
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditEnabledSection", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AuditId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OptionalGroupKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuditId");
+
+                    b.HasIndex("AuditId", "OptionalGroupKey")
+                        .IsUnique();
+
+                    b.ToTable("AuditEnabledSection", "audit");
                 });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditFinding", b =>
@@ -427,6 +459,9 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsLifeCritical")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsRequired")
                         .HasColumnType("bit");
 
@@ -513,6 +548,9 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsLifeCriticalSnapshot")
+                        .HasColumnType("bit");
+
                     b.Property<int>("QuestionId")
                         .HasColumnType("int");
 
@@ -521,6 +559,9 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<decimal>("QuestionWeightSnapshot")
+                        .HasColumnType("decimal(8,4)");
+
                     b.Property<string>("ReportingCategorySnapshot")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -528,6 +569,9 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Property<string>("SectionNameSnapshot")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<decimal>("SectionWeightSnapshot")
+                        .HasColumnType("decimal(8,4)");
 
                     b.Property<int?>("SortOrderSnapshot")
                         .HasColumnType("int");
@@ -588,6 +632,9 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsOptional")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsRequired")
                         .HasColumnType("bit");
 
@@ -595,6 +642,10 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("OptionalGroupKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<int?>("ReportingCategoryId")
                         .HasColumnType("int");
@@ -612,6 +663,9 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<decimal>("Weight")
+                        .HasColumnType("decimal(8,4)");
 
                     b.HasKey("Id");
 
@@ -827,6 +881,37 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.ToTable("AuditVersionQuestion", "audit");
                 });
 
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.CaNotificationLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CorrectiveActionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("NotificationType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Recipient")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CorrectiveActionId", "NotificationType", "SentAt");
+
+                    b.ToTable("CaNotificationLog", "audit");
+                });
+
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.CorrectiveAction", b =>
                 {
                     b.Property<int>("Id")
@@ -955,6 +1040,9 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<decimal?>("ScoreTarget")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -1025,6 +1113,76 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.ToTable("EmailRoutingRule", "audit");
                 });
 
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.FindingPhoto", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AuditId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Caption")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("QuestionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UploadedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("QuestionId");
+
+                    b.HasIndex("AuditId", "QuestionId");
+
+                    b.ToTable("FindingPhoto", "audit");
+                });
+
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.NewsletterTemplate", b =>
                 {
                     b.Property<int>("Id")
@@ -1091,6 +1249,50 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.HasIndex("DivisionId", "IsDefault", "IsDeleted");
 
                     b.ToTable("NewsletterTemplate", "audit");
+                });
+
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.QuestionLogicRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("TargetSectionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TemplateVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TriggerResponse")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("TriggerVersionQuestionId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TargetSectionId");
+
+                    b.HasIndex("TemplateVersionId");
+
+                    b.HasIndex("TriggerVersionQuestionId");
+
+                    b.ToTable("QuestionLogicRule", "audit", t =>
+                        {
+                            t.HasCheckConstraint("CK_QuestionLogicRule_Action", "[Action] IN ('HideSection', 'ShowSection')");
+                        });
                 });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.ReportDraft", b =>
@@ -1346,6 +1548,142 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("ResponseType", "audit");
+                });
+
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.ReviewGroupMember", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("ReviewGroupMember", "audit");
+                });
+
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.ScheduledReport", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("DateRangePreset")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("DayOfMonth")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DayOfWeek")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DivisionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Frequency")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastRunAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("NextRunAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PrimaryColor")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("RecipientsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("ScoreThreshold")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("TemplateId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("TimeUtc")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DivisionId");
+
+                    b.HasIndex("IsActive", "NextRunAt");
+
+                    b.ToTable("ScheduledReport", "audit", t =>
+                        {
+                            t.HasCheckConstraint("CK_ScheduledReport_Frequency", "[Frequency] IN ('Daily', 'Weekly', 'Monthly', 'Quarterly')");
+                        });
                 });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.TemplateChangeLog", b =>
@@ -2224,6 +2562,17 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Navigation("Audit");
                 });
 
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditEnabledSection", b =>
+                {
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.Audit", "Audit")
+                        .WithMany("EnabledSections")
+                        .HasForeignKey("AuditId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Audit");
+                });
+
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditFinding", b =>
                 {
                     b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.Audit", "Audit")
@@ -2350,6 +2699,17 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Navigation("TemplateVersion");
                 });
 
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.CaNotificationLog", b =>
+                {
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.CorrectiveAction", "CorrectiveAction")
+                        .WithMany()
+                        .HasForeignKey("CorrectiveActionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CorrectiveAction");
+                });
+
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.CorrectiveAction", b =>
                 {
                     b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.AuditFinding", "Finding")
@@ -2372,6 +2732,25 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Navigation("Division");
                 });
 
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.FindingPhoto", b =>
+                {
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.Audit", "Audit")
+                        .WithMany()
+                        .HasForeignKey("AuditId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.AuditQuestion", "Question")
+                        .WithMany()
+                        .HasForeignKey("QuestionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Audit");
+
+                    b.Navigation("Question");
+                });
+
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.NewsletterTemplate", b =>
                 {
                     b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.Division", "Division")
@@ -2381,6 +2760,32 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Division");
+                });
+
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.QuestionLogicRule", b =>
+                {
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.AuditSection", "TargetSection")
+                        .WithMany()
+                        .HasForeignKey("TargetSectionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.AuditTemplateVersion", "TemplateVersion")
+                        .WithMany()
+                        .HasForeignKey("TemplateVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.AuditVersionQuestion", "TriggerVersionQuestion")
+                        .WithMany()
+                        .HasForeignKey("TriggerVersionQuestionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("TargetSection");
+
+                    b.Navigation("TemplateVersion");
+
+                    b.Navigation("TriggerVersionQuestion");
                 });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.ReportDraft", b =>
@@ -2403,6 +2808,16 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("ResponseType");
+                });
+
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.ScheduledReport", b =>
+                {
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.Division", "Division")
+                        .WithMany()
+                        .HasForeignKey("DivisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Division");
                 });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.TemplateChangeLog", b =>
@@ -2566,6 +2981,8 @@ namespace Stronghold.AppDashboard.Data.Migrations
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.Audit", b =>
                 {
                     b.Navigation("Attachments");
+
+                    b.Navigation("EnabledSections");
 
                     b.Navigation("Findings");
 

@@ -34,6 +34,46 @@ export const useUserStore = defineStore('user', () => {
         return !!(user.value?.roles?.map(role => role.role?.name).includes('Administrator'));
     });
 
+    // ── Audit-specific role helpers ───────────────────────────────────────────
+    const auditRoleNames = computed(() =>
+        user.value?.roles?.map(r => r.role?.name ?? '').filter(Boolean) ?? []
+    );
+
+    const hasAuditRole = (role: string) =>
+        auditRoleNames.value.includes(role) || isAdmin.value;
+
+    /** User is a TemplateAdmin (or system Administrator). */
+    const isTemplateAdmin = computed(() =>
+        hasAuditRole('TemplateAdmin')
+    );
+
+    /** User can create, save, and submit audits. */
+    const isAuditManager = computed(() =>
+        hasAuditRole('AuditManager') || isTemplateAdmin.value
+    );
+
+    /** User can review and close audits + manage CAs. */
+    const isAuditReviewer = computed(() =>
+        hasAuditRole('AuditReviewer') || isTemplateAdmin.value
+    );
+
+    /** User has any audit-module role (controls route access). */
+    const canViewAudits = computed(() =>
+        isAdmin.value ||
+        ['TemplateAdmin', 'AuditManager', 'AuditReviewer',
+         'CorrectiveActionOwner', 'ReadOnlyViewer', 'ExecutiveViewer']
+            .some(r => auditRoleNames.value.includes(r))
+    );
+
+    /** User can create new audits. */
+    const canCreateAudit = computed(() => isAuditManager.value);
+
+    /** User can manage corrective actions. */
+    const canManageCas = computed(() => isAuditManager.value || isAuditReviewer.value);
+
+    /** User can access the template admin section. */
+    const canAccessAdminTemplates = computed(() => isTemplateAdmin.value);
+
     async function logoutUser() {
         await logout();
         await setUser(null);
@@ -91,5 +131,13 @@ export const useUserStore = defineStore('user', () => {
         setUser,
         setMockUser,
         logoutUser,
+        // Audit roles
+        isTemplateAdmin,
+        isAuditManager,
+        isAuditReviewer,
+        canViewAudits,
+        canCreateAudit,
+        canManageCas,
+        canAccessAdminTemplates,
     };
 });

@@ -3,6 +3,8 @@ type AppRoute = {
     icon: string;
     label: string;
     items?: AppRoute[];
+    /** Optional visibility gate — if provided, item only appears when this returns true. */
+    visible?: () => boolean;
 };
 
 type App = {

@@ -78,6 +78,53 @@
 
         <div v-else-if="review" class="p-4 space-y-4">
 
+            <!-- ── Life-Critical Failure Banner ───────────────────────────────── -->
+            <div
+                v-if="review.hasLifeCriticalFailure"
+                class="rounded-lg border-2 border-red-500 bg-red-950/70 p-4 flex items-start gap-3"
+                role="alert"
+            >
+                <i class="pi pi-exclamation-triangle text-red-400 text-2xl mt-0.5 flex-shrink-0" />
+                <div>
+                    <p class="text-red-300 font-bold text-base tracking-wide uppercase">AUTOMATIC FAIL — Life Critical Violation</p>
+                    <p class="text-red-400 text-sm mt-1">
+                        The following life-critical question(s) received a Non-Conforming response.
+                        Regardless of overall score, this audit is an automatic failure.
+                    </p>
+                    <ul class="mt-2 space-y-1">
+                        <li
+                            v-for="(item, idx) in review.lifeCriticalFailures"
+                            :key="idx"
+                            class="flex items-start gap-2 text-sm text-red-300"
+                        >
+                            <i class="pi pi-times-circle text-red-500 mt-0.5 flex-shrink-0" />
+                            {{ item }}
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- ── AI Audit Summary ────────────────────────────────────────────── -->
+            <div
+                v-if="review.aiSummary"
+                class="rounded-lg border border-sky-800 bg-sky-950/40 overflow-hidden"
+            >
+                <button
+                    class="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-sky-900/20 transition-colors"
+                    @click="showAiSummary = !showAiSummary"
+                >
+                    <div class="flex items-center gap-2">
+                        <i class="pi pi-sparkles text-sky-400 text-sm" />
+                        <span class="text-sm font-semibold text-sky-300">AI Audit Summary</span>
+                        <span class="text-xs text-sky-500 italic">Generated at submission</span>
+                    </div>
+                    <i :class="['pi text-sky-500 text-xs', showAiSummary ? 'pi-chevron-up' : 'pi-chevron-down']" />
+                </button>
+                <div v-if="showAiSummary" class="px-4 pb-4">
+                    <p class="text-sm text-slate-300 leading-relaxed">{{ review.aiSummary }}</p>
+                </div>
+            </div>
+
             <!-- Score summary card -->
             <Card>
                 <template #title>
@@ -153,6 +200,13 @@
                         <div v-if="review.header.company1"><p class="text-slate-400 text-xs">Company</p><p class="text-white">{{ review.header.company1 }}</p></div>
                         <div v-if="review.header.responsibleParty"><p class="text-slate-400 text-xs">Responsible Party</p><p class="text-white">{{ review.header.responsibleParty }}</p></div>
                     </div>
+                </template>
+            </Card>
+
+            <!-- Attachments (read-only view) -->
+            <Card>
+                <template #content>
+                    <AuditAttachments :audit-id="Number(route.params.id)" :readonly="true" />
                 </template>
             </Card>
 
@@ -366,6 +420,7 @@ import Tag from 'primevue/tag';
 import Textarea from 'primevue/textarea';
 import InputText from 'primevue/inputtext';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
+import AuditAttachments from '@/modules/audit-management/features/audit-form/components/AuditAttachments.vue';
 import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
 import { useApiStore } from '@/stores/apiStore';
 import { AuditClient, type AuditFindingDto, type CorrectiveActionDto } from '@/apiclient/auditClient';
@@ -379,6 +434,7 @@ const toast = useToast();
 const review = computed(() => store.review);
 const saving = ref(false);
 const showFullRecord = ref(false);
+const showAiSummary = ref(true); // expanded by default
 
 // ── Assign modal ──────────────────────────────────────────────────────────────
 const showAssign = ref(false);

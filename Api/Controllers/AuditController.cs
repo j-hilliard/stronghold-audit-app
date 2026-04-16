@@ -5,6 +5,8 @@ using Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 using Stronghold.AppDashboard.Api.Domain.Audit.Divisions;
 using Stronghold.AppDashboard.Api.Domain.Audit.Newsletter;
 using Stronghold.AppDashboard.Api.Domain.Audit.ReportDrafts;
+using Stronghold.AppDashboard.Api.Domain.Audit.Export;
+using Stronghold.AppDashboard.Api.Domain.Audit.Reports;
 using Stronghold.AppDashboard.Api.Domain.Audit.Templates;
 using Stronghold.AppDashboard.Api.Helpers;
 using Stronghold.AppDashboard.Api.Models.Audit;
@@ -13,6 +15,7 @@ namespace Stronghold.AppDashboard.Api.Controllers;
 
 public record ReopenAuditRequest(string? Reason);
 public record CloseAuditRequest(string? Notes);
+public record SetScoreTargetRequest(decimal? ScoreTarget);
 
 [Route(Constants.Routes.ApiTemplate)]
 public class AuditController : V1ControllerBase
@@ -165,7 +168,8 @@ public class AuditController : V1ControllerBase
                 var auditId = await Mediator.Send(new CreateAudit
                 {
                     DivisionId = body.DivisionId,
-                    CreatedBy = user.Email!
+                    CreatedBy = user.Email!,
+                    EnabledOptionalGroupKeys = body.EnabledOptionalGroupKeys
                 });
                 return CreatedAtAction(nameof(GetAudit), new { id = auditId }, auditId);
             },
@@ -508,6 +512,35 @@ public class AuditController : V1ControllerBase
                     DraftVersionId = draftId,
                     VersionQuestionId = versionQuestionId,
                     QuestionText = body.QuestionText,
+                    Weight = body.Weight,
+                    IsLifeCritical = body.IsLifeCritical,
+                    AllowNA = body.AllowNA,
+                    RequireCommentOnNC = body.RequireCommentOnNC,
+                    IsScoreable = body.IsScoreable,
+                    UpdatedBy = user.Email!
+                });
+                return NoContent();
+            },
+            ex => ex is InvalidOperationException or ArgumentException
+                ? Task.FromResult<IActionResult>(BadRequest(ex.Message))
+                : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPut("admin/versions/{draftId:int}/questions/weights")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> BatchUpdateQuestionWeights([FromRoute] int draftId, [FromBody] BatchUpdateQuestionWeightsRequest body)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                var user = await GetUser();
+                await Mediator.Send(new BatchUpdateQuestionWeights
+                {
+                    DraftVersionId = draftId,
+                    Weights = body.Weights.Select(w => (w.VersionQuestionId, w.Weight)).ToList(),
                     UpdatedBy = user.Email!
                 });
                 return NoContent();
@@ -693,6 +726,58 @@ public class AuditController : V1ControllerBase
                 return Ok(await Mediator.Send(new GetArchivedQuestions()));
             },
             ex => Error<List<ArchivedQuestionDto>>(ex)
+        );
+    }
+
+    // ── Admin — Skip-Logic Rules ──────────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("admin/templates/{versionId:int}/logic-rules")]
+    [ProducesResponseType(typeof(List<LogicRuleDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetLogicRules([FromRoute] int versionId)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                var result = await Mediator.Send(new GetLogicRules { TemplateVersionId = versionId });
+                return Ok(result);
+            },
+            ex => Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPut("admin/templates/logic-rules")]
+    [ProducesResponseType(typeof(LogicRuleDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpsertLogicRule([FromBody] SaveLogicRuleRequest req)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                var result = await Mediator.Send(new UpsertLogicRule { Rule = req });
+                return Ok(result);
+            },
+            ex => Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpDelete("admin/templates/logic-rules/{id:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteLogicRule([FromRoute] int id)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                await Mediator.Send(new DeleteLogicRule { Id = id });
+                return NoContent();
+            },
+            ex => ex is KeyNotFoundException
+                ? Task.FromResult<IActionResult>(NotFound(ex.Message))
+                : Error(ex)
         );
     }
 
@@ -980,6 +1065,482 @@ public class AuditController : V1ControllerBase
             ex => ex is KeyNotFoundException
                 ? Task.FromResult<IActionResult>(NotFound())
                 : Error(ex)
+        );
+    }
+
+    // ── Attachments ──────────────────────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("audits/{id:int}/attachments")]
+    [ProducesResponseType(typeof(List<AuditAttachmentDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<AuditAttachmentDto>>> GetAttachments([FromRoute] int id)
+    {
+        return await TryExecuteAsync<ActionResult<List<AuditAttachmentDto>>>(
+            async () =>
+            {
+                await GetUser();
+                var baseUrl = $"{Request.Scheme}://{Request.Host}";
+                return Ok(await Mediator.Send(new GetAttachments { AuditId = id, BaseUrl = baseUrl }));
+            },
+            ex => Error<List<AuditAttachmentDto>>(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPost("audits/{id:int}/attachments")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(AuditAttachmentDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<AuditAttachmentDto>> UploadAttachment([FromRoute] int id, IFormFile file)
+    {
+        return await TryExecuteAsync<ActionResult<AuditAttachmentDto>>(
+            async () =>
+            {
+                var user = await GetUser();
+                if (file == null || file.Length == 0)
+                    return BadRequest("No file provided.");
+
+                using var ms = new MemoryStream();
+                await file.CopyToAsync(ms);
+                var fileData = ms.ToArray();
+
+                var baseUrl = $"{Request.Scheme}://{Request.Host}";
+                var result = await Mediator.Send(new UploadAttachment
+                {
+                    AuditId = id,
+                    FileName = file.FileName,
+                    FileData = fileData,
+                    UploadedBy = user.Email!,
+                    BaseUrl = baseUrl,
+                });
+                return StatusCode(StatusCodes.Status201Created, result);
+            },
+            ex => ex is InvalidOperationException or ArgumentException
+                ? Task.FromResult<ActionResult<AuditAttachmentDto>>(BadRequest(ex.Message))
+                : Error<AuditAttachmentDto>(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("audits/{id:int}/attachments/{aid:int}/download")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadAttachment([FromRoute] int id, [FromRoute] int aid)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                var result = await Mediator.Send(new DownloadAttachment { AuditId = id, AttachmentId = aid });
+                return File(result.FileStream, result.ContentType, result.FileName);
+            },
+            ex => ex is KeyNotFoundException or FileNotFoundException
+                ? Task.FromResult<IActionResult>(NotFound(ex.Message))
+                : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpDelete("audits/{id:int}/attachments/{aid:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteAttachment([FromRoute] int id, [FromRoute] int aid)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                var user = await GetUser();
+                await Mediator.Send(new DeleteAttachment
+                {
+                    AuditId = id,
+                    AttachmentId = aid,
+                    DeletedBy = user.Email!
+                });
+                return NoContent();
+            },
+            ex => ex is KeyNotFoundException
+                ? Task.FromResult<IActionResult>(NotFound(ex.Message))
+                : Error(ex)
+        );
+    }
+
+    // ── Reports — Generate PDF ────────────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPost("reports/generate")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GenerateReport([FromBody] GenerateReportRequest body)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                if (string.IsNullOrWhiteSpace(body.TemplateId))
+                    return BadRequest("templateId is required.");
+
+                var pdfBytes = await Mediator.Send(new GenerateReport { Payload = body });
+
+                var fileName = $"report-{body.TemplateId}-{DateTime.UtcNow:yyyyMMdd}.pdf";
+                return File(pdfBytes, "application/pdf", fileName);
+            },
+            ex => ex is InvalidOperationException
+                ? Task.FromResult<IActionResult>(BadRequest(ex.Message))
+                : Error(ex)
+        );
+    }
+
+    // ── Reports — Scheduled Delivery ─────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("reports/scheduled")]
+    [ProducesResponseType(typeof(List<ScheduledReportDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<ScheduledReportDto>>> GetScheduledReports([FromQuery] int? divisionId)
+    {
+        return await TryExecuteAsync<ActionResult<List<ScheduledReportDto>>>(
+            async () =>
+            {
+                await GetUser();
+                return Ok(await Mediator.Send(new GetScheduledReports { DivisionId = divisionId }));
+            },
+            ex => Error<List<ScheduledReportDto>>(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPut("reports/scheduled")]
+    [ProducesResponseType(typeof(ScheduledReportDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ScheduledReportDto>> SaveScheduledReport([FromBody] SaveScheduledReportRequest body)
+    {
+        return await TryExecuteAsync<ActionResult<ScheduledReportDto>>(
+            async () =>
+            {
+                var user = await GetUser();
+                var result = await Mediator.Send(new SaveScheduledReport { Payload = body, SavedBy = user.Email! });
+                return Ok(result);
+            },
+            ex => ex is ArgumentException
+                ? Task.FromResult<ActionResult<ScheduledReportDto>>(BadRequest(ex.Message))
+                : Error<ScheduledReportDto>(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpDelete("reports/scheduled/{id:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteScheduledReport([FromRoute] int id)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                await Mediator.Send(new DeleteScheduledReport { Id = id });
+                return NoContent();
+            },
+            ex => ex is KeyNotFoundException
+                ? Task.FromResult<IActionResult>(NotFound(ex.Message))
+                : Error(ex)
+        );
+    }
+
+    // ── Audits by Employee ────────────────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("audits/by-employee")]
+    [ProducesResponseType(typeof(List<AuditsByEmployeeDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAuditsByEmployee(
+        [FromQuery] int? divisionId,
+        [FromQuery] DateTime? dateFrom,
+        [FromQuery] DateTime? dateTo)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                var result = await Mediator.Send(new GetAuditsByEmployee
+                {
+                    DivisionId = divisionId,
+                    DateFrom   = dateFrom,
+                    DateTo     = dateTo,
+                });
+                return Ok(result);
+            },
+            ex => Error(ex)
+        );
+    }
+
+    // ── Excel Exports ─────────────────────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("audits/export/quarterly-summary")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportQuarterlySummary(
+        [FromQuery] int? divisionId,
+        [FromQuery] DateTime? dateFrom,
+        [FromQuery] DateTime? dateTo)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                var bytes = await Mediator.Send(new ExportQuarterlySummary
+                {
+                    DivisionId = divisionId,
+                    DateFrom   = dateFrom,
+                    DateTo     = dateTo,
+                });
+                var fileName = $"quarterly-summary-{DateTime.UtcNow:yyyy-MM}.xlsx";
+                return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            },
+            ex => Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("audits/export/ncr-report")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportNcrReport(
+        [FromQuery] int? divisionId,
+        [FromQuery] DateTime? dateFrom,
+        [FromQuery] DateTime? dateTo)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                var bytes = await Mediator.Send(new ExportNcrReport
+                {
+                    DivisionId = divisionId,
+                    DateFrom   = dateFrom,
+                    DateTo     = dateTo,
+                });
+                var fileName = $"ncr-report-{DateTime.UtcNow:yyyy-MM}.xlsx";
+                return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            },
+            ex => Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("corrective-actions/export")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportCorrectiveActions(
+        [FromQuery] int? divisionId,
+        [FromQuery] DateTime? dateFrom,
+        [FromQuery] DateTime? dateTo)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                var bytes = await Mediator.Send(new ExportCorrectiveActions
+                {
+                    DivisionId = divisionId,
+                    DateFrom   = dateFrom,
+                    DateTo     = dateTo,
+                });
+                var fileName = $"corrective-actions-{DateTime.UtcNow:yyyy-MM}.xlsx";
+                return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            },
+            ex => Error(ex)
+        );
+    }
+
+    // ── Admin — Review Group ──────────────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("admin/review-group")]
+    [ProducesResponseType(typeof(List<ReviewGroupMemberDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<ReviewGroupMemberDto>>> GetReviewGroup()
+    {
+        return await TryExecuteAsync<ActionResult<List<ReviewGroupMemberDto>>>(
+            async () =>
+            {
+                await GetUser();
+                return Ok(await Mediator.Send(new GetReviewGroup()));
+            },
+            ex => Error<List<ReviewGroupMemberDto>>(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPut("admin/review-group")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> SaveReviewGroup([FromBody] SaveReviewGroupRequest body)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                var user = await GetUser();
+                await Mediator.Send(new SaveReviewGroup { Payload = body, SavedBy = user.Email! });
+                return NoContent();
+            },
+            ex => Error(ex)
+        );
+    }
+
+    // ── Finding Photos ────────────────────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("audits/{id:int}/questions/{qid:int}/photos")]
+    [ProducesResponseType(typeof(List<FindingPhotoDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetFindingPhotos([FromRoute] int id, [FromRoute] int qid)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                var baseUrl = $"{Request.Scheme}://{Request.Host}";
+                return Ok(await Mediator.Send(new GetFindingPhotos { AuditId = id, QuestionId = qid, BaseUrl = baseUrl }));
+            },
+            ex => Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPost("audits/{id:int}/questions/{qid:int}/photos")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(FindingPhotoDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UploadFindingPhoto([FromRoute] int id, [FromRoute] int qid, IFormFile file, [FromForm] string? caption)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                var user = await GetUser();
+                if (file == null || file.Length == 0)
+                    return BadRequest("No file provided.");
+
+                using var ms = new MemoryStream();
+                await file.CopyToAsync(ms);
+
+                var baseUrl = $"{Request.Scheme}://{Request.Host}";
+                var result = await Mediator.Send(new UploadFindingPhoto
+                {
+                    AuditId = id,
+                    QuestionId = qid,
+                    FileName = file.FileName,
+                    FileData = ms.ToArray(),
+                    Caption = caption,
+                    UploadedBy = user.Email!,
+                    BaseUrl = baseUrl,
+                });
+                return StatusCode(StatusCodes.Status201Created, result);
+            },
+            ex => ex is InvalidOperationException or KeyNotFoundException
+                ? Task.FromResult<IActionResult>(BadRequest(ex.Message))
+                : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("audits/{id:int}/questions/{qid:int}/photos/{pid:int}/download")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadFindingPhoto([FromRoute] int id, [FromRoute] int qid, [FromRoute] int pid)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                var result = await Mediator.Send(new DownloadFindingPhoto { AuditId = id, QuestionId = qid, PhotoId = pid });
+                return File(result.FileStream, result.ContentType, result.FileName);
+            },
+            ex => ex is KeyNotFoundException or FileNotFoundException
+                ? Task.FromResult<IActionResult>(NotFound(ex.Message))
+                : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpDelete("audits/{id:int}/questions/{qid:int}/photos/{pid:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteFindingPhoto([FromRoute] int id, [FromRoute] int qid, [FromRoute] int pid)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                await Mediator.Send(new DeleteFindingPhoto { AuditId = id, QuestionId = qid, PhotoId = pid });
+                return NoContent();
+            },
+            ex => ex is KeyNotFoundException
+                ? Task.FromResult<IActionResult>(NotFound(ex.Message))
+                : Error(ex)
+        );
+    }
+
+    // ── Repeat Findings ───────────────────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("audits/{id:int}/repeat-findings")]
+    [ProducesResponseType(typeof(List<RepeatFindingDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetRepeatFindings([FromRoute] int id)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                return Ok(await Mediator.Send(new GetRepeatFindings { AuditId = id }));
+            },
+            ex => Error(ex)
+        );
+    }
+
+    // ── Division Score Targets ────────────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("admin/divisions/score-targets")]
+    [ProducesResponseType(typeof(List<DivisionScoreTargetDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetDivisionScoreTargets()
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                return Ok(await Mediator.Send(new GetDivisionScoreTargets()));
+            },
+            ex => Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPut("admin/divisions/{id:int}/score-target")]
+    [ProducesResponseType(typeof(DivisionScoreTargetDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetDivisionScoreTarget([FromRoute] int id, [FromBody] SetScoreTargetRequest body)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                var result = await Mediator.Send(new SetDivisionScoreTarget { DivisionId = id, ScoreTarget = body.ScoreTarget });
+                return Ok(result);
+            },
+            ex => ex is ArgumentException
+                ? Task.FromResult<IActionResult>(BadRequest(ex.Message))
+                : ex is KeyNotFoundException
+                    ? Task.FromResult<IActionResult>(NotFound(ex.Message))
+                    : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("divisions/{id:int}/benchmark")]
+    [ProducesResponseType(typeof(DivisionBenchmarkDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetDivisionBenchmark([FromRoute] int id)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                return Ok(await Mediator.Send(new GetDivisionBenchmark { DivisionId = id }));
+            },
+            ex => Error(ex)
         );
     }
 }

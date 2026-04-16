@@ -111,6 +111,22 @@ builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddScoped<IProcessLogService, ProcessLogService>();
 builder.Services.AddHostedService<LogPurgeService>();
 
+// Email + background services
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddHostedService<CaReminderService>();
+
+// AI audit summary (Claude Haiku — fails gracefully when API key absent)
+builder.Services.AddScoped<IAuditSummaryService, AuditSummaryService>();
+
+// PDF generation (PuppeteerSharp / headless Chromium — singleton, browser is reused)
+builder.Services.AddSingleton<IPdfGeneratorService, PdfGeneratorService>();
+
+// Scheduled report delivery
+builder.Services.AddHostedService<Stronghold.AppDashboard.Api.BackgroundServices.ScheduledReportService>();
+
+// Audit user context — scoped per request, populated by AuthorizationBehavior
+builder.Services.AddScoped<IAuditUserContext, AuditUserContext>();
+
 // Auth
 builder.Services.AddScoped<GraphService>();
 if (!isLocal)

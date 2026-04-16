@@ -161,6 +161,22 @@
                             Drag sections from the library on the left to start building this template
                         </div>
 
+                        <!-- Overall section-weight totals banner -->
+                        <div
+                            v-if="draftDetail.sections.length > 0"
+                            class="flex items-center gap-2 px-3 py-1.5 rounded mb-2 text-xs border"
+                            :class="Math.abs(overallWeightTotal - 100) < 0.1
+                                ? 'bg-emerald-900/30 border-emerald-800 text-emerald-400'
+                                : 'bg-amber-900/30 border-amber-800 text-amber-400'"
+                        >
+                            <i class="pi pi-chart-pie" />
+                            <span>Section weights total: <strong>{{ overallWeightTotal }}%</strong> / 100%</span>
+                            <span v-if="Math.abs(overallWeightTotal - 100) >= 0.1" class="ml-auto font-medium">
+                                {{ overallWeightTotal > 100 ? '▲ Over 100%' : '▼ Under 100%' }}
+                            </span>
+                            <span v-else class="ml-auto">✓</span>
+                        </div>
+
                         <!-- Sections canvas (drag-drop between library and here) -->
                         <draggable
                             :list="draftDetail.sections"
@@ -175,7 +191,7 @@
                             <template #item="{ element: section }">
                                 <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
                                     <!-- Section header -->
-                                    <div class="px-3 py-2.5 bg-slate-750 border-b border-slate-700 flex items-center gap-2">
+                                    <div class="px-3 py-2.5 bg-slate-750 border-b border-slate-700 flex items-center gap-2 flex-wrap">
                                         <span class="section-drag-handle cursor-grab text-slate-500 hover:text-slate-300 pi pi-bars shrink-0" title="Drag to reorder" />
 
                                         <template v-if="editingSectionId === section.id">
@@ -196,6 +212,28 @@
                                             >{{ section.name }}</span>
                                         </template>
 
+                                        <!-- Section weight toward overall score -->
+                                        <div class="flex items-center gap-1 shrink-0" title="Section weight toward overall score (all sections must sum to 100%)">
+                                            <span class="text-[10px] text-slate-500">Section W:</span>
+                                            <input
+                                                type="number"
+                                                v-model.number="section.weight"
+                                                @change="saveSectionWeight(section)"
+                                                min="0" max="200" step="1"
+                                                class="w-14 bg-slate-700 border border-slate-600 rounded px-1 py-0.5 text-xs text-slate-200 text-center focus:outline-none focus:border-blue-400"
+                                            />
+                                            <span class="text-[10px] text-slate-500">%</span>
+                                        </div>
+
+                                        <!-- Question weight running total for this section -->
+                                        <span
+                                            class="text-[10px] shrink-0 font-medium px-1.5 py-0.5 rounded"
+                                            :class="Math.abs(questionWeightTotal(section) - 100) < 0.1
+                                                ? 'bg-emerald-900/40 text-emerald-400'
+                                                : 'bg-amber-900/40 text-amber-400'"
+                                            :title="`Question weights in this section sum to ${questionWeightTotal(section)}% (must be 100%)`"
+                                        >Q∑{{ questionWeightTotal(section) }}%</span>
+
                                         <span v-if="section.reportingCategoryName" class="text-xs text-slate-400 bg-slate-700 px-1.5 py-0.5 rounded shrink-0">{{ section.reportingCategoryName }}</span>
                                         <span class="text-xs text-slate-500 shrink-0">{{ section.questions.length }}Q</span>
                                         <button
@@ -204,6 +242,7 @@
                                             class="text-slate-400 hover:text-blue-300 pi pi-refresh text-xs shrink-0"
                                             title="Reset to original order"
                                         />
+                                        <button @click="onRedistributeWeights(section)" class="text-slate-400 hover:text-blue-300 pi pi-share-alt text-xs shrink-0" title="Equalize question weights" />
                                         <button @click="confirmRemoveSection(section)" class="text-red-400 hover:text-red-300 pi pi-trash text-xs shrink-0 ml-1" title="Remove section" />
                                     </div>
 
@@ -216,7 +255,7 @@
                                         class="divide-y divide-slate-700"
                                     >
                                         <template #item="{ element: q, index: qIndex }">
-                                            <div class="px-4 py-2 flex items-center gap-3 group">
+                                            <div class="px-3 py-2 flex items-center gap-2 group">
                                                 <span class="drag-handle cursor-grab text-slate-600 hover:text-slate-400 pi pi-bars shrink-0" />
                                                 <span class="text-xs text-slate-500 w-5 shrink-0">{{ qIndex + 1 }}.</span>
                                                 <template v-if="editingQuestionId === q.versionQuestionId">
@@ -230,17 +269,38 @@
                                                 </template>
                                                 <template v-else>
                                                     <span
-                                                        class="flex-1 text-sm text-slate-300 cursor-pointer hover:text-white"
+                                                        class="flex-1 text-sm text-slate-300 cursor-pointer hover:text-white min-w-0 truncate"
                                                         @click="startEditQuestion(q)"
-                                                        title="Click to edit"
+                                                        :title="q.questionText + ' (click to edit)'"
                                                     >{{ q.questionText }}</span>
                                                 </template>
-                                                <div class="flex gap-2 shrink-0 text-xs text-slate-500">
-                                                    <span v-if="q.allowNA">N/A</span>
-                                                    <span v-if="q.requireCommentOnNC">Cmnt</span>
-                                                    <span v-if="q.isScoreable">Scored</span>
+
+                                                <!-- Question weight (editable) -->
+                                                <div class="flex items-center gap-0.5 shrink-0" title="Question weight within this section (all questions must sum to 100%)">
+                                                    <input
+                                                        type="number"
+                                                        v-model.number="q.weight"
+                                                        @change="saveQuestionWeight(section, q)"
+                                                        min="0" max="100" step="1"
+                                                        class="w-12 bg-slate-700 border border-slate-600 rounded px-1 py-0.5 text-xs text-slate-200 text-center focus:outline-none focus:border-blue-400"
+                                                    />
+                                                    <span class="text-[10px] text-slate-500">%</span>
                                                 </div>
-                                                <button @click="startEditQuestion(q)" class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-300 pi pi-pencil text-xs shrink-0 transition-opacity" title="Edit question" />
+
+                                                <!-- Life Critical toggle -->
+                                                <button
+                                                    @click="toggleLifeCritical(section, q)"
+                                                    :class="q.isLifeCritical ? 'text-red-400 hover:text-red-300' : 'text-slate-600 hover:text-slate-400'"
+                                                    title="Life Critical — NonConforming auto-fails entire audit"
+                                                    class="pi pi-exclamation-triangle text-xs shrink-0 transition-colors"
+                                                />
+
+                                                <div class="flex gap-1.5 shrink-0 text-[10px] text-slate-600">
+                                                    <span v-if="q.allowNA" title="N/A allowed">N/A</span>
+                                                    <span v-if="q.requireCommentOnNC" title="Comment required on NC">Cmnt</span>
+                                                    <span v-if="!q.isScoreable" title="Not scored" class="text-amber-600">Unscored</span>
+                                                </div>
+                                                <button @click="startEditQuestion(q)" class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-300 pi pi-pencil text-xs shrink-0 transition-opacity" title="Edit question text" />
                                                 <button @click="onRemoveQuestion(section.id, q.versionQuestionId)" class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 pi pi-trash text-xs shrink-0 transition-opacity" title="Remove question" />
                                             </div>
                                         </template>
@@ -291,6 +351,75 @@
                                 Add Blank Section
                             </button>
                         </div>
+
+                        <!-- ── Skip Logic Rules ─────────────────────────────── -->
+                        <div class="mt-6 bg-slate-900 border border-slate-700 rounded-lg overflow-hidden">
+                            <button
+                                class="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-800/50 transition-colors"
+                                @click="showLogicRules = !showLogicRules"
+                            >
+                                <div class="flex items-center gap-2">
+                                    <i class="pi pi-share-alt text-violet-400 text-sm" />
+                                    <span class="text-sm font-semibold text-slate-200">Skip Logic Rules</span>
+                                    <span class="text-xs bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded">{{ logicRules.length }}</span>
+                                </div>
+                                <i :class="['pi text-slate-500 text-xs', showLogicRules ? 'pi-chevron-up' : 'pi-chevron-down']" />
+                            </button>
+
+                            <div v-if="showLogicRules" class="p-4 space-y-3">
+                                <p class="text-xs text-slate-500">Hide or show entire sections based on a question's answer.</p>
+
+                                <!-- Existing rules -->
+                                <div
+                                    v-for="rule in logicRules"
+                                    :key="rule.id"
+                                    class="flex items-center gap-2 text-xs bg-slate-800 border border-slate-700 rounded px-3 py-2"
+                                >
+                                    <span class="text-slate-400">If</span>
+                                    <span class="text-slate-200 font-medium">{{ questionLabel(rule.triggerVersionQuestionId) }}</span>
+                                    <span class="text-slate-400">is</span>
+                                    <span class="text-amber-400 font-medium">{{ rule.triggerResponse }}</span>
+                                    <span class="text-slate-400">→</span>
+                                    <span :class="rule.action === 'HideSection' ? 'text-red-400' : 'text-emerald-400'" class="font-medium">
+                                        {{ rule.action === 'HideSection' ? 'Hide' : 'Show' }}
+                                    </span>
+                                    <span class="text-slate-200 font-medium">{{ sectionLabel(rule.targetSectionId) }}</span>
+                                    <button class="ml-auto text-slate-500 hover:text-red-400 pi pi-times" @click="deleteLogicRule(rule.id)" />
+                                </div>
+
+                                <!-- Add new rule form -->
+                                <div class="grid grid-cols-4 gap-2 mt-2">
+                                    <select v-model="newRule.triggerVersionQuestionId" class="logic-select col-span-1">
+                                        <option :value="null" disabled>When question…</option>
+                                        <option v-for="q in allDraftQuestions" :key="q.versionQuestionId" :value="q.versionQuestionId">
+                                            {{ q.questionText.slice(0, 50) }}{{ q.questionText.length > 50 ? '…' : '' }}
+                                        </option>
+                                    </select>
+                                    <select v-model="newRule.triggerResponse" class="logic-select">
+                                        <option value="NonConforming">NonConforming</option>
+                                        <option value="Conforming">Conforming</option>
+                                        <option value="Warning">Warning</option>
+                                        <option value="NA">NA</option>
+                                        <option value="AnyAnswer">Any Answer</option>
+                                    </select>
+                                    <select v-model="newRule.action" class="logic-select">
+                                        <option value="HideSection">Hide section</option>
+                                        <option value="ShowSection">Show section</option>
+                                    </select>
+                                    <select v-model="newRule.targetSectionId" class="logic-select">
+                                        <option :value="null" disabled>Select section…</option>
+                                        <option v-for="s in draftDetail.sections" :key="s.id" :value="s.id">{{ s.name }}</option>
+                                    </select>
+                                </div>
+                                <button
+                                    @click="saveLogicRule"
+                                    :disabled="!newRule.triggerVersionQuestionId || !newRule.targetSectionId || logicSaving"
+                                    class="px-3 py-1.5 text-xs bg-violet-700 hover:bg-violet-600 text-white rounded disabled:opacity-40 transition-colors"
+                                >
+                                    + Add Rule
+                                </button>
+                            </div>
+                        </div>
                     </template>
                 </template>
             </div>
@@ -331,12 +460,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { ref, computed, reactive, onMounted, watch, nextTick } from 'vue';
 import draggable from 'vuedraggable';
 import Dialog from 'primevue/dialog';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import { useAdminStore } from '../../../stores/adminStore';
-import type { TemplateVersionListItemDto, DraftVersionDetailDto, DraftSectionDto, DraftQuestionDto, SectionLibraryItemDto } from '@/apiclient/auditClient';
+import { AuditClient } from '@/apiclient/auditClient';
+import type { TemplateVersionListItemDto, DraftVersionDetailDto, DraftSectionDto, DraftQuestionDto, SectionLibraryItemDto, LogicRuleDto } from '@/apiclient/auditClient';
+import { useApiStore } from '@/stores/apiStore';
 
 const adminStore = useAdminStore();
 
@@ -499,7 +630,80 @@ async function saveSectionName(section: DraftSectionDto) {
     await adminStore.updateSection(selectedVersionId.value, section.id, {
         name,
         isRequired: section.isRequired,
+        weight: section.weight,
+        isOptional: section.isOptional,
+        optionalGroupKey: section.optionalGroupKey,
         reportingCategoryId: section.reportingCategoryId,
+    });
+}
+
+async function saveSectionWeight(section: DraftSectionDto) {
+    if (!selectedVersionId.value) return;
+    await adminStore.updateSection(selectedVersionId.value, section.id, {
+        name: section.name,
+        isRequired: section.isRequired,
+        weight: section.weight,
+        isOptional: section.isOptional,
+        optionalGroupKey: section.optionalGroupKey,
+        reportingCategoryId: section.reportingCategoryId,
+    });
+}
+
+// ── Weight helpers ─────────────────────────────────────────────────────────────
+
+const overallWeightTotal = computed(() => {
+    if (!draftDetail.value) return 0;
+    const sum = draftDetail.value.sections.reduce((acc, s) => acc + (s.weight || 0), 0);
+    return Math.round(sum * 10) / 10;
+});
+
+function questionWeightTotal(section: DraftSectionDto): number {
+    const sum = section.questions.reduce((acc, q) => acc + (q.weight || 0), 0);
+    return Math.round(sum * 10) / 10;
+}
+
+async function redistributeQuestionWeights(section: DraftSectionDto) {
+    if (!selectedVersionId.value || section.questions.length === 0) return;
+    const count = section.questions.length;
+    const base = Math.floor(100 / count);
+    const remainder = 100 - base * count;
+    const weights = section.questions.map((q, idx) => ({
+        versionQuestionId: q.versionQuestionId,
+        weight: base + (idx === count - 1 ? remainder : 0),
+    }));
+    for (const w of weights) {
+        const q = section.questions.find(q => q.versionQuestionId === w.versionQuestionId);
+        if (q) q.weight = w.weight;
+    }
+    await adminStore.batchUpdateQuestionWeights(selectedVersionId.value, weights);
+}
+
+async function onRedistributeWeights(section: DraftSectionDto) {
+    await redistributeQuestionWeights(section);
+}
+
+async function saveQuestionWeight(section: DraftSectionDto, q: DraftQuestionDto) {
+    if (!selectedVersionId.value) return;
+    await adminStore.updateQuestion(selectedVersionId.value, q.versionQuestionId, {
+        questionText: q.questionText,
+        weight: q.weight,
+        isLifeCritical: q.isLifeCritical,
+        allowNA: q.allowNA,
+        requireCommentOnNC: q.requireCommentOnNC,
+        isScoreable: q.isScoreable,
+    });
+}
+
+async function toggleLifeCritical(section: DraftSectionDto, q: DraftQuestionDto) {
+    if (!selectedVersionId.value) return;
+    q.isLifeCritical = !q.isLifeCritical;
+    await adminStore.updateQuestion(selectedVersionId.value, q.versionQuestionId, {
+        questionText: q.questionText,
+        weight: q.weight,
+        isLifeCritical: q.isLifeCritical,
+        allowNA: q.allowNA,
+        requireCommentOnNC: q.requireCommentOnNC,
+        isScoreable: q.isScoreable,
     });
 }
 
@@ -573,7 +777,15 @@ async function saveQuestionText(section: DraftSectionDto, q: DraftQuestionDto) {
     const text = editingQuestionText.value.trim();
     editingQuestionId.value = null;
     if (!text || text === q.questionText || !selectedVersionId.value) return;
-    await adminStore.updateQuestion(selectedVersionId.value, q.versionQuestionId, text);
+    q.questionText = text;
+    await adminStore.updateQuestion(selectedVersionId.value, q.versionQuestionId, {
+        questionText: text,
+        weight: q.weight,
+        isLifeCritical: q.isLifeCritical,
+        allowNA: q.allowNA,
+        requireCommentOnNC: q.requireCommentOnNC,
+        isScoreable: q.isScoreable,
+    });
 }
 
 // ── Add question ───────────────────────────────────────────────────────────────
@@ -590,7 +802,12 @@ async function onAddQuestion(sectionId: number) {
         requireCommentOnNC: true,
         isScoreable: true,
     });
-    if (ok) newQuestionText.value[sectionId] = '';
+    if (ok) {
+        newQuestionText.value[sectionId] = '';
+        // Auto-equalize question weights after adding
+        const section = draftDetail.value?.sections.find(s => s.id === sectionId);
+        if (section) await redistributeQuestionWeights(section);
+    }
 }
 
 // ── Remove question ────────────────────────────────────────────────────────────
@@ -634,4 +851,94 @@ function statusBadgeClass(status: string): string {
     if (status === 'Draft') return 'bg-amber-800 text-amber-300';
     return 'bg-slate-700 text-slate-400';
 }
+
+// ── Logic rule client ──────────────────────────────────────────────────────────
+
+const apiStore = useApiStore();
+function getClient(): AuditClient {
+    return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
+}
+
+// ── Skip logic rules ───────────────────────────────────────────────────────────
+
+const showLogicRules = ref(false);
+const logicRules = ref<LogicRuleDto[]>([]);
+const logicSaving = ref(false);
+const newRule = reactive({
+    triggerVersionQuestionId: null as number | null,
+    triggerResponse: 'NonConforming',
+    action: 'HideSection',
+    targetSectionId: null as number | null,
+});
+
+const allDraftQuestions = computed(() => {
+    if (!draftDetail.value) return [];
+    return draftDetail.value.sections.flatMap(s => s.questions);
+});
+
+function questionLabel(vqId: number | null): string {
+    if (!vqId || !draftDetail.value) return `#${vqId}`;
+    for (const s of draftDetail.value.sections) {
+        const q = s.questions.find(q => q.versionQuestionId === vqId);
+        if (q) {
+            const text = q.questionText;
+            return text.length > 55 ? text.slice(0, 55) + '…' : text;
+        }
+    }
+    return `#${vqId}`;
+}
+
+function sectionLabel(sId: number | null | undefined): string {
+    if (!sId || !draftDetail.value) return `#${sId}`;
+    const s = draftDetail.value.sections.find(s => s.id === sId);
+    return s?.name ?? `#${sId}`;
+}
+
+async function loadLogicRules(versionId: number) {
+    try {
+        logicRules.value = await getClient().getLogicRules(versionId);
+    } catch {
+        logicRules.value = [];
+    }
+}
+
+async function saveLogicRule() {
+    if (!selectedVersionId.value || !newRule.triggerVersionQuestionId || !newRule.targetSectionId) return;
+    logicSaving.value = true;
+    try {
+        await getClient().upsertLogicRule({
+            templateVersionId: selectedVersionId.value,
+            triggerVersionQuestionId: newRule.triggerVersionQuestionId,
+            triggerResponse: newRule.triggerResponse,
+            action: newRule.action,
+            targetSectionId: newRule.targetSectionId,
+        });
+        newRule.triggerVersionQuestionId = null;
+        newRule.triggerResponse = 'NonConforming';
+        newRule.action = 'HideSection';
+        newRule.targetSectionId = null;
+        await loadLogicRules(selectedVersionId.value);
+    } finally {
+        logicSaving.value = false;
+    }
+}
+
+async function deleteLogicRule(id: number) {
+    if (!selectedVersionId.value) return;
+    await getClient().deleteLogicRule(id);
+    await loadLogicRules(selectedVersionId.value);
+}
+
+// Load rules when version changes (Draft mode only)
+watch(selectedVersionId, async (id) => {
+    logicRules.value = [];
+    showLogicRules.value = false;
+    if (id) await loadLogicRules(id);
+}, { immediate: false });
 </script>
+
+<style scoped>
+.logic-select {
+    @apply bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-slate-400 w-full;
+}
+</style>

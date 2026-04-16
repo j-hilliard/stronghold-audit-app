@@ -35,6 +35,9 @@ public class DraftSectionDto
     public string? SectionCode { get; set; }
     public int DisplayOrder { get; set; }
     public bool IsRequired { get; set; }
+    public decimal Weight { get; set; } = 1.0m;
+    public bool IsOptional { get; set; }
+    public string? OptionalGroupKey { get; set; }
     public int? ReportingCategoryId { get; set; }
     public string? ReportingCategoryName { get; set; }
     public List<DraftQuestionDto> Questions { get; set; } = new();
@@ -52,6 +55,8 @@ public class DraftQuestionDto
     public bool RequireCommentOnNC { get; set; }
     public bool IsScoreable { get; set; }
     public bool IsArchived { get; set; }
+    /// <summary>If true, a NonConforming answer auto-fails the entire audit.</summary>
+    public bool IsLifeCritical { get; set; }
     public int? ResponseTypeId { get; set; }
     public string? ResponseTypeCode { get; set; }
     /// <summary>Effective weight: version-level override if set, else question default.</summary>
@@ -82,12 +87,18 @@ public class CopySectionRequest
 public class AddSectionRequest
 {
     public string Name { get; set; } = null!;
+    public decimal Weight { get; set; } = 1.0m;
+    public bool IsOptional { get; set; } = false;
+    public string? OptionalGroupKey { get; set; }
 }
 
 public class UpdateSectionRequest
 {
     public string Name { get; set; } = null!;
     public bool IsRequired { get; set; }
+    public decimal Weight { get; set; } = 1.0m;
+    public bool IsOptional { get; set; } = false;
+    public string? OptionalGroupKey { get; set; }
     public int? ReportingCategoryId { get; set; }
 }
 
@@ -111,6 +122,24 @@ public class AddQuestionRequest
 public class UpdateQuestionRequest
 {
     public string QuestionText { get; set; } = null!;
+    /// <summary>Per-version weight override (stored on AuditVersionQuestion).</summary>
+    public decimal Weight { get; set; } = 1.0m;
+    /// <summary>When true, a NonConforming response auto-fails the audit.</summary>
+    public bool IsLifeCritical { get; set; } = false;
+    public bool AllowNA { get; set; } = true;
+    public bool RequireCommentOnNC { get; set; } = true;
+    public bool IsScoreable { get; set; } = true;
+}
+
+public class BatchUpdateQuestionWeightsRequest
+{
+    public List<QuestionWeightItem> Weights { get; set; } = new();
+}
+
+public class QuestionWeightItem
+{
+    public int VersionQuestionId { get; set; }
+    public decimal Weight { get; set; }
 }
 
 public class ReorderQuestionsRequest

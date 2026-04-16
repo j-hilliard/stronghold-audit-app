@@ -93,10 +93,19 @@
                 />
             </div>
 
-            <!-- Sections -->
+            <!-- Attachments -->
+            <div class="px-4">
+                <AuditAttachments
+                    v-if="store.auditId"
+                    :audit-id="store.auditId"
+                    :readonly="store.isSubmitted"
+                />
+            </div>
+
+            <!-- Sections (filtered to enabled optional groups) -->
             <div class="px-4">
                 <AuditSection
-                    v-for="section in store.template.sections"
+                    v-for="section in store.visibleSections"
                     :key="section.id"
                     :ref="el => { if (el) sectionRefs.set(section.id, el as unknown as SectionRef) }"
                     :section="section"
@@ -196,6 +205,7 @@ import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
 import AuditHeader from '../components/AuditHeader.vue';
 import AuditSection from '../components/AuditSection.vue';
 import ScoreSummaryBar from '../components/ScoreSummaryBar.vue';
+import AuditAttachments from '../components/AuditAttachments.vue';
 
 interface SectionRef {
     toggleOpen(): void;

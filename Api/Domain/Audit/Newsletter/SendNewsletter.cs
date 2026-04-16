@@ -7,7 +7,9 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Newsletter;
 
-[AllowedAuthorizationRole(AuthorizationRole.AuthenticatedUser)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
+    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
 public class SendNewsletter : IRequest<NewsletterSendResult>
 {
     public int DivisionId { get; set; }

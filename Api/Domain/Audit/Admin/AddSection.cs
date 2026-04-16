@@ -50,6 +50,9 @@ public class AddSectionHandler : IRequestHandler<AddSection, int>
             Name = request.Payload.Name.Trim(),
             DisplayOrder = maxOrder + 1,
             IsRequired = false,
+            Weight = request.Payload.Weight,
+            IsOptional = request.Payload.IsOptional,
+            OptionalGroupKey = request.Payload.OptionalGroupKey?.Trim(),
             CreatedAt = now,
             CreatedBy = request.AddedBy,
         };

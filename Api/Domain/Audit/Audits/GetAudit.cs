@@ -7,7 +7,11 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
-[AllowedAuthorizationRole(AuthorizationRole.AuthenticatedUser)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
+    AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.ReadOnlyViewer,
+    AuthorizationRole.ExecutiveViewer, AuthorizationRole.TemplateAdmin,
+    AuthorizationRole.Administrator)]
 public class GetAudit : IRequest<AuditDetailDto?>
 {
     public int AuditId { get; set; }
@@ -29,6 +33,7 @@ public class GetAuditHandler : IRequestHandler<GetAudit, AuditDetailDto?>
             .Include(a => a.Division)
             .Include(a => a.Header)
             .Include(a => a.Responses)
+            .Include(a => a.EnabledSections)
             .FirstOrDefaultAsync(a => a.Id == request.AuditId, cancellationToken);
 
         if (audit == null) return null;
@@ -71,7 +76,8 @@ public class GetAuditHandler : IRequestHandler<GetAudit, AuditDetailDto?>
                 Status = r.Status,
                 Comment = r.Comment,
                 CorrectedOnSite = r.CorrectedOnSite
-            }).ToList()
+            }).ToList(),
+            EnabledOptionalGroupKeys = audit.EnabledSections.Select(s => s.OptionalGroupKey).ToList()
         };
     }
 }

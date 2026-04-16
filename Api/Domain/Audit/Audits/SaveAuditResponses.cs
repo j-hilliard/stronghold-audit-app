@@ -10,7 +10,9 @@ using AuditResponseEntity = Stronghold.AppDashboard.Data.Models.Audit.AuditRespo
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
-[AllowedAuthorizationRole(AuthorizationRole.AuthenticatedUser)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.AuditManager, AuthorizationRole.TemplateAdmin,
+    AuthorizationRole.Administrator)]
 public class SaveAuditResponses : IRequest<Unit>
 {
     public int AuditId { get; set; }
@@ -97,17 +99,40 @@ public class SaveAuditResponsesHandler : IRequestHandler<SaveAuditResponses, Uni
             }
         }
 
+        // ── Weight lookup — snapshot at save time so scores stay deterministic ─
+        // Effective question weight = version-level override if set, else question default.
+        var versionQuestions = await _context.AuditVersionQuestions
+            .Include(vq => vq.Question)
+            .Include(vq => vq.Section)
+            .Where(vq => vq.TemplateVersionId == audit.TemplateVersionId)
+            .ToListAsync(cancellationToken);
+
+        var weightByQuestionId = versionQuestions.ToDictionary(
+            vq => vq.QuestionId,
+            vq => (
+                QuestionWeight: vq.Weight ?? vq.Question.Weight,
+                SectionWeight: vq.Section.Weight,
+                IsLifeCritical: vq.Question.IsLifeCritical
+            )
+        );
+
         // ── Responses — full upsert ───────────────────────────────────────────
         var existingByQuestionId = audit.Responses.ToDictionary(r => r.QuestionId);
 
         foreach (var dto in request.Responses)
         {
+            var (qw, sw, lc) = weightByQuestionId.TryGetValue(dto.QuestionId, out var w)
+                ? w : (1.0m, 1.0m, false);
+
             if (existingByQuestionId.TryGetValue(dto.QuestionId, out var existing))
             {
                 existing.QuestionTextSnapshot = dto.QuestionTextSnapshot;
                 existing.Status = dto.Status;
                 existing.Comment = dto.Comment;
                 existing.CorrectedOnSite = dto.Status == "NonConforming" && dto.CorrectedOnSite;
+                existing.QuestionWeightSnapshot = qw;
+                existing.SectionWeightSnapshot = sw;
+                existing.IsLifeCriticalSnapshot = lc;
                 existing.UpdatedAt = now;
                 existing.UpdatedBy = request.SavedBy;
             }
@@ -121,6 +146,9 @@ public class SaveAuditResponsesHandler : IRequestHandler<SaveAuditResponses, Uni
                     Status = dto.Status,
                     Comment = dto.Comment,
                     CorrectedOnSite = dto.Status == "NonConforming" && dto.CorrectedOnSite,
+                    QuestionWeightSnapshot = qw,
+                    SectionWeightSnapshot = sw,
+                    IsLifeCriticalSnapshot = lc,
                     CreatedAt = now,
                     CreatedBy = request.SavedBy
                 });

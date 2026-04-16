@@ -3,7 +3,7 @@
         <BasePageHeader
             icon="pi pi-plus"
             title="New Audit"
-            subtitle="Choose a division and template to begin"
+            subtitle="Select a division to begin"
         />
 
         <div class="p-6 max-w-3xl">
@@ -26,49 +26,56 @@
                     </select>
                 </div>
 
-                <!-- Step 2: Template card (shows once division is selected) -->
+                <!-- Template info (read-only, shown once division is selected) -->
                 <template v-if="selectedDivision">
-                    <label class="block text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">Template</label>
+                    <div v-if="loadingTemplate" class="mb-6 text-slate-500 text-sm">Loading template info…</div>
 
-                    <div v-if="loadingTemplate" class="text-slate-500 text-sm py-4">Loading template info…</div>
+                    <div v-else-if="activeTemplate" class="mb-6 rounded-xl border border-slate-700 bg-slate-800/60 px-5 py-4 flex items-center justify-between">
+                        <div>
+                            <p class="text-white font-semibold text-sm">{{ selectedDivision.name }} — Version {{ activeTemplate.versionNumber }}</p>
+                            <p class="text-slate-400 text-xs mt-0.5">
+                                {{ activeTemplate.questionCount }} questions · {{ activeTemplate.sectionCount }} section{{ activeTemplate.sectionCount !== 1 ? 's' : '' }}
+                            </p>
+                        </div>
+                        <span class="text-xs bg-green-800 text-green-300 px-2 py-0.5 rounded font-medium shrink-0">Active</span>
+                    </div>
 
-                    <div v-else-if="activeTemplate" class="mb-8">
-                        <button
-                            type="button"
-                            @click="templateSelected = true"
-                            :class="[
-                                'w-full text-left rounded-xl border-2 p-5 transition-all duration-150 focus:outline-none',
-                                templateSelected
-                                    ? 'bg-blue-600/20 border-blue-500 shadow-lg shadow-blue-900/30'
-                                    : 'bg-slate-800 border-slate-700 hover:border-slate-500',
-                            ]"
-                            :disabled="creating"
-                        >
-                            <div class="flex items-start justify-between">
-                                <div>
-                                    <p class="text-white font-semibold text-base">
-                                        {{ selectedDivision.name }} — Version {{ activeTemplate.versionNumber }}
-                                    </p>
-                                    <p class="text-slate-400 text-sm mt-1">
-                                        {{ activeTemplate.questionCount }} questions across {{ activeTemplate.sectionCount }} section{{ activeTemplate.sectionCount !== 1 ? 's' : '' }}
-                                    </p>
-                                </div>
-                                <div class="flex items-center gap-2 shrink-0">
-                                    <span class="text-xs bg-green-800 text-green-300 px-2 py-0.5 rounded font-medium">Active</span>
+                    <div v-else class="mb-6 p-4 bg-amber-900/20 border border-amber-700/40 rounded-lg text-amber-300 text-sm">
+                        No active template found for this division. Contact your Template Admin to publish a template first.
+                    </div>
+
+                    <!-- Optional section groups (only shown when optional groups exist) -->
+                    <template v-if="activeTemplate && optionalGroups.length > 0">
+                        <div class="mb-6">
+                            <label class="block text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">Special Sections</label>
+                            <p class="text-xs text-slate-500 mb-3">
+                                These sections only apply to certain job types. Toggle on any that apply to this audit.
+                                Sections left off will not appear on the form or affect scoring.
+                            </p>
+                            <div class="space-y-2">
+                                <div
+                                    v-for="group in optionalGroups"
+                                    :key="group.key"
+                                    class="flex items-start gap-3 rounded-lg border p-4 cursor-pointer transition-colors"
+                                    :class="enabledGroupKeys.includes(group.key)
+                                        ? 'bg-blue-600/15 border-blue-600/50'
+                                        : 'bg-slate-800 border-slate-700 hover:border-slate-500'"
+                                    @click="toggleGroup(group.key)"
+                                >
                                     <div
-                                        v-if="templateSelected"
-                                        class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center"
+                                        class="mt-0.5 shrink-0 w-10 h-5 rounded-full transition-colors flex items-center px-0.5"
+                                        :class="enabledGroupKeys.includes(group.key) ? 'bg-blue-500 justify-end' : 'bg-slate-600 justify-start'"
                                     >
-                                        <i class="pi pi-check text-white text-[10px]" />
+                                        <div class="w-4 h-4 rounded-full bg-white shadow-sm" />
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-medium text-slate-200">{{ group.label }}</p>
+                                        <p class="text-xs text-slate-400 mt-0.5">{{ group.sectionNames.join(' · ') }}</p>
                                     </div>
                                 </div>
                             </div>
-                        </button>
-                    </div>
-
-                    <div v-else class="mb-8 p-4 bg-amber-900/20 border border-amber-700/40 rounded-lg text-amber-300 text-sm">
-                        No active template found for this division. Contact your Template Admin to publish a template first.
-                    </div>
+                        </div>
+                    </template>
                 </template>
 
                 <!-- Action row -->
@@ -111,7 +118,7 @@ const loadingTemplate = ref(false);
 const creating = ref(false);
 
 const selectedDivisionId = ref<number | null>(null);
-const templateSelected = ref(false);
+const enabledGroupKeys = ref<string[]>([]);
 
 interface TemplateCard {
     versionNumber: number;
@@ -119,14 +126,22 @@ interface TemplateCard {
     sectionCount: number;
 }
 
+interface OptionalGroup {
+    key: string;
+    label: string;
+    sectionNames: string[];
+}
+
 const activeTemplate = ref<TemplateCard | null>(null);
+const optionalGroups = ref<OptionalGroup[]>([]);
 
 const selectedDivision = computed((): DivisionDto | null =>
     store.divisions.find(d => d.id === selectedDivisionId.value) ?? null
 );
 
+// Ready to start as soon as a division with an active template is chosen
 const canStart = computed(() =>
-    selectedDivision.value !== null && templateSelected.value && !creating.value
+    selectedDivision.value !== null && activeTemplate.value !== null && !creating.value && !loadingTemplate.value
 );
 
 onMounted(async () => {
@@ -143,8 +158,9 @@ onMounted(async () => {
 });
 
 watch(selectedDivisionId, async (divId) => {
-    templateSelected.value = false;
     activeTemplate.value = null;
+    optionalGroups.value = [];
+    enabledGroupKeys.value = [];
     if (!divId) return;
 
     const div = store.divisions.find(d => d.id === divId);
@@ -152,30 +168,53 @@ watch(selectedDivisionId, async (divId) => {
 
     loadingTemplate.value = true;
     try {
-        // Find active template version for this division from adminStore
         const versions = adminStore.templates.filter(
             t => t.divisionCode === div.code && t.status === 'Active'
         );
         if (versions.length > 0) {
             const v = versions[0];
-            // Load draft detail to get section count
             await adminStore.loadDraft(v.id);
             const detail = adminStore.draftDetail;
-            activeTemplate.value = {
-                versionNumber: v.versionNumber,
-                questionCount: v.questionCount,
-                sectionCount: detail?.sections.length ?? 0,
-            };
+            if (detail) {
+                activeTemplate.value = {
+                    versionNumber: v.versionNumber,
+                    questionCount: v.questionCount,
+                    sectionCount: detail.sections.length,
+                };
+
+                const groupMap = new Map<string, string[]>();
+                for (const s of detail.sections) {
+                    if (s.isOptional && s.optionalGroupKey) {
+                        const existing = groupMap.get(s.optionalGroupKey) ?? [];
+                        existing.push(s.name);
+                        groupMap.set(s.optionalGroupKey, existing);
+                    }
+                }
+                optionalGroups.value = Array.from(groupMap.entries()).map(([key, names]) => ({
+                    key,
+                    label: key.replace(/_/g, ' '),
+                    sectionNames: names,
+                }));
+            }
         }
     } finally {
         loadingTemplate.value = false;
     }
 });
 
+function toggleGroup(key: string) {
+    const idx = enabledGroupKeys.value.indexOf(key);
+    if (idx >= 0) {
+        enabledGroupKeys.value.splice(idx, 1);
+    } else {
+        enabledGroupKeys.value.push(key);
+    }
+}
+
 async function startAudit() {
     if (!selectedDivision.value || !canStart.value) return;
     creating.value = true;
-    const id = await store.createAudit(selectedDivision.value.id);
+    const id = await store.createAudit(selectedDivision.value.id, enabledGroupKeys.value);
     creating.value = false;
     if (id) {
         router.push(`/audit-management/audits/${id}`);

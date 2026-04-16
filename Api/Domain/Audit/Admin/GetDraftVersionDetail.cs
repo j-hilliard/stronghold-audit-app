@@ -7,7 +7,9 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Admin;
 
-[AllowedAuthorizationRole(AuthorizationRole.Administrator, AuthorizationRole.TemplateAdmin)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.AuditManager, AuthorizationRole.TemplateAdmin,
+    AuthorizationRole.Administrator)]
 public class GetDraftVersionDetail : IRequest<DraftVersionDetailDto?>
 {
     public int DraftVersionId { get; set; }
@@ -62,6 +64,9 @@ public class GetDraftVersionDetailHandler : IRequestHandler<GetDraftVersionDetai
                 SectionCode = s.SectionCode,
                 DisplayOrder = s.DisplayOrder,
                 IsRequired = s.IsRequired,
+                Weight = s.Weight,
+                IsOptional = s.IsOptional,
+                OptionalGroupKey = s.OptionalGroupKey,
                 ReportingCategoryId = s.ReportingCategoryId,
                 ReportingCategoryName = s.ReportingCategory?.Name,
                 Questions = questionsBySectionId.TryGetValue(s.Id, out var qs)
@@ -77,6 +82,7 @@ public class GetDraftVersionDetailHandler : IRequestHandler<GetDraftVersionDetai
                         RequireCommentOnNC = vq.RequireCommentOnNC,
                         IsScoreable = vq.IsScoreable,
                         IsArchived = vq.Question.IsArchived,
+                        IsLifeCritical = vq.Question.IsLifeCritical,
                         ResponseTypeId = vq.Question.ResponseTypeId,
                         ResponseTypeCode = vq.Question.ResponseType?.Code,
                         Weight = vq.Weight ?? vq.Question.Weight,

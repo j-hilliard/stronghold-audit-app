@@ -9,7 +9,9 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.ReportDrafts;
 
-[AllowedAuthorizationRole(AuthorizationRole.AuthenticatedUser)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
+    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
 public class CreateReportDraft : IRequest<int>
 {
     public CreateReportDraftRequest Payload { get; set; } = null!;

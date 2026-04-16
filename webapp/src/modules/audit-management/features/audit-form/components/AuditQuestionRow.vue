@@ -32,7 +32,36 @@
             />
         </div>
 
-        <!-- Expanded area: NC and Warning only -->
+        <!-- Conforming: optional note (collapsed until clicked or note already exists) -->
+        <Transition name="nc-expand">
+            <div v-if="response.status === 'Conforming'" class="px-4 pb-3 border-t border-slate-700/50">
+                <button
+                    v-if="!showConformingNote"
+                    type="button"
+                    class="mt-2 text-xs text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1"
+                    :disabled="disabled"
+                    @click="showConformingNote = true"
+                >
+                    <i class="pi pi-plus-circle text-[10px]" /> Add note
+                </button>
+                <Transition name="nc-expand">
+                    <div v-if="showConformingNote" class="pt-2">
+                        <label class="text-xs font-semibold block mb-1 text-slate-400">Notes</label>
+                        <Textarea
+                            :model-value="response.comment ?? ''"
+                            rows="2"
+                            class="w-full text-sm"
+                            :disabled="disabled"
+                            placeholder="Optional notes on this conforming item..."
+                            autoResize
+                            @update:model-value="store.setComment(response.questionId, $event as string || null)"
+                        />
+                    </div>
+                </Transition>
+            </div>
+        </Transition>
+
+        <!-- Expanded area: NC and Warning -->
         <Transition name="nc-expand">
             <div
                 v-if="response.status === 'NonConforming' || response.status === 'Warning'"
@@ -101,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import Textarea from 'primevue/textarea';
 import StatusButtons from './StatusButtons.vue';
 import { useAuditStore, type ResponseState } from '@/modules/audit-management/stores/auditStore';
@@ -113,6 +142,19 @@ const props = defineProps<{
 }>();
 
 const store = useAuditStore();
+
+// Show conforming note box if there's already a comment (e.g. loaded from server)
+const showConformingNote = ref(!!props.response.comment);
+
+// If a comment is cleared/restored from outside, keep the panel in sync
+watch(() => props.response.comment, (val) => {
+    if (val) showConformingNote.value = true;
+});
+
+// Collapse the note panel when status changes away from Conforming
+watch(() => props.response.status, (val) => {
+    if (val !== 'Conforming') showConformingNote.value = false;
+});
 
 const badgeClass = computed(() => {
     switch (props.response.status) {

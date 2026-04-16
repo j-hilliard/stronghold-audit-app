@@ -7,7 +7,11 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
-[AllowedAuthorizationRole(AuthorizationRole.AuthenticatedUser)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
+    AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.ReadOnlyViewer,
+    AuthorizationRole.ExecutiveViewer, AuthorizationRole.TemplateAdmin,
+    AuthorizationRole.Administrator)]
 public class GetSectionTrends : IRequest<SectionTrendsReportDto>
 {
     public int? DivisionId { get; set; }

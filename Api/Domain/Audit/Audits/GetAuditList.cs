@@ -7,7 +7,11 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
-[AllowedAuthorizationRole(AuthorizationRole.AuthenticatedUser)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
+    AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.ReadOnlyViewer,
+    AuthorizationRole.ExecutiveViewer, AuthorizationRole.TemplateAdmin,
+    AuthorizationRole.Administrator)]
 public class GetAuditList : IRequest<List<AuditListItemDto>>
 {
     public int? DivisionId { get; set; }
@@ -22,8 +26,13 @@ public class GetAuditList : IRequest<List<AuditListItemDto>>
 public class GetAuditListHandler : IRequestHandler<GetAuditList, List<AuditListItemDto>>
 {
     private readonly AppDbContext _context;
+    private readonly IAuditUserContext _userContext;
 
-    public GetAuditListHandler(AppDbContext context) => _context = context;
+    public GetAuditListHandler(AppDbContext context, IAuditUserContext userContext)
+    {
+        _context = context;
+        _userContext = userContext;
+    }
 
     public async Task<List<AuditListItemDto>> Handle(GetAuditList request, CancellationToken cancellationToken)
     {
@@ -31,6 +40,10 @@ public class GetAuditListHandler : IRequestHandler<GetAuditList, List<AuditListI
             .Include(a => a.Division)
             .Include(a => a.Header)
             .AsQueryable();
+
+        // Division scope: scoped users only see their assigned divisions
+        if (!_userContext.IsGlobal && _userContext.AllowedDivisionIds is { Count: > 0 } allowed)
+            query = query.Where(a => allowed.Contains(a.DivisionId));
 
         if (request.DivisionId.HasValue)
             query = query.Where(a => a.DivisionId == request.DivisionId.Value);

@@ -10,6 +10,8 @@ import {
     type AddQuestionRequest,
     type AddSectionRequest,
     type UpdateSectionRequest,
+    type UpdateQuestionRequest,
+    type QuestionWeightItem,
     type SectionLibraryItemDto,
     type EmailRoutingRuleDto,
     type EmailRoutingRuleUpsertDto,
@@ -96,17 +98,47 @@ export const useAdminStore = defineStore('auditAdmin', () => {
         }
     }
 
-    async function updateQuestion(draftId: number, versionQuestionId: number, questionText: string): Promise<boolean> {
+    async function updateQuestion(draftId: number, versionQuestionId: number, request: UpdateQuestionRequest): Promise<boolean> {
         saving.value = true;
         try {
-            await getClient().updateQuestion(draftId, versionQuestionId, questionText);
+            await getClient().updateQuestion(draftId, versionQuestionId, request);
             // Update local state immediately — no need for full reload
             const section = draftDetail.value?.sections.find(s => s.questions.some(q => q.versionQuestionId === versionQuestionId));
             const q = section?.questions.find(q => q.versionQuestionId === versionQuestionId);
-            if (q) q.questionText = questionText;
+            if (q) {
+                q.questionText = request.questionText;
+                q.weight = request.weight;
+                q.isLifeCritical = request.isLifeCritical;
+                q.allowNA = request.allowNA;
+                q.requireCommentOnNC = request.requireCommentOnNC;
+                q.isScoreable = request.isScoreable;
+            }
             return true;
         } catch (err: any) {
             const msg = err?.response?.data ?? err?.message ?? 'Failed to update question.';
+            toast.add({ severity: 'error', summary: 'Error', detail: String(msg), life: 4000 });
+            return false;
+        } finally {
+            saving.value = false;
+        }
+    }
+
+    async function batchUpdateQuestionWeights(draftId: number, weights: QuestionWeightItem[]): Promise<boolean> {
+        saving.value = true;
+        try {
+            await getClient().batchUpdateQuestionWeights(draftId, weights);
+            // Update local state immediately
+            if (draftDetail.value) {
+                for (const w of weights) {
+                    for (const s of draftDetail.value.sections) {
+                        const q = s.questions.find(q => q.versionQuestionId === w.versionQuestionId);
+                        if (q) { q.weight = w.weight; break; }
+                    }
+                }
+            }
+            return true;
+        } catch (err: any) {
+            const msg = err?.response?.data ?? err?.message ?? 'Failed to save weights.';
             toast.add({ severity: 'error', summary: 'Error', detail: String(msg), life: 4000 });
             return false;
         } finally {
@@ -314,6 +346,7 @@ export const useAdminStore = defineStore('auditAdmin', () => {
         loadDraft,
         addQuestion,
         updateQuestion,
+        batchUpdateQuestionWeights,
         removeQuestion,
         reorderQuestions,
         publishDraft,

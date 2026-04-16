@@ -23,6 +23,24 @@ public class AuditSection : AuditableEntity
     /// <summary>Whether this section must contain at least one answered question before the audit can be submitted</summary>
     public bool IsRequired { get; set; } = false;
 
+    /// <summary>
+    /// Section-level scoring weight multiplier applied to every question in this section.
+    /// Default 1.0 = no adjustment. Snapshotted onto AuditResponse.SectionWeightSnapshot at save time.
+    /// </summary>
+    public decimal Weight { get; set; } = 1.0m;
+
+    /// <summary>
+    /// When true, this section is not shown by default and must be explicitly enabled at audit creation.
+    /// For example, "RADIOGRAPHY" or "ROPE_ACCESS" sections only apply to certain jobs.
+    /// </summary>
+    public bool IsOptional { get; set; } = false;
+
+    /// <summary>
+    /// Groups optional sections so they can be toggled together (e.g., all "RADIOGRAPHY" sections on/off at once).
+    /// Null = always visible. Non-null = only shown when the auditor explicitly enables the group.
+    /// </summary>
+    public string? OptionalGroupKey { get; set; }
+
     // Navigation
     public AuditTemplateVersion TemplateVersion { get; set; } = null!;
     public ReportingCategory? ReportingCategory { get; set; }

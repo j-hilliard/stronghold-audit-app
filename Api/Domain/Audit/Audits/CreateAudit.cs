@@ -2,16 +2,25 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Stronghold.AppDashboard.Api.Authorization;
 using Stronghold.AppDashboard.Data;
+using Stronghold.AppDashboard.Data.Models.Audit;
 using Stronghold.AppDashboard.Shared.Enumerations;
 using AuditEntity = Stronghold.AppDashboard.Data.Models.Audit.Audit;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
-[AllowedAuthorizationRole(AuthorizationRole.AuthenticatedUser)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.AuditManager, AuthorizationRole.TemplateAdmin,
+    AuthorizationRole.Administrator)]
 public class CreateAudit : IRequest<int>
 {
     public int DivisionId { get; set; }
     public string CreatedBy { get; set; } = null!;
+
+    /// <summary>
+    /// Optional section group keys to enable for this audit.
+    /// Empty = no optional sections enabled. Immutable after creation.
+    /// </summary>
+    public List<string> EnabledOptionalGroupKeys { get; set; } = new();
 }
 
 public class CreateAuditHandler : IRequestHandler<CreateAudit, int>
@@ -51,6 +60,19 @@ public class CreateAuditHandler : IRequestHandler<CreateAudit, int>
 
         _context.Audits.Add(audit);
         await _context.SaveChangesAsync(cancellationToken);
+
+        // Persist enabled optional section groups (immutable snapshot)
+        foreach (var key in request.EnabledOptionalGroupKeys.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            _context.AuditEnabledSections.Add(new AuditEnabledSection
+            {
+                AuditId = audit.Id,
+                OptionalGroupKey = key,
+            });
+        }
+
+        if (request.EnabledOptionalGroupKeys.Any())
+            await _context.SaveChangesAsync(cancellationToken);
 
         return audit.Id;
     }

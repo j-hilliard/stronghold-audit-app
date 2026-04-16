@@ -46,11 +46,17 @@ public class GetActiveTemplateHandler : IRequestHandler<GetActiveTemplate, Templ
             .OrderBy(vq => vq.DisplayOrder)
             .ToListAsync(cancellationToken);
 
+        var logicRules = await _context.QuestionLogicRules
+            .Where(r => r.TemplateVersionId == version.Id && r.IsActive)
+            .ToListAsync(cancellationToken);
+
         var sectionDtos = sections.Select(s => new TemplateSectionDto
         {
             Id = s.Id,
             Name = s.Name,
             DisplayOrder = s.DisplayOrder,
+            IsOptional = s.IsOptional,
+            OptionalGroupKey = s.OptionalGroupKey,
             Questions = versionQuestions
                 .Where(vq => vq.SectionId == s.Id)
                 .Select(vq => new TemplateQuestionDto
@@ -61,7 +67,8 @@ public class GetActiveTemplateHandler : IRequestHandler<GetActiveTemplate, Templ
                     DisplayOrder = vq.DisplayOrder,
                     AllowNA = vq.AllowNA,
                     RequireCommentOnNC = vq.RequireCommentOnNC,
-                    IsScoreable = vq.IsScoreable
+                    IsScoreable = vq.IsScoreable,
+                    IsLifeCritical = vq.Question.IsLifeCritical
                 }).ToList()
         }).ToList();
 
@@ -72,7 +79,15 @@ public class GetActiveTemplateHandler : IRequestHandler<GetActiveTemplate, Templ
             DivisionCode = division.Code,
             DivisionName = division.Name,
             AuditType = division.AuditType,
-            Sections = sectionDtos
+            Sections = sectionDtos,
+            LogicRules = logicRules.Select(r => new LogicRuleDto
+            {
+                Id = r.Id,
+                TriggerVersionQuestionId = r.TriggerVersionQuestionId,
+                TriggerResponse = r.TriggerResponse,
+                Action = r.Action,
+                TargetSectionId = r.TargetSectionId,
+            }).ToList(),
         };
     }
 }

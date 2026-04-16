@@ -29,4 +29,10 @@ public class Audit : AuditableEntity
     public ICollection<AuditResponse> Responses { get; set; } = new List<AuditResponse>();
     public ICollection<AuditFinding> Findings { get; set; } = new List<AuditFinding>();
     public ICollection<AuditAttachment> Attachments { get; set; } = new List<AuditAttachment>();
+
+    /// <summary>Optional section groups enabled at audit creation (immutable after create).</summary>
+    public ICollection<AuditEnabledSection> EnabledSections { get; set; } = new List<AuditEnabledSection>();
+
+    /// <summary>AI-generated plain-language summary generated at submission time. Null when AI is disabled or unavailable.</summary>
+    public string? AiSummary { get; set; }
 }

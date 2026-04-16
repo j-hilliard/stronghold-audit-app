@@ -9,7 +9,10 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
-[AllowedAuthorizationRole(AuthorizationRole.AuthenticatedUser)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
+    AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.TemplateAdmin,
+    AuthorizationRole.Administrator)]
 public class AssignCorrectiveAction : IRequest<int>
 {
     public AssignCorrectiveActionRequest Payload { get; set; } = null!;
@@ -33,7 +36,8 @@ public class AssignCorrectiveActionHandler : IRequestHandler<AssignCorrectiveAct
             .FirstOrDefaultAsync(f => f.Id == request.Payload.FindingId, cancellationToken)
             ?? throw new ArgumentException($"Finding {request.Payload.FindingId} not found.");
 
-        DateOnly? dueDate = null;
+        // Default to 14 days from today when no due date provided (per workflow requirement)
+        DateOnly? dueDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(14));
         if (!string.IsNullOrWhiteSpace(request.Payload.DueDate) &&
             DateOnly.TryParse(request.Payload.DueDate, out var parsed))
             dueDate = parsed;

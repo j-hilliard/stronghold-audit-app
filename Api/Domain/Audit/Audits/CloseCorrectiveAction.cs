@@ -8,7 +8,10 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
-[AllowedAuthorizationRole(AuthorizationRole.AuthenticatedUser)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
+    AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.TemplateAdmin,
+    AuthorizationRole.Administrator)]
 public class CloseCorrectiveAction : IRequest<Unit>
 {
     public int CorrectiveActionId { get; set; }

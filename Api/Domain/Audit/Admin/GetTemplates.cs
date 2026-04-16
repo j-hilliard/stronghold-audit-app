@@ -7,7 +7,9 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Admin;
 
-[AllowedAuthorizationRole(AuthorizationRole.Administrator)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.AuditManager, AuthorizationRole.TemplateAdmin,
+    AuthorizationRole.Administrator)]
 public class GetTemplates : IRequest<List<TemplateVersionListItemDto>> { }
 
 public class GetTemplatesHandler : IRequestHandler<GetTemplates, List<TemplateVersionListItemDto>>
