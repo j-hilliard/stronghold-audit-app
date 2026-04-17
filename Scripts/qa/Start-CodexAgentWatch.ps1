@@ -34,23 +34,29 @@ if (Test-Path $pidFile) {
 }
 
 if ($Foreground) {
-    if ($RunAllSuites) {
-        & $workerScript -PollSeconds $PollSeconds -DebounceSeconds $DebounceSeconds -RunAllSuites -Strict:$Strict
+    if ($Strict) {
+        if ($RunAllSuites) {
+            & $workerScript -PollSeconds $PollSeconds -DebounceSeconds $DebounceSeconds -RunAllSuites -Strict
+        } else {
+            & $workerScript -PollSeconds $PollSeconds -DebounceSeconds $DebounceSeconds -Strict
+        }
     } else {
-        & $workerScript -PollSeconds $PollSeconds -DebounceSeconds $DebounceSeconds -Strict:$Strict
+        if ($RunAllSuites) {
+            & $workerScript -PollSeconds $PollSeconds -DebounceSeconds $DebounceSeconds -RunAllSuites
+        } else {
+            & $workerScript -PollSeconds $PollSeconds -DebounceSeconds $DebounceSeconds
+        }
     }
     return
 }
 
-$strictLiteral = if ($Strict) { '1' } else { '0' }
-$command = "& '$workerScript' -PollSeconds $PollSeconds -DebounceSeconds $DebounceSeconds -Strict $strictLiteral"
-if ($RunAllSuites) { $command += ' -RunAllSuites' }
-
-$argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $command)
+$argString = "-NoProfile -ExecutionPolicy Bypass -File `"$workerScript`" -PollSeconds $PollSeconds -DebounceSeconds $DebounceSeconds"
+if ($Strict) { $argString += ' -Strict' }
+if ($RunAllSuites) { $argString += ' -RunAllSuites' }
 
 if (Test-Path $startupOut) { Remove-Item -LiteralPath $startupOut -Force }
 if (Test-Path $startupErr) { Remove-Item -LiteralPath $startupErr -Force }
-$process = Start-Process -FilePath 'powershell' -ArgumentList $argList -WindowStyle Hidden -RedirectStandardOutput $startupOut -RedirectStandardError $startupErr -PassThru
+$process = Start-Process -FilePath 'powershell' -ArgumentList $argString -WindowStyle Hidden -RedirectStandardOutput $startupOut -RedirectStandardError $startupErr -PassThru
 
 Write-Host "Codex watcher started."
 Write-Host "PID: $($process.Id)"

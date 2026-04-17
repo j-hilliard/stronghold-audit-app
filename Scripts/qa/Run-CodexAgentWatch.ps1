@@ -2,7 +2,7 @@ param(
     [int]$PollSeconds = 1,
     [int]$DebounceSeconds = 3,
     [switch]$RunAllSuites,
-    [bool]$Strict = $true
+    [switch]$Strict
 )
 
 $ErrorActionPreference = 'Stop'
@@ -112,7 +112,7 @@ function Get-Delta {
     return $changed
 }
 
-Write-RunLog "Codex agent watcher started. PID=$PID, poll=${PollSeconds}s, debounce=${DebounceSeconds}s, runAll=$RunAllSuites, strict=$Strict"
+Write-RunLog "Codex agent watcher started. PID=$PID, poll=${PollSeconds}s, debounce=${DebounceSeconds}s, runAll=$RunAllSuites, strict=$($Strict.IsPresent)"
 
 $snapshot = Get-Snapshot
 $pending = [System.Collections.Generic.HashSet[string]]::new()
@@ -152,7 +152,7 @@ while ($true) {
             $cycleArgs = @{
                 ChangedFiles = $changedFiles
                 Reason       = 'file-change'
-                Strict       = $Strict
+                Strict       = [bool]$Strict
             }
 
             if ($RunAllSuites) {
