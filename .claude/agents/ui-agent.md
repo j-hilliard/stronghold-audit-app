@@ -21,11 +21,22 @@ grep -rn "path:" webapp/src/router/ --include="*.ts"
 ```
 Build a complete list of all routes including nested ones before doing anything else.
 
-### Step 2: Verify the Dev Server Is Up
+### Step 2: Verify the Dev Server Is Up AND the App Builds Clean
+
 ```bash
 curl -s -o /dev/null -w "%{http_code}" http://localhost:7220
 ```
-If it returns anything other than a connection error, proceed. If it's down, note it prominently in the report.
+
+**If the server is not running, attempt a build check first:**
+```bash
+cd "c:/Users/joseph.hilliard/OneDrive - Quanta Services Management Partnership, L.P/Desktop/Stronghold Audit App/webapp" && node_modules/.bin/vite build --mode development 2>&1 | grep -E "error|Error|✓" | head -30
+```
+
+**If the build has ANY errors — STOP. Do not proceed to screenshots.**
+Report the build errors immediately. A page that fails to load cannot be visually audited.
+This is a CRITICAL failure — report it as severity P0 and fix the import/build error before continuing.
+
+Only proceed to screenshots when the build is clean (✓ N modules transformed, 0 errors).
 
 ### Step 3: Take BEFORE Screenshots of EVERY Page
 Save to `.claude/visual-tests/screenshots/before/`. Capture 3 viewports per page: 1440px, 768px, 375px. Also capture dark mode on every page.
