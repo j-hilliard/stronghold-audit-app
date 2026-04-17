@@ -23,14 +23,27 @@ public class UpdateCorrectiveAction : IRequest
 public class UpdateCorrectiveActionHandler : IRequestHandler<UpdateCorrectiveAction>
 {
     private readonly AppDbContext _context;
+    private readonly IAuditUserContext _userContext;
 
-    public UpdateCorrectiveActionHandler(AppDbContext context) => _context = context;
+    public UpdateCorrectiveActionHandler(AppDbContext context, IAuditUserContext userContext)
+    {
+        _context     = context;
+        _userContext = userContext;
+    }
 
     public async Task Handle(UpdateCorrectiveAction request, CancellationToken cancellationToken)
     {
         var ca = await _context.CorrectiveActions
+            .Include(c => c.Audit)
             .FirstOrDefaultAsync(c => c.Id == request.CorrectiveActionId, cancellationToken)
             ?? throw new KeyNotFoundException($"Corrective action #{request.CorrectiveActionId} not found.");
+
+        // Division scope enforcement (prevents IDOR across division boundaries)
+        if (!_userContext.IsGlobal
+            && _userContext.AllowedDivisionIds is { Count: > 0 } allowed
+            && ca.Audit != null
+            && !allowed.Contains(ca.Audit.DivisionId))
+            throw new UnauthorizedAccessException("You do not have access to this corrective action.");
 
         if (ca.Status is "Closed" or "Voided")
             throw new InvalidOperationException($"Cannot edit a corrective action with status '{ca.Status}'.");

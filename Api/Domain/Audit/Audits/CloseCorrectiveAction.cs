@@ -22,12 +22,14 @@ public class CloseCorrectiveAction : IRequest<Unit>
 public class CloseCorrectiveActionHandler : IRequestHandler<CloseCorrectiveAction, Unit>
 {
     private readonly AppDbContext _context;
+    private readonly IAuditUserContext _userContext;
     private readonly IProcessLogService _log;
 
-    public CloseCorrectiveActionHandler(AppDbContext context, IProcessLogService log)
+    public CloseCorrectiveActionHandler(AppDbContext context, IAuditUserContext userContext, IProcessLogService log)
     {
-        _context = context;
-        _log = log;
+        _context     = context;
+        _userContext = userContext;
+        _log         = log;
     }
 
     public async Task<Unit> Handle(CloseCorrectiveAction request, CancellationToken cancellationToken)
@@ -37,8 +39,15 @@ public class CloseCorrectiveActionHandler : IRequestHandler<CloseCorrectiveActio
             .FirstOrDefaultAsync(c => c.Id == request.CorrectiveActionId, cancellationToken)
             ?? throw new ArgumentException($"Corrective action {request.CorrectiveActionId} not found.");
 
-        if (ca.Status == "Closed")
-            throw new InvalidOperationException("Corrective action is already closed.");
+        // Division scope enforcement (prevents IDOR across division boundaries)
+        if (!_userContext.IsGlobal
+            && _userContext.AllowedDivisionIds is { Count: > 0 } allowed
+            && ca.Audit != null
+            && !allowed.Contains(ca.Audit.DivisionId))
+            throw new UnauthorizedAccessException("You do not have access to this corrective action.");
+
+        if (ca.Status is "Closed" or "Voided")
+            throw new InvalidOperationException($"Corrective action is already {ca.Status.ToLower()}.");
 
         // Enforce per-division closure photo requirement
         if (ca.Audit?.Division?.RequireClosurePhoto == true)

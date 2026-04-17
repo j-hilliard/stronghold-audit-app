@@ -55,6 +55,9 @@ public class BulkUpdateCorrectiveActionsHandler
         if (!request.CorrectiveActionIds.Any())
             throw new ArgumentException("No corrective action IDs provided.");
 
+        if (request.CorrectiveActionIds.Count > 500)
+            throw new ArgumentException("Bulk operations are limited to 500 corrective actions at a time.");
+
         if (request.Action is not ("status" or "reassign"))
             throw new ArgumentException($"Unknown bulk action '{request.Action}'. Expected 'status' or 'reassign'.");
 
