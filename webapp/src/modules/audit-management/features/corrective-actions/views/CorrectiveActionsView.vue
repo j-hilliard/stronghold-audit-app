@@ -6,15 +6,15 @@
             <!-- Search -->
             <div class="flex flex-col gap-1 flex-1 min-w-[200px]">
                 <label class="text-xs text-slate-400 font-medium">Search</label>
-                <IconField icon-position="left">
-                    <InputIcon class="pi pi-search" />
+                <span class="p-input-icon-left w-full">
+                    <i class="pi pi-search" />
                     <InputText
                         v-model="filterSearch"
                         placeholder="Description, assignee, question…"
                         class="w-full"
                         @keyup.enter="load"
                     />
-                </IconField>
+                </span>
             </div>
 
             <!-- Division -->
