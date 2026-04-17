@@ -2,7 +2,7 @@ import { Page, Route } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { expectNoRuntimeErrors, gotoAndStabilize } from './utils/ui';
 
-const composerGateEnabled = process.env.PW_AUDIT_COMPOSER_GATE === 'true';
+const composerGateEnabled = process.env.PW_AUDIT_COMPOSER_GATE !== 'false';
 
 function replyJson(route: Route, payload: unknown, status = 200) {
     return route.fulfill({
@@ -56,6 +56,47 @@ async function installComposerMocks(page: Page) {
             createdBy: 'qa@stronghold.local',
         },
     ];
+    let draft42 = {
+        id: 42,
+        divisionId: 1,
+        divisionCode: 'ETS',
+        title: 'ETS Q1 Newsletter',
+        period: 'Q1 2026',
+        dateFrom: '2026-01-01',
+        dateTo: '2026-03-31',
+        blocksJson: JSON.stringify([
+            {
+                id: 'bar-1',
+                type: 'chart-bar',
+                isEdited: false,
+                style: { backgroundColor: '#0f172a' },
+                content: {
+                    title: 'Findings by Section',
+                    labels: ['PPE'],
+                    datasets: [{ label: 'ETS', data: [0.3], backgroundColor: '#2563eb' }],
+                    caption: 'Existing caption note',
+                },
+            },
+            {
+                id: 'nar-1',
+                type: 'narrative',
+                isEdited: true,
+                style: { backgroundColor: '#111827' },
+                content: {
+                    text: 'Prior analyst narrative.',
+                    aiPromptContext: 'ets-q1',
+                },
+            },
+        ]),
+        rowVersion: 'AAAAAAAAB9E=',
+        createdAt: '2026-04-01T12:00:00Z',
+        updatedAt: '2026-04-02T10:00:00Z',
+        createdBy: 'qa@stronghold.local',
+    };
+
+    await page.route(/\/favicon\.ico$/i, async (route) => {
+        await route.fulfill({ status: 204, body: '' });
+    });
 
     await page.route(/\/v1\/divisions(\?.*)?$/i, async (route) => {
         return replyJson(route, [
@@ -137,47 +178,30 @@ async function installComposerMocks(page: Page) {
     await page.route(/\/v1\/audits\/report-drafts\/42(\?.*)?$/i, async (route) => {
         const method = route.request().method().toUpperCase();
         if (method === 'GET') {
-            return replyJson(route, {
-                id: 42,
-                divisionId: 1,
-                divisionCode: 'ETS',
-                title: 'ETS Q1 Newsletter',
-                period: 'Q1 2026',
-                dateFrom: '2026-01-01',
-                dateTo: '2026-03-31',
-                blocksJson: JSON.stringify([
-                    {
-                        id: 'bar-1',
-                        type: 'chart-bar',
-                        isEdited: false,
-                        style: { backgroundColor: '#0f172a' },
-                        content: {
-                            title: 'Findings by Section',
-                            labels: ['PPE'],
-                            datasets: [{ label: 'ETS', data: [0.3], backgroundColor: '#2563eb' }],
-                            caption: 'Existing caption note',
-                        },
-                    },
-                    {
-                        id: 'nar-1',
-                        type: 'narrative',
-                        isEdited: true,
-                        style: { backgroundColor: '#111827' },
-                        content: {
-                            text: 'Prior analyst narrative.',
-                            aiPromptContext: 'ets-q1',
-                        },
-                    },
-                ]),
-                rowVersion: 'AAAAAAAAB9E=',
-                createdAt: '2026-04-01T12:00:00Z',
-                updatedAt: '2026-04-02T10:00:00Z',
-                createdBy: 'qa@stronghold.local',
-            });
+            return replyJson(route, draft42);
         }
 
         if (method === 'PUT') {
-            updateBodies.push(parseBody(route.request().postData()));
+            const body = parseBody(route.request().postData());
+            updateBodies.push(body);
+
+            draft42 = {
+                ...draft42,
+                title: typeof body.title === 'string' ? body.title : draft42.title,
+                period: typeof body.period === 'string' ? body.period : draft42.period,
+                dateFrom: typeof body.dateFrom === 'string' ? body.dateFrom : draft42.dateFrom,
+                dateTo: typeof body.dateTo === 'string' ? body.dateTo : draft42.dateTo,
+                blocksJson: typeof body.blocksJson === 'string' ? body.blocksJson : draft42.blocksJson,
+                updatedAt: '2026-04-15T11:11:11Z',
+            };
+            draftList = draftList.map((draft) => (draft.id === 42 ? {
+                ...draft,
+                title: draft42.title,
+                period: draft42.period,
+                dateFrom: draft42.dateFrom,
+                dateTo: draft42.dateTo,
+                updatedAt: draft42.updatedAt,
+            } : draft));
             return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' } });
         }
 
@@ -265,9 +289,14 @@ test.describe('Audit report composer contract (feature-gated)', () => {
         // Click the narrative block — inner text div has @click="editing=true" so
         // clicking the block wrapper both selects it and enters edit mode
         await page.locator('[data-testid="composer-block-nar-1"]').click();
-        const narrative = page.locator('[data-testid="block-narrative-text"]');
+        expect(
+            runtimeErrors.join('\n'),
+            `Narrative editor runtime errors:\n${runtimeErrors.join('\n')}`,
+        ).not.toContain('@tiptap_extension-text-style');
+        const narrative = page.locator('[data-testid="block-narrative-text"] [contenteditable="true"]').first();
         await expect(narrative).toBeVisible();
-        await expect(narrative).toHaveValue('Prior analyst narrative.');
+        await expect(narrative).toContainText('Prior analyst narrative.');
+        await narrative.click();
         await narrative.fill('Manual narrative should persist after refresh');
 
         // Refresh data — re-generate with same date params; engine preserves authored content
@@ -279,7 +308,7 @@ test.describe('Audit report composer contract (feature-gated)', () => {
         await expect(caption).toHaveValue('Edited caption persists');
         await expect(styleBg).toHaveValue('#123456');
         // Narrative textarea persists on canvas (editing stays true for same component key)
-        await expect(narrative).toHaveValue('Manual narrative should persist after refresh');
+        await expect(narrative).toContainText('Manual narrative should persist after refresh');
 
         // Save draft — button is enabled because isDirty=true after edits
         await page.locator('[data-testid="composer-save"]').click();
@@ -298,7 +327,45 @@ test.describe('Audit report composer contract (feature-gated)', () => {
         expect(narrativeBlock).toBeTruthy();
         expect((barBlock?.content as { caption?: string })?.caption).toBe('Edited caption persists');
         expect((barBlock?.style as { backgroundColor?: string })?.backgroundColor).toBe('#123456');
-        expect((narrativeBlock?.content as { text?: string })?.text).toBe('Manual narrative should persist after refresh');
+        expect((narrativeBlock?.content as { text?: string })?.text ?? '').toContain('Manual narrative should persist after refresh');
+
+        expectNoRuntimeErrors(runtimeErrors);
+    });
+
+    test('saved draft can be reloaded after navigation refresh with authored content intact', async ({ page, runtimeErrors }) => {
+        const state = await installComposerMocks(page);
+
+        await gotoAndStabilize(page, '/audit-management/reports/composer');
+        await expect(page.getByRole('heading', { name: 'Report Composer' })).toBeVisible();
+
+        await page.locator('[data-testid="composer-filter-division"]').selectOption({ value: '1' });
+        await page.locator('[data-testid="composer-filter-from"]').fill('2026-01-01');
+        await page.locator('[data-testid="composer-filter-to"]').fill('2026-03-31');
+        await page.locator('[data-testid="composer-generate"]').click();
+        await expect.poll(() => state.reportUrls().length).toBeGreaterThan(0);
+
+        await page.locator('[data-testid="composer-draft-select"]').selectOption({ value: '42' });
+        await expect(page.locator('[data-testid="composer-block-bar-1"]')).toBeVisible();
+        await page.locator('[data-testid="composer-draft-title"]').fill('ETS Q1 Reload Validation');
+
+        await page.locator('[data-testid="composer-block-bar-1"]').click();
+        const caption = page.locator('[data-testid="block-caption-input"]');
+        await caption.fill('Caption survives reload');
+
+        await page.locator('[data-testid="composer-save"]').click();
+        await expect.poll(() => state.updateBodies().length).toBeGreaterThan(0);
+
+        await gotoAndStabilize(page, '/audit-management/reports');
+        await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+        await gotoAndStabilize(page, '/audit-management/reports/composer');
+        await expect(page.getByRole('heading', { name: 'Report Composer' })).toBeVisible();
+
+        await page.locator('[data-testid="composer-draft-select"]').selectOption({ value: '42' });
+        await expect(page.locator('[data-testid="composer-draft-title"]')).toHaveValue('ETS Q1 Reload Validation');
+        await page.locator('[data-testid="composer-block-bar-1"]').click();
+        await expect(page.locator('[data-testid="block-caption-input"]')).toHaveValue('Caption survives reload');
+        await expect(page.locator('[data-testid="composer-filter-from"]')).toHaveValue('2026-01-01');
+        await expect(page.locator('[data-testid="composer-filter-to"]')).toHaveValue('2026-03-31');
 
         expectNoRuntimeErrors(runtimeErrors);
     });
@@ -323,6 +390,48 @@ test.describe('Audit report composer contract (feature-gated)', () => {
 
         await expect.poll(() => state.deletedDraftIds().length).toBe(1);
         await expect(dialog.locator('tbody tr')).toHaveCount(1);
+
+        expectNoRuntimeErrors(runtimeErrors);
+    });
+
+    test('composer shell keeps controls aligned and add-page docked to page width', async ({ page, runtimeErrors }) => {
+        await installComposerMocks(page);
+
+        await gotoAndStabilize(page, '/audit-management/reports/composer');
+        await expect(page.getByRole('heading', { name: 'Report Composer' })).toBeVisible();
+
+        const printButton = page.locator('[data-testid="composer-print"]');
+        await expect(printButton).toBeVisible();
+        await expect(printButton).toHaveCSS('white-space', 'nowrap');
+
+        const printButtonBox = await printButton.boundingBox();
+        expect(printButtonBox?.height ?? 0).toBeLessThanOrEqual(36);
+
+        const documentPage = page.locator('[data-testid="composer-document-page"]');
+        const footerInner = page.locator('[data-testid="composer-canvas-footer-inner"]');
+        await expect(documentPage).toBeVisible();
+        await expect(footerInner).toBeVisible();
+
+        const pageBox = await documentPage.boundingBox();
+        const footerBox = await footerInner.boundingBox();
+        expect(pageBox).not.toBeNull();
+        expect(footerBox).not.toBeNull();
+
+        if (pageBox && footerBox) {
+            const pageCenter = pageBox.x + (pageBox.width / 2);
+            const footerCenter = footerBox.x + (footerBox.width / 2);
+            const centerDiff = Math.abs(pageCenter - footerCenter);
+            const widthDiff = Math.abs(pageBox.width - footerBox.width);
+
+            expect(centerDiff).toBeLessThanOrEqual(3);
+            expect(widthDiff).toBeLessThanOrEqual(3);
+        }
+
+        const pageLabel = page.locator('[data-testid="composer-page-label"]');
+        await expect(pageLabel).toContainText('Page 1 of 1');
+
+        await page.locator('[data-testid="composer-add-page"]').click();
+        await expect.poll(async () => (await pageLabel.textContent()) ?? '').toContain('Page 2 of 2');
 
         expectNoRuntimeErrors(runtimeErrors);
     });
@@ -355,11 +464,10 @@ test.describe('Audit report composer contract (feature-gated)', () => {
         const printedChartImages = printRoot.locator('img[src^="data:image/png"]');
         await expect(printedChartImages.first()).toBeVisible();
 
-        const printCalls = await page.evaluate(() => {
+        await expect.poll(async () => page.evaluate(() => {
             // @ts-expect-error test-only global
             return window.__printCalls ?? 0;
-        });
-        expect(printCalls).toBeGreaterThan(0);
+        })).toBeGreaterThan(0);
 
         expectNoRuntimeErrors(runtimeErrors);
     });

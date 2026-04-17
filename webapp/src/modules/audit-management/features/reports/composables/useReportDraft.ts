@@ -121,7 +121,7 @@ export function useReportDraft() {
                 const block = ensureLayout(b, i, cumulativeY);
                 // Advance Y by this block's estimated height (or its stored height if set)
                 const EST: Partial<Record<ReportBlock['type'], number>> = {
-                    cover: 240, heading: 56, 'kpi-grid': 320, 'chart-bar': 380,
+                    cover: 240, 'cover-page': 1123, heading: 56, 'kpi-grid': 320, 'chart-bar': 380,
                     'chart-line': 340, narrative: 220, callout: 120, 'ca-table': 220,
                     image: 300, 'toc-sidebar': 620, 'oval-callout': 250,
                     'findings-category': 220, divider: 32, spacer: 48, 'column-row': 400,

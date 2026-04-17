@@ -20,6 +20,8 @@ public class UpdateQuestion : IRequest<Unit>
     public bool AllowNA { get; set; } = true;
     public bool RequireCommentOnNC { get; set; } = true;
     public bool IsScoreable { get; set; } = true;
+    public bool RequirePhotoOnNc { get; set; } = false;
+    public bool AutoCreateCa { get; set; } = false;
     public string UpdatedBy { get; set; } = null!;
 }
 
@@ -51,9 +53,11 @@ public class UpdateQuestionHandler : IRequestHandler<UpdateQuestion, Unit>
         var oldText = vq.Question.QuestionText;
         var now = DateTime.UtcNow;
 
-        // Update question text + life-critical flag on the master question record
+        // Update question text + per-question flags on the master question record
         vq.Question.QuestionText = request.QuestionText.Trim();
         vq.Question.IsLifeCritical = request.IsLifeCritical;
+        vq.Question.RequirePhotoOnNc = request.RequirePhotoOnNc;
+        vq.Question.AutoCreateCa = request.AutoCreateCa;
         vq.Question.UpdatedAt = now;
         vq.Question.UpdatedBy = request.UpdatedBy;
 

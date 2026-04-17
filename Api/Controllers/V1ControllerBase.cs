@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Asp.Versioning;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

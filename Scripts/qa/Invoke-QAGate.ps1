@@ -37,6 +37,7 @@ if ($RequireLive) {
 
 $env:PW_AUDIT_TEMPLATE_GATE = if ($EnableTemplateGate) { 'true' } else { 'false' }
 $env:PW_AUDIT_REPORTING_GATE = if ($EnableReportingGate) { 'true' } else { 'false' }
+$env:PW_AUDIT_COMPOSER_GATE = if ($EnableReportingGate) { 'true' } else { 'false' }
 
 function Invoke-GateStep {
     param(

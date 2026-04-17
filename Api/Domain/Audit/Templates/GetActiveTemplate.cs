@@ -68,7 +68,9 @@ public class GetActiveTemplateHandler : IRequestHandler<GetActiveTemplate, Templ
                     AllowNA = vq.AllowNA,
                     RequireCommentOnNC = vq.RequireCommentOnNC,
                     IsScoreable = vq.IsScoreable,
-                    IsLifeCritical = vq.Question.IsLifeCritical
+                    IsLifeCritical = vq.Question.IsLifeCritical,
+                    RequirePhotoOnNc = vq.Question.RequirePhotoOnNc,
+                    AutoCreateCa = vq.Question.AutoCreateCa
                 }).ToList()
         }).ToList();
 

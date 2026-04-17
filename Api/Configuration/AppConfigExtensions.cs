@@ -107,7 +107,7 @@ namespace Stronghold.AppDashboard.Api.Configuration
                 {
                     // NOTE: Key Vault references through Azure App Config refresh based on the below interval, regardless of the interval or Sentinel set in Azure App Config
                     config.SetCredential(credential);
-                    config.SetSecretRefreshInterval(TimeSpan.FromSeconds(30));
+                    config.SetSecretRefreshInterval(TimeSpan.FromSeconds(60));
                 });
             });
 

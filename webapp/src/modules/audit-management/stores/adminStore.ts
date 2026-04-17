@@ -112,6 +112,8 @@ export const useAdminStore = defineStore('auditAdmin', () => {
                 q.allowNA = request.allowNA;
                 q.requireCommentOnNC = request.requireCommentOnNC;
                 q.isScoreable = request.isScoreable;
+                q.requirePhotoOnNc = request.requirePhotoOnNc;
+                q.autoCreateCa = request.autoCreateCa;
             }
             return true;
         } catch (err: any) {

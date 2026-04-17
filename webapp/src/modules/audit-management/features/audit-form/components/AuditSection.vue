@@ -22,6 +22,20 @@
                 >
                     {{ answeredCount }}/{{ section.questions.length }}
                 </span>
+                <!-- Live score badge — only shown once at least one scoreable answer exists -->
+                <span
+                    v-if="sectionScore.scorePercent !== null"
+                    :class="[
+                        'text-xs font-semibold px-1.5 py-0.5 rounded',
+                        sectionScore.scorePercent >= 80
+                            ? 'bg-emerald-900/60 text-emerald-300'
+                            : sectionScore.scorePercent >= 60
+                                ? 'bg-yellow-900/60 text-yellow-300'
+                                : 'bg-red-900/60 text-red-300',
+                    ]"
+                >
+                    {{ Math.round(sectionScore.scorePercent) }}%
+                </span>
             </div>
 
             <!-- Right: filled triangle matching legacy -->
@@ -41,6 +55,7 @@
                 :response="getResponse(q.questionId)"
                 :display-order="idx + 1"
                 :disabled="disabled"
+                :is-repeat-finding="store.repeatFindingQuestionIds.has(q.questionId)"
             />
         </div>
     </div>
@@ -49,7 +64,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import type { TemplateSectionDto } from '@/apiclient/auditClient';
-import { useAuditStore, type ResponseState } from '@/modules/audit-management/stores/auditStore';
+import { useAuditStore, calculateScore, type ResponseState } from '@/modules/audit-management/stores/auditStore';
 import AuditQuestionRow from './AuditQuestionRow.vue';
 
 const props = withDefaults(defineProps<{
@@ -73,6 +88,8 @@ const EMPTY_RESPONSE: ResponseState = {
     allowNA: true,
     requireCommentOnNC: false,
     isScoreable: true,
+    requirePhotoOnNc: false,
+    autoCreateCa: false,
 };
 
 function getResponse(questionId: number): ResponseState {
@@ -92,6 +109,14 @@ const ncCount = computed(() =>
         return r?.status === 'NonConforming';
     }).length,
 );
+
+/** Live section score using the same calculateScore engine as the rest of the app. */
+const sectionScore = computed(() => {
+    const sectionResponses = props.section.questions
+        .map(q => store.responses.get(q.questionId))
+        .filter((r): r is ResponseState => r != null);
+    return calculateScore(sectionResponses);
+});
 
 function toggleOpen() {
     isOpen.value = !isOpen.value;

@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Stronghold.AppDashboard.Api.Domain.ReferenceData;

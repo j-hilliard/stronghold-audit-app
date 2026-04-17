@@ -12,6 +12,12 @@
             <!-- Cover-specific -->
             <template v-if="block.type === 'cover'">
 
+                <!-- ── Template picker ───────────────────────────────────── -->
+                <button @click="showTemplateGallery = true"
+                    class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-700 hover:bg-blue-600 text-white text-xs font-semibold rounded transition-colors">
+                    <i class="pi pi-th-large" /> Choose Template
+                </button>
+
                 <!-- ── Size & spacing ─────────────────────────────────────── -->
                 <div class="space-y-1">
                     <label class="block text-xs text-slate-400">Block Height</label>
@@ -152,6 +158,256 @@
                         <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
                             :class="block.content.showDecorativeRules !== false ? 'translate-x-4' : 'translate-x-1'" />
                     </button>
+                </div>
+
+            </template>
+
+            <!-- ── Full Cover Page (cover-page block) ───────────────────── -->
+            <template v-if="block.type === 'cover-page'">
+
+                <!-- Template -->
+                <div class="space-y-2">
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 pb-1">Template</div>
+                    <button
+                        @click="showCoverPagePicker = true"
+                        class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-700 hover:bg-blue-600 text-white text-xs font-semibold rounded transition-colors focus-visible:ring-2 focus-visible:ring-blue-400"
+                    >
+                        <i class="pi pi-th-large" /> Change Template
+                    </button>
+                    <div class="text-[10px] text-slate-500 text-center">{{ block.content.templateId }}</div>
+                </div>
+
+                <!-- Theme overrides -->
+                <div class="space-y-2">
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 pb-1">Theme Overrides</div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="space-y-1">
+                            <label class="block text-[10px] text-slate-400">Background</label>
+                            <div class="flex items-center gap-1.5">
+                                <input type="color"
+                                    :value="block.content.primaryColor || '#0f1e36'"
+                                    @input="updateContent({ ...block.content, primaryColor: ($event.target as HTMLInputElement).value })"
+                                    class="w-7 h-7 rounded border border-slate-600 cursor-pointer bg-transparent p-0.5"
+                                    aria-label="Background color override"
+                                />
+                                <button v-if="block.content.primaryColor"
+                                    @click="updateContent({ ...block.content, primaryColor: undefined })"
+                                    class="text-slate-500 hover:text-slate-300 text-[10px]"
+                                    aria-label="Reset background color">Reset</button>
+                            </div>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="block text-[10px] text-slate-400">Accent</label>
+                            <div class="flex items-center gap-1.5">
+                                <input type="color"
+                                    :value="block.content.accentColor || '#f59e0b'"
+                                    @input="updateContent({ ...block.content, accentColor: ($event.target as HTMLInputElement).value })"
+                                    class="w-7 h-7 rounded border border-slate-600 cursor-pointer bg-transparent p-0.5"
+                                    aria-label="Accent color override"
+                                />
+                                <button v-if="block.content.accentColor"
+                                    @click="updateContent({ ...block.content, accentColor: undefined })"
+                                    class="text-slate-500 hover:text-slate-300 text-[10px]"
+                                    aria-label="Reset accent color">Reset</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Content -->
+                <div class="space-y-2">
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 pb-1">Content</div>
+                    <div class="space-y-1">
+                        <label class="block text-[10px] text-slate-400">Subtitle</label>
+                        <input type="text" :value="block.content.reportSubtitle ?? ''"
+                            @input="updateContent({ ...block.content, reportSubtitle: ($event.target as HTMLInputElement).value || undefined })"
+                            placeholder="Annual Compliance Review"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-[10px] text-slate-400">Tagline</label>
+                        <input type="text" :value="block.content.tagline ?? ''"
+                            @input="updateContent({ ...block.content, tagline: ($event.target as HTMLInputElement).value || undefined })"
+                            placeholder="A Year in Review"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-[10px] text-slate-400">Summary Text</label>
+                        <textarea :value="block.content.summaryText ?? ''"
+                            @input="updateContent({ ...block.content, summaryText: ($event.target as HTMLTextAreaElement).value || undefined })"
+                            rows="3" placeholder="Sidebar intro text…"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500 resize-none" />
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-[10px] text-slate-400">Locations</label>
+                        <input type="text" :value="block.content.locationsText ?? ''"
+                            @input="updateContent({ ...block.content, locationsText: ($event.target as HTMLInputElement).value || undefined })"
+                            placeholder="TX · OK · AR"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+                    </div>
+                </div>
+
+                <!-- Modules -->
+                <div class="space-y-2">
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 pb-1">Modules</div>
+                    <div v-for="(toggle, i) in ([
+                        { key: 'showStats',      label: 'Stats Row' },
+                        { key: 'showCallout',    label: 'Callout Box' },
+                        { key: 'showLocations',  label: 'Locations' },
+                        { key: 'showMap',        label: 'Map' },
+                        { key: 'showHighlights', label: 'Highlights' },
+                        { key: 'showAward',      label: 'Award' },
+                    ] as const)" :key="i"
+                        class="flex items-center justify-between">
+                        <span class="text-xs text-slate-300">{{ toggle.label }}</span>
+                        <button
+                            @click="updateContent({ ...block.content, [toggle.key]: !(block.content as any)[toggle.key] })"
+                            :aria-label="`Toggle ${toggle.label}`"
+                            class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 shrink-0"
+                            :class="(block.content as any)[toggle.key] ? 'bg-blue-600' : 'bg-slate-600'"
+                        >
+                            <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                                :class="(block.content as any)[toggle.key] ? 'translate-x-4' : 'translate-x-1'" />
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Images -->
+                <div class="space-y-2">
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 pb-1">Images</div>
+                    <div class="space-y-1">
+                        <label class="block text-[10px] text-slate-400">Hero Image URL</label>
+                        <input type="text" :value="block.content.heroImageUrl ?? ''"
+                            @input="updateContent({ ...block.content, heroImageUrl: ($event.target as HTMLInputElement).value || undefined })"
+                            placeholder="https://…"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-[10px] text-slate-400">Chart Image URL</label>
+                        <input type="text" :value="block.content.chartImageUrl ?? ''"
+                            @input="updateContent({ ...block.content, chartImageUrl: ($event.target as HTMLInputElement).value || undefined })"
+                            placeholder="https://…"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-[10px] text-slate-400">Map Image URL</label>
+                        <input type="text" :value="block.content.mapImageUrl ?? ''"
+                            @input="updateContent({ ...block.content, mapImageUrl: ($event.target as HTMLInputElement).value || undefined })"
+                            placeholder="https://…"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+                    </div>
+                </div>
+
+                <!-- Stats editor -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between border-b border-slate-700 pb-1">
+                        <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Stats</div>
+                        <button
+                            v-if="block.content.stats.length < 6"
+                            @click="updateContent({ ...block.content, stats: [...block.content.stats, { label: 'Label', value: '—' }] })"
+                            class="text-blue-400 hover:text-blue-300 text-xs focus-visible:ring-1 focus-visible:ring-blue-400 rounded px-1"
+                            aria-label="Add stat"
+                        >+ Add</button>
+                    </div>
+                    <div v-for="(stat, si) in block.content.stats" :key="si" class="space-y-1 p-2 bg-slate-700/40 rounded">
+                        <div class="flex gap-1">
+                            <input type="text" :value="stat.value"
+                                @input="updateContent({ ...block.content, stats: block.content.stats.map((s: CoverStat, j: number) => j === si ? { ...s, value: ($event.target as HTMLInputElement).value } : s) })"
+                                placeholder="Value"
+                                class="w-1/3 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                                :aria-label="`Stat ${si + 1} value`"
+                            />
+                            <input type="text" :value="stat.label"
+                                @input="updateContent({ ...block.content, stats: block.content.stats.map((s: CoverStat, j: number) => j === si ? { ...s, label: ($event.target as HTMLInputElement).value } : s) })"
+                                placeholder="Label"
+                                class="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                                :aria-label="`Stat ${si + 1} label`"
+                            />
+                            <button
+                                @click="updateContent({ ...block.content, stats: block.content.stats.filter((_: CoverStat, j: number) => j !== si) })"
+                                class="text-slate-500 hover:text-red-400 px-1 text-xs focus-visible:ring-1 focus-visible:ring-red-400 rounded"
+                                :aria-label="`Remove stat ${si + 1}`"
+                            ><i class="pi pi-times" /></button>
+                        </div>
+                        <label class="flex items-center gap-2 text-[10px] text-slate-400 cursor-pointer">
+                            <input type="checkbox" :checked="!!stat.accent"
+                                @change="updateContent({ ...block.content, stats: block.content.stats.map((s: CoverStat, j: number) => j === si ? { ...s, accent: ($event.target as HTMLInputElement).checked } : s) })"
+                                class="rounded" :aria-label="`Stat ${si + 1} accent color`"
+                            /> Accent color
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Callout editor (shown when callout module is on) -->
+                <div v-if="block.content.showCallout" class="space-y-2">
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 pb-1">Callout</div>
+                    <div class="space-y-1">
+                        <label class="block text-[10px] text-slate-400">Headline</label>
+                        <input type="text" :value="block.content.calloutTitle ?? ''"
+                            @input="updateContent({ ...block.content, calloutTitle: ($event.target as HTMLInputElement).value || undefined })"
+                            placeholder="Callout headline"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-[10px] text-slate-400">Body</label>
+                        <textarea :value="block.content.calloutBody ?? ''"
+                            @input="updateContent({ ...block.content, calloutBody: ($event.target as HTMLTextAreaElement).value || undefined })"
+                            rows="3" placeholder="Supporting detail…"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500 resize-none" />
+                    </div>
+                </div>
+
+                <!-- Award editor (shown when award module is on) -->
+                <div v-if="block.content.showAward" class="space-y-2">
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 pb-1">Award</div>
+                    <div class="space-y-1">
+                        <label class="block text-[10px] text-slate-400">Title</label>
+                        <input type="text" :value="block.content.awardTitle ?? ''"
+                            @input="updateContent({ ...block.content, awardTitle: ($event.target as HTMLInputElement).value || undefined })"
+                            placeholder="Award title"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500" />
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-[10px] text-slate-400">Description</label>
+                        <textarea :value="block.content.awardDescription ?? ''"
+                            @input="updateContent({ ...block.content, awardDescription: ($event.target as HTMLTextAreaElement).value || undefined })"
+                            rows="2" placeholder="Award description"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500 resize-none" />
+                    </div>
+                </div>
+
+                <!-- Highlights editor (shown when highlights module is on) -->
+                <div v-if="block.content.showHighlights" class="space-y-2">
+                    <div class="flex items-center justify-between border-b border-slate-700 pb-1">
+                        <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Highlights</div>
+                        <button
+                            v-if="block.content.highlights.length < 5"
+                            @click="updateContent({ ...block.content, highlights: [...block.content.highlights, { icon: 'pi pi-check-circle', text: 'Highlight' }] })"
+                            class="text-blue-400 hover:text-blue-300 text-xs focus-visible:ring-1 focus-visible:ring-blue-400 rounded px-1"
+                            aria-label="Add highlight"
+                        >+ Add</button>
+                    </div>
+                    <div v-for="(h, hi) in block.content.highlights" :key="hi" class="space-y-1 p-2 bg-slate-700/40 rounded">
+                        <div class="flex gap-1">
+                            <input type="text" :value="h.icon"
+                                @input="updateContent({ ...block.content, highlights: block.content.highlights.map((x: CoverHighlight, j: number) => j === hi ? { ...x, icon: ($event.target as HTMLInputElement).value } : x) })"
+                                placeholder="pi pi-check-circle"
+                                class="w-2/5 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                                :aria-label="`Highlight ${hi + 1} icon`"
+                            />
+                            <input type="text" :value="h.text"
+                                @input="updateContent({ ...block.content, highlights: block.content.highlights.map((x: CoverHighlight, j: number) => j === hi ? { ...x, text: ($event.target as HTMLInputElement).value } : x) })"
+                                placeholder="Highlight text"
+                                class="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                                :aria-label="`Highlight ${hi + 1} text`"
+                            />
+                            <button
+                                @click="updateContent({ ...block.content, highlights: block.content.highlights.filter((_: CoverHighlight, j: number) => j !== hi) })"
+                                class="text-slate-500 hover:text-red-400 px-1 text-xs focus-visible:ring-1 focus-visible:ring-red-400 rounded"
+                                :aria-label="`Remove highlight ${hi + 1}`"
+                            ><i class="pi pi-times" /></button>
+                        </div>
+                    </div>
                 </div>
 
             </template>
@@ -703,10 +959,51 @@
             </div>
         </div>
     </div>
+
+    <!-- Cover template gallery modal (existing cover block) -->
+    <CoverTemplateGallery
+        v-if="block?.type === 'cover'"
+        v-model="showTemplateGallery"
+        :current-content="(block as any).content"
+        @apply="applyPreset"
+    />
+
+    <!-- Cover-page template picker modal (full-page cover-page block) -->
+    <CoverPageTemplatePicker
+        v-if="block?.type === 'cover-page'"
+        v-model="showCoverPagePicker"
+        :current-template-id="(block as any).content.templateId"
+        @apply="(id: string) => updateContent({ ...(block as any).content, templateId: id })"
+    />
 </template>
 
 <script setup lang="ts">
-import type { ReportBlock, BlockStyle, BlockLayout, BlockType, KpiCard } from '../types/report-block';
+import { ref } from 'vue';
+import type { ReportBlock, BlockStyle, BlockLayout, BlockType, KpiCard, CoverContent, CoverPageContent, CoverStat, CoverHighlight } from '../types/report-block';
+import CoverTemplateGallery from './CoverTemplateGallery.vue';
+import CoverPageTemplatePicker from './CoverPageTemplatePicker.vue';
+
+// ── Cover template gallery (existing cover block) ─────────────────────────────
+const showTemplateGallery = ref(false);
+
+// ── Cover-page template picker (full-page cover-page block) ──────────────────
+const showCoverPagePicker = ref(false);
+
+function applyPreset(preset: Partial<CoverContent>) {
+    if (!props.block || props.block.type !== 'cover') return;
+    const content = props.block.content;
+    // Merge preset visual properties; always preserve the text/identity fields
+    updateContent({
+        ...content,
+        ...preset,
+        divisionName: content.divisionName,
+        divisionCode: content.divisionCode,
+        period: content.period,
+        preparedBy: content.preparedBy,
+        subtitle: content.subtitle,
+        tagline: content.tagline,
+    });
+}
 
 /** Convert a local file to a base64 data-URL so it can be stored in the draft. */
 function onImageUpload(event: Event, callback: (url: string) => void) {
@@ -814,6 +1111,7 @@ function updateTocItem(block: ReportBlock, index: number, field: 'heading' | 'de
 function blockLabel(type: BlockType): string {
     const labels: Record<BlockType, string> = {
         'cover':        'Cover Page',
+        'cover-page':   'Full Cover Page',
         'heading':      'Heading',
         'kpi-grid':     'KPI Cards',
         'chart-bar':    'Bar Chart',

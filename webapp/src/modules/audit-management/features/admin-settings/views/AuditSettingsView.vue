@@ -2,7 +2,7 @@
     <div>
         <BasePageHeader
             title="Admin Settings"
-            subtitle="Email routing and user role assignments for the audit module"
+            subtitle="Email routing, user role assignments, and division score targets"
             icon="pi pi-cog"
         />
 
@@ -183,6 +183,99 @@
                 </div>
             </div>
 
+            <!-- ── SCORE TARGETS TAB ── -->
+            <template v-else-if="activeTab === 'targets'">
+                <div class="flex items-center justify-between mb-4">
+                    <p class="text-slate-400 text-sm flex-1">
+                        Set a compliance score target (0–100%) per division. This target appears in the audit review
+                        page benchmark card and turns the score indicator green/red.
+                        Leave blank to disable for that division.
+                    </p>
+                </div>
+
+                <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-700 text-slate-400 text-xs uppercase tracking-wide">
+                                <th class="px-4 py-2 text-left">Division</th>
+                                <th class="px-4 py-2 text-left">Code</th>
+                                <th class="px-4 py-2 text-center w-40">Score Target (%)</th>
+                                <th class="px-4 py-2 w-24 text-center">Target</th>
+                                <th class="px-4 py-2 text-center w-44">Audit Frequency (days)</th>
+                                <th class="px-4 py-2 w-24 text-center">Frequency</th>
+                                <th class="px-4 py-2 text-center w-44" title="Require at least one photo when closing a corrective action">Require Closure Photo</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-700/50">
+                            <tr
+                                v-for="row in targetRows"
+                                :key="row.divisionId"
+                                class="hover:bg-slate-700/30 transition-colors"
+                            >
+                                <td class="px-4 py-2 text-slate-200">{{ row.divisionName }}</td>
+                                <td class="px-4 py-2 text-slate-400 font-mono text-xs">{{ row.divisionCode }}</td>
+                                <td class="px-4 py-2 text-center">
+                                    <input
+                                        v-model.number="row.pendingTarget"
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        step="1"
+                                        placeholder="—"
+                                        class="w-20 text-center bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                                    />
+                                    <span class="text-slate-400 ml-1 text-xs">%</span>
+                                </td>
+                                <td class="px-4 py-2 text-center">
+                                    <button
+                                        @click="saveTarget(row)"
+                                        :disabled="row.saving || row.pendingTarget === (row.scoreTarget ?? null)"
+                                        class="px-3 py-1 text-xs bg-blue-700 hover:bg-blue-600 text-white rounded disabled:opacity-40 transition-colors"
+                                    >
+                                        {{ row.saving ? 'Saving…' : 'Save' }}
+                                    </button>
+                                </td>
+                                <td class="px-4 py-2 text-center">
+                                    <input
+                                        v-model.number="row.pendingFrequency"
+                                        type="number"
+                                        min="1"
+                                        step="1"
+                                        placeholder="—"
+                                        class="w-20 text-center bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                                    />
+                                    <span class="text-slate-400 ml-1 text-xs">days</span>
+                                </td>
+                                <td class="px-4 py-2 text-center">
+                                    <button
+                                        @click="saveFrequency(row)"
+                                        :disabled="row.savingFrequency || (row.pendingFrequency ?? null) === (row.auditFrequencyDays ?? null)"
+                                        class="px-3 py-1 text-xs bg-blue-700 hover:bg-blue-600 text-white rounded disabled:opacity-40 transition-colors"
+                                    >
+                                        {{ row.savingFrequency ? 'Saving…' : 'Save' }}
+                                    </button>
+                                </td>
+                                <td class="px-4 py-2 text-center">
+                                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            :checked="row.requireClosurePhoto"
+                                            :disabled="row.savingClosurePhoto"
+                                            class="w-4 h-4 accent-blue-500 cursor-pointer"
+                                            @change="toggleClosurePhoto(row, ($event.target as HTMLInputElement).checked)"
+                                        />
+                                        <span class="text-xs text-slate-400">{{ row.savingClosurePhoto ? 'Saving…' : '' }}</span>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr v-if="!targetRows.length">
+                                <td colspan="7" class="px-4 py-6 text-center text-slate-500 italic">Loading divisions…</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </template>
+
             <!-- ── USER ROLES TAB ── -->
             <template v-else-if="activeTab === 'roles'">
                 <div class="flex items-center justify-between mb-4">
@@ -240,16 +333,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import { useAdminStore } from '../../../stores/adminStore';
 import type { EmailRoutingRuleUpsertDto } from '@/apiclient/auditClient';
+import { AuditClient } from '@/apiclient/auditClient';
+import { useApiStore } from '@/stores/apiStore';
+import { useToast } from 'primevue/usetoast';
 
 const adminStore = useAdminStore();
+const apiStore = useApiStore();
+const toast = useToast();
+
+function getClient() {
+    return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
+}
 
 const TABS = [
-    { key: 'email', label: 'Email Routing' },
-    { key: 'roles', label: 'User Roles' },
+    { key: 'email',   label: 'Email Routing' },
+    { key: 'targets', label: 'Score Targets' },
+    { key: 'roles',   label: 'User Roles' },
 ] as const;
 type TabKey = typeof TABS[number]['key'];
 const activeTab = ref<TabKey>('email');
@@ -303,6 +406,101 @@ const selectedDivisionCode = ref<string>('');
 const activeDivisionGroup = computed(() =>
     divisionGroups.value.find(g => g.divisionCode === selectedDivisionCode.value) ?? null
 );
+
+// ── Score Targets ──────────────────────────────────────────────────────────────
+
+interface TargetRow {
+    divisionId: number;
+    divisionCode: string;
+    divisionName: string;
+    scoreTarget: number | null;
+    /** Input-bound value — starts equal to scoreTarget */
+    pendingTarget: number | null | undefined;
+    auditFrequencyDays: number | null;
+    pendingFrequency: number | null | undefined;
+    savingFrequency: boolean;
+    saving: boolean;
+    requireClosurePhoto: boolean;
+    savingClosurePhoto: boolean;
+}
+
+const targetRows = ref<TargetRow[]>([]);
+
+async function loadScoreTargets() {
+    try {
+        const dtos = await getClient().getDivisionScoreTargets();
+        targetRows.value = dtos.map(d => ({
+            divisionId:         d.divisionId,
+            divisionCode:       d.divisionCode,
+            divisionName:       d.divisionName,
+            scoreTarget:        d.scoreTarget ?? null,
+            pendingTarget:      d.scoreTarget ?? null,
+            auditFrequencyDays: d.auditFrequencyDays ?? null,
+            pendingFrequency:   d.auditFrequencyDays ?? null,
+            savingFrequency:    false,
+            saving:             false,
+            requireClosurePhoto:  d.requireClosurePhoto ?? false,
+            savingClosurePhoto:   false,
+        }));
+    } catch {
+        // Non-fatal — tab will show "Loading divisions…"
+    }
+}
+
+async function saveTarget(row: TargetRow) {
+    row.saving = true;
+    try {
+        // Convert empty string / undefined from number input to null
+        const val = row.pendingTarget != null && !Number.isNaN(Number(row.pendingTarget))
+            ? Number(row.pendingTarget)
+            : null;
+        const dto = await getClient().setDivisionScoreTarget(row.divisionId, val);
+        row.scoreTarget = dto.scoreTarget ?? null;
+        row.pendingTarget = dto.scoreTarget ?? null;
+        toast.add({ severity: 'success', summary: 'Saved', detail: `${row.divisionCode} target updated.`, life: 2500 });
+    } catch {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Could not save score target.', life: 4000 });
+    } finally {
+        row.saving = false;
+    }
+}
+
+async function saveFrequency(row: TargetRow) {
+    row.savingFrequency = true;
+    try {
+        const val = row.pendingFrequency != null && !Number.isNaN(Number(row.pendingFrequency)) && Number(row.pendingFrequency) > 0
+            ? Number(row.pendingFrequency)
+            : null;
+        const dto = await getClient().setDivisionAuditFrequency(row.divisionId, val);
+        row.auditFrequencyDays = dto.auditFrequencyDays ?? null;
+        row.pendingFrequency = dto.auditFrequencyDays ?? null;
+        toast.add({ severity: 'success', summary: 'Saved', detail: `${row.divisionCode} audit frequency updated.`, life: 2500 });
+    } catch {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Could not save audit frequency.', life: 4000 });
+    } finally {
+        row.savingFrequency = false;
+    }
+}
+
+async function toggleClosurePhoto(row: TargetRow, value: boolean) {
+    row.savingClosurePhoto = true;
+    try {
+        const dto = await getClient().setDivisionRequireClosurePhoto(row.divisionId, value);
+        row.requireClosurePhoto = dto.requireClosurePhoto ?? false;
+        toast.add({ severity: 'success', summary: 'Saved', detail: `${row.divisionCode} closure photo requirement ${value ? 'enabled' : 'disabled'}.`, life: 2500 });
+    } catch {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Could not save closure photo setting.', life: 4000 });
+    } finally {
+        row.savingClosurePhoto = false;
+    }
+}
+
+// Load score targets the first time the tab is clicked
+watch(activeTab, (tab) => {
+    if (tab === 'targets' && targetRows.value.length === 0) {
+        loadScoreTargets();
+    }
+});
 
 onMounted(async () => {
     await Promise.all([

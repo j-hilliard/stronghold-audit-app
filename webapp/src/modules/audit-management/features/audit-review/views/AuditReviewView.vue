@@ -184,6 +184,41 @@
                 </template>
             </Card>
 
+            <!-- Benchmark comparison card -->
+            <Card v-if="review.divisionAvgScore != null || review.divisionScoreTarget != null">
+                <template #title>
+                    <span class="text-base font-semibold text-white">Division Benchmark</span>
+                </template>
+                <template #content>
+                    <div class="flex flex-wrap gap-3 items-stretch text-sm">
+                        <!-- Division avg -->
+                        <div class="flex flex-col items-center bg-slate-700/60 border border-slate-600 rounded-lg px-4 py-2 min-w-20">
+                            <span class="text-xl font-bold text-slate-200">
+                                {{ review.divisionAvgScore != null ? `${review.divisionAvgScore.toFixed(1)}%` : '—' }}
+                            </span>
+                            <span class="text-xs text-slate-400 mt-0.5">Div Avg (last 10)</span>
+                        </div>
+                        <!-- Target -->
+                        <div v-if="review.divisionScoreTarget != null" class="flex flex-col items-center bg-slate-700/60 border border-slate-600 rounded-lg px-4 py-2 min-w-20">
+                            <span class="text-xl font-bold text-slate-200">{{ review.divisionScoreTarget }}%</span>
+                            <span class="text-xs text-slate-400 mt-0.5">Target</span>
+                        </div>
+                        <!-- This audit vs target -->
+                        <div
+                            v-if="review.scorePercent != null"
+                            class="flex flex-col items-center border rounded-lg px-4 py-2 min-w-20"
+                            :class="benchmarkStatusClass"
+                        >
+                            <span class="text-xl font-bold">{{ scoreDisplay }}</span>
+                            <span class="text-xs mt-0.5">This Audit</span>
+                            <span v-if="review.divisionScoreTarget != null" class="text-xs font-semibold mt-0.5">
+                                {{ review.scorePercent >= Number(review.divisionScoreTarget) ? '✓ Above Target' : '✗ Below Target' }}
+                            </span>
+                        </div>
+                    </div>
+                </template>
+            </Card>
+
             <!-- Audit header info -->
             <Card v-if="review.header">
                 <template #title>
@@ -226,10 +261,19 @@
                         >
                             <!-- Finding header -->
                             <div class="flex items-start justify-between gap-2">
-                                <p class="text-sm text-slate-200 flex-1">
-                                    <span class="text-slate-500 mr-1">{{ idx + 1 }}.</span>
-                                    {{ item.questionText }}
-                                </p>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm text-slate-200">
+                                        <span class="text-slate-500 mr-1">{{ idx + 1 }}.</span>
+                                        {{ item.questionText }}
+                                    </p>
+                                    <span
+                                        v-if="repeatFindingIdSet.has(item.questionId)"
+                                        class="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold bg-amber-900/50 border border-amber-700/60 text-amber-300 rounded px-1.5 py-0.5"
+                                    >
+                                        <i class="pi pi-exclamation-circle text-[9px]" />
+                                        Repeat Finding
+                                    </span>
+                                </div>
                                 <div class="flex items-center gap-2 shrink-0">
                                     <span v-if="item.correctedOnSite" class="text-xs bg-emerald-900 border border-emerald-700 text-emerald-300 rounded px-1.5 py-0.5">Corrected On-Site</span>
                                     <span v-else class="text-xs bg-slate-700 border border-slate-600 text-slate-400 rounded px-1.5 py-0.5">Not Corrected</span>
@@ -436,6 +480,9 @@ const saving = ref(false);
 const showFullRecord = ref(false);
 const showAiSummary = ref(true); // expanded by default
 
+/** O(1) set for repeat-finding badge lookups */
+const repeatFindingIdSet = computed(() => new Set(review.value?.repeatFindingQuestionIds ?? []));
+
 // ── Assign modal ──────────────────────────────────────────────────────────────
 const showAssign = ref(false);
 const assignTarget = ref<AuditFindingDto | null>(null);
@@ -581,6 +628,16 @@ const ringColor = computed(() => {
     if (pct >= 90) return '#34d399';
     if (pct >= 75) return '#fbbf24';
     return '#f87171';
+});
+
+const benchmarkStatusClass = computed(() => {
+    const pct = review.value?.scorePercent;
+    const target = review.value?.divisionScoreTarget;
+    if (pct == null) return 'bg-slate-700/60 border-slate-600 text-slate-300';
+    if (target == null) return 'bg-slate-700/60 border-slate-600 text-slate-300';
+    return pct >= Number(target)
+        ? 'bg-emerald-900/50 border-emerald-700 text-emerald-300'
+        : 'bg-red-900/50 border-red-700 text-red-300';
 });
 
 function caSeverity(status: string): string {

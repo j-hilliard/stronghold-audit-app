@@ -159,6 +159,8 @@ public class AuditReviewDto
 public class AuditFindingDto
 {
     public int Id { get; set; }
+    /// <summary>AuditQuestion.Id — used to cross-reference repeat finding badges.</summary>
+    public int QuestionId { get; set; }
     public string QuestionText { get; set; } = null!;
     public string? Comment { get; set; }
     public bool CorrectedOnSite { get; set; }
@@ -192,7 +194,8 @@ public class EmailRoutingDto
 public class CorrectiveActionDto
 {
     public int Id { get; set; }
-    public int FindingId { get; set; }
+    /// <summary>Nullable — auto-generated CAs may not be linked to a specific finding.</summary>
+    public int? FindingId { get; set; }
     public int? AuditId { get; set; }
     public string Description { get; set; } = null!;
     public string? AssignedTo { get; set; }
@@ -216,6 +219,29 @@ public class CloseCorrectiveActionRequest
 {
     public string Notes { get; set; } = null!;
     public string? CompletedDate { get; set; }
+}
+
+public class UpdateCorrectiveActionRequest
+{
+    public string? Description      { get; set; }
+    public string? AssignedTo       { get; set; }
+    public int?    AssignedToUserId { get; set; }
+    /// <summary>ISO "YYYY-MM-DD". Send empty string to clear the due date.</summary>
+    public string? DueDate          { get; set; }
+}
+
+public class BulkUpdateCorrectiveActionsRequest
+{
+    public List<int> CorrectiveActionIds { get; set; } = new();
+    /// <summary>"status" | "reassign"</summary>
+    public string Action { get; set; } = null!;
+    /// <summary>For action="status": "InProgress" | "Closed" | "Voided"</summary>
+    public string? NewStatus { get; set; }
+    /// <summary>Required when NewStatus="Closed"</summary>
+    public string? ClosureNotes { get; set; }
+    /// <summary>For action="reassign"</summary>
+    public string? NewAssignee { get; set; }
+    public int?    NewAssigneeUserId { get; set; }
 }
 
 // ── Report / KPI ──────────────────────────────────────────────────────────────

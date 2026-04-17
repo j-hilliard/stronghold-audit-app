@@ -14,6 +14,7 @@
 
 export type BlockType =
     | 'cover'
+    | 'cover-page'
     | 'heading'
     | 'kpi-grid'
     | 'chart-bar'
@@ -132,6 +133,16 @@ export interface CoverContent {
      * Set to false to remove the lines entirely.
      */
     showDecorativeRules?: boolean;
+    /**
+     * Cover layout variant. Controls the structural arrangement of the cover.
+     *   'classic'    — bottom-left text, rules, dark bg (default)
+     *   'centered'   — vertically & horizontally centered, dark bg
+     *   'top-left'   — text anchored to top-left, dark bg
+     *   'stripe-side'— thick left accent bar, content bottom-left
+     *   'minimal'    — light bg, dark text, clean underline
+     *   'bold-full'  — oversized centered title, no decorative elements
+     */
+    layoutVariant?: 'classic' | 'centered' | 'top-left' | 'stripe-side' | 'minimal' | 'bold-full';
 }
 
 export interface CoverBlock extends ReportBlockBase {
@@ -448,10 +459,70 @@ export interface FindingsCategoryBlock extends ReportBlockBase {
     content: FindingsCategoryContent;
 }
 
+// ── CoverPage (full 794×1123px newsletter-style page) ────────────────────────
+//
+// Completely separate from the lightweight `cover` block.
+// Uses its own template registry (cover-template.ts) and normalizer.
+// BlockStyle.backgroundColor is intentionally unused for cover-page blocks.
+
+export interface CoverStat {
+    label: string;
+    value: string;
+    /** When true, the stat value is rendered in the accent color */
+    accent?: boolean;
+}
+
+export interface CoverHighlight {
+    /** PrimeIcons class, e.g. 'pi pi-check-circle' */
+    icon: string;
+    text: string;
+}
+
+export interface CoverPageContent {
+    /** Schema version for future migrations. Current: 1 */
+    schemaVersion?: number;
+    /** References a CoverTemplateDefinition.id from COVER_PAGE_TEMPLATES */
+    templateId: string;
+    divisionName: string;
+    year: string;
+    reportSubtitle?: string;
+    preparedBy?: string;
+    period?: string;
+    tagline?: string;
+    summaryText?: string;
+    locationsText?: string;
+    heroImageUrl?: string;
+    chartImageUrl?: string;
+    mapImageUrl?: string;
+    // ── Module visibility toggles ─────────────────────────────────────────────
+    showStats: boolean;
+    showCallout: boolean;
+    showMap: boolean;
+    showLocations: boolean;
+    showAward: boolean;
+    showHighlights: boolean;
+    // ── Content data ──────────────────────────────────────────────────────────
+    stats: CoverStat[];
+    calloutTitle?: string;
+    calloutBody?: string;
+    awardTitle?: string;
+    awardDescription?: string;
+    highlights: CoverHighlight[];
+    // ── Optional theme overrides (applied on top of template theme) ───────────
+    primaryColor?: string;
+    accentColor?: string;
+}
+
+export interface CoverPageBlock extends ReportBlockBase {
+    type: 'cover-page';
+    content: CoverPageContent;
+}
+
 // ── Discriminated union ───────────────────────────────────────────────────────
 
 export type ReportBlock =
     | CoverBlock
+    | CoverPageBlock
     | HeadingBlock
     | KpiGridBlock
     | BarChartBlock

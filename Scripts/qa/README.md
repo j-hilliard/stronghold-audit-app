@@ -2,7 +2,27 @@
 
 ## Files
 - `Invoke-QAGate.ps1`: Runs baseline/full/PR/pre-merge/pre-release QA gates and stores artifacts.
+- `Invoke-CodexAgentCycle.ps1`: Runs Codex-owned test/improvement cycle based on changed file scope.
+- `Invoke-EfCodeFirstGuard.ps1`: EF Core code-first guard checks and report generation.
+- `Start-CodexAgentWatch.ps1`: Starts background watcher that auto-runs Codex cycle on file changes.
+- `Run-CodexAgentWatch.ps1`: Worker loop for watcher process.
+- `Stop-CodexAgentWatch.ps1`: Stops background watcher process.
 - `Verify-ProcessLogs.sql`: SQL query to validate logging records for live-gate verification.
+
+## Strict Auto-Cycle Behavior (Default)
+- Watcher defaults are aggressive: `PollSeconds=1`, `DebounceSeconds=3`.
+- Strict mode is enabled by default.
+- On relevant frontend changes, strict mode runs:
+  - `qa:baseline`
+  - `test:e2e:audit:template-gate`
+  - `test:e2e:audit:parity`
+  - `test:e2e:audit:composer-gate`
+  - `test:e2e:audit:reporting-gate`
+  - `webapp` build
+- On relevant backend/data changes, strict mode runs:
+  - EF code-first guard
+  - backend build
+- Every strict cycle also runs an isolation guard that fails if any Codex-owned files reference `.claude/*`.
 
 ## Typical Usage
 ```powershell
@@ -25,9 +45,42 @@ cmd /c "npm --prefix webapp run test:e2e:audit:template-gate"
 
 # Standalone KPI/reporting contract checks
 $env:PW_AUDIT_REPORTING_GATE = 'true'
+$env:PW_AUDIT_COMPOSER_GATE = 'true'
 cmd /c "npm --prefix webapp run test:e2e:audit:reporting-gate"
+
+# Standalone composer contract checks
+$env:PW_AUDIT_COMPOSER_GATE = 'true'
+cmd /c "npm --prefix webapp run test:e2e:audit:composer-gate"
+
+# Run one Codex cycle manually with explicit files
+.\Scripts\qa\Invoke-CodexAgentCycle.ps1 -ChangedFiles @(
+  'webapp/src/modules/audit-management/features/reports/views/ReportsView.vue',
+  'Data/AppDbContext.cs'
+) -Reason 'manual-check'
+
+# Run one Codex cycle in non-strict mode
+.\Scripts\qa\Invoke-CodexAgentCycle.ps1 -ChangedFiles @('webapp/src/main.ts') -Strict:$false
+
+# Start auto watcher in background
+.\Scripts\qa\Start-CodexAgentWatch.ps1
+
+# Start auto watcher in foreground (for active terminal diagnostics)
+.\Scripts\qa\Start-CodexAgentWatch.ps1 -Foreground
+
+# Start watcher and force all suites on every detected change cycle
+.\Scripts\qa\Start-CodexAgentWatch.ps1 -RunAllSuites
+
+# Start watcher in non-strict mode (rarely needed)
+.\Scripts\qa\Start-CodexAgentWatch.ps1 -Strict:$false
+
+# Stop watcher
+.\Scripts\qa\Stop-CodexAgentWatch.ps1
 ```
 
 ## Output
 - All gate logs, Playwright report, traces/screenshots/videos, and test results are saved under:
   - `qa-artifacts/<timestamp>-<gate>/`
+- Auto-cycle reports are saved under:
+  - `qa-runtime/reports/agent-cycles/<timestamp>/`
+  - `qa-runtime/reports/ef-guard/`
+  - `qa-runtime/agent-watch/logs/`

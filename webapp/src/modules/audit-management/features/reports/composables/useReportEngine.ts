@@ -21,11 +21,12 @@ import { AuditClient } from '@/apiclient/auditClient';
 import type { AuditReportDto, SectionTrendsReportDto } from '@/apiclient/auditClient';
 import type {
     ReportBlock, BlockStyle, BlockLayout,
-    CoverBlock, HeadingBlock, KpiGridBlock,
+    CoverBlock, CoverPageBlock, HeadingBlock, KpiGridBlock,
     BarChartBlock, LineChartBlock, NarrativeBlock,
     CalloutBlock, CaTableBlock,
     KpiCard, CaTableRow,
 } from '../types/report-block';
+import { normalizeCoverPageContent } from '../utils/normalize-cover-page';
 
 const COLORS = {
     division: 'rgba(59, 130, 246, 0.75)',    // blue-500
@@ -46,6 +47,7 @@ const BLOCK_GAP = 16;
 /** Estimated content heights for Y stacking in buildDefaultLayout. height: 0 = auto on canvas. */
 const EST_HEIGHT: Partial<Record<ReportBlock['type'], number>> = {
     cover: 240,
+    'cover-page': 1123,
     heading: 56,
     'kpi-grid': 320,
     'chart-bar': 380,
@@ -448,7 +450,9 @@ function mergeBlocks(
     // Add chart-line blocks for newly enabled sections that have no existing block
     for (const section of enabledSections) {
         if (!handledSections.has(section)) {
-            result.push(buildLineChart(section, trends, divisionCode));
+            const newBlock = buildLineChart(section, trends, divisionCode);
+            newBlock.layout = makeLayout(nextAvailableY(result), 'chart-line');
+            result.push(newBlock);
         }
     }
 
@@ -534,6 +538,31 @@ export function useReportEngine() {
         switch (type) {
             case 'cover':
                 return { ...buildCover(divisionCode, '', period, preparedBy), layout };
+            case 'cover-page': {
+                const pc = normalizeCoverPageContent({
+                    schemaVersion: 1,
+                    templateId: 'stronghold-dark',
+                    divisionName: divisionCode || 'Division Name',
+                    year: period.split(' ').pop() ?? String(new Date().getFullYear()),
+                    reportSubtitle: 'Annual Compliance Review',
+                    preparedBy,
+                    period,
+                    showStats: true,
+                    showCallout: true,
+                    showMap: false,
+                    showLocations: true,
+                    showAward: false,
+                    showHighlights: false,
+                });
+                return {
+                    id: uuid(),
+                    type: 'cover-page',
+                    isEdited: false,
+                    style: { ...DEFAULT_STYLE, padding: 'none' },
+                    layout: { ...layout, x: 0, width: 794, height: 1123 },
+                    content: pc,
+                } as CoverPageBlock;
+            }
             case 'heading':
                 return { id: uuid(), type: 'heading', isEdited: false, style: DEFAULT_STYLE, layout, content: { text: 'New Section', level: 2 } } as HeadingBlock;
             case 'kpi-grid': {

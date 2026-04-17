@@ -19,3 +19,6 @@ webapp/.playwright/
 webapp/.cache/
 webapp/.vite/
 webapp/.eslintcache
+
+# Codex auto-agent runtime outputs
+qa-runtime/

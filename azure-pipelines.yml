@@ -50,10 +50,10 @@ stages:
             displayName: 'install NuGet 6.5.0'
 
           - task: UseDotNet@2
-            displayName: 'Install .NET SDK 7.0.410'
+            displayName: 'Install .NET SDK 10.0.100'
             inputs:
               packageType: 'sdk'
-              version: '7.0.410'
+              version: '10.0.100'
               installationPath: $(Agent.ToolsDirectory)/dotnet
 
           - script: |
@@ -96,21 +96,23 @@ stages:
             displayName: 'Enforce schema change authorization'
 
           # Keep these gated to develop for now (useful for later deploy)
+          # Restore local tool manifest (.config/dotnet-tools.json) — this pins dotnet-ef at 10.0.0
           - task: DotNetCoreCLI@2
             inputs:
               command: custom
               custom: tool
-              arguments: 'install --global dotnet-ef --version 7.0.5 --ignore-failed-sources'
-            displayName: 'install dotnet-ef'
+              arguments: 'restore'
+            displayName: 'restore dotnet local tools (dotnet-ef 10.0.0)'
             condition: eq(variables.isDevelop, true)
 
+          # Generate idempotent SQL migration script — applied to DB before app deploy
+          # --idempotent: wraps each migration in IF NOT EXISTS check, safe to re-run
           - task: DotNetCoreCLI@2
             inputs:
               command: custom
               custom: ef
-              arguments: 'migrations script --configuration $(BuildConfiguration) --no-build --idempotent --output $(Build.ArtifactStagingDirectory)/migrations.sql'
-              workingDirectory: 'Data'
-            displayName: 'generate sql scripts'
+              arguments: 'migrations script --configuration $(BuildConfiguration) --no-build --idempotent --output $(Build.ArtifactStagingDirectory)/migrations.sql --project Data --startup-project Api --context AppDbContext'
+            displayName: 'generate idempotent sql migration script'
             condition: eq(variables.isDevelop, true)
 
           - task: DotNetCoreCLI@2

@@ -22,6 +22,19 @@ public class Division : AuditableEntity
     /// </summary>
     public decimal? ScoreTarget { get; set; }
 
+    /// <summary>
+    /// How often this division is expected to complete an audit, in days. Null = no schedule set.
+    /// Used by the compliance status dashboard row (2C-1+2) to compute On Track / Due Soon / Overdue.
+    /// Common values: 7 (weekly), 14 (bi-weekly), 30 (monthly), 90 (quarterly).
+    /// </summary>
+    public int? AuditFrequencyDays { get; set; }
+
+    /// <summary>
+    /// When true, closing a corrective action requires at least one closure photo to be attached first.
+    /// Enforced at the application layer in CloseCorrectiveAction.
+    /// </summary>
+    public bool RequireClosurePhoto { get; set; } = false;
+
     // Navigation
     public ICollection<AuditTemplate> Templates { get; set; } = new List<AuditTemplate>();
     public ICollection<EmailRoutingRule> EmailRoutingRules { get; set; } = new List<EmailRoutingRule>();

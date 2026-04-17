@@ -295,6 +295,22 @@
                                                     class="pi pi-exclamation-triangle text-xs shrink-0 transition-colors"
                                                 />
 
+                                                <!-- Require Photo on NC toggle -->
+                                                <button
+                                                    @click="toggleRequirePhotoOnNc(section, q)"
+                                                    :class="q.requirePhotoOnNc ? 'text-amber-400 hover:text-amber-300' : 'text-slate-600 hover:text-slate-400'"
+                                                    title="Require Photo on NC — auditor must attach a photo when NonConforming"
+                                                    class="pi pi-camera text-xs shrink-0 transition-colors"
+                                                />
+
+                                                <!-- Auto-Create CA toggle -->
+                                                <button
+                                                    @click="toggleAutoCreateCa(section, q)"
+                                                    :class="q.autoCreateCa ? 'text-blue-400 hover:text-blue-300' : 'text-slate-600 hover:text-slate-400'"
+                                                    title="Auto-Create CA — NonConforming response auto-creates a corrective action on submit"
+                                                    class="pi pi-ticket text-xs shrink-0 transition-colors"
+                                                />
+
                                                 <div class="flex gap-1.5 shrink-0 text-[10px] text-slate-600">
                                                     <span v-if="q.allowNA" title="N/A allowed">N/A</span>
                                                     <span v-if="q.requireCommentOnNC" title="Comment required on NC">Cmnt</span>
@@ -691,6 +707,8 @@ async function saveQuestionWeight(section: DraftSectionDto, q: DraftQuestionDto)
         allowNA: q.allowNA,
         requireCommentOnNC: q.requireCommentOnNC,
         isScoreable: q.isScoreable,
+        requirePhotoOnNc: q.requirePhotoOnNc,
+        autoCreateCa: q.autoCreateCa,
     });
 }
 
@@ -704,6 +722,38 @@ async function toggleLifeCritical(section: DraftSectionDto, q: DraftQuestionDto)
         allowNA: q.allowNA,
         requireCommentOnNC: q.requireCommentOnNC,
         isScoreable: q.isScoreable,
+        requirePhotoOnNc: q.requirePhotoOnNc,
+        autoCreateCa: q.autoCreateCa,
+    });
+}
+
+async function toggleRequirePhotoOnNc(section: DraftSectionDto, q: DraftQuestionDto) {
+    if (!selectedVersionId.value) return;
+    q.requirePhotoOnNc = !q.requirePhotoOnNc;
+    await adminStore.updateQuestion(selectedVersionId.value, q.versionQuestionId, {
+        questionText: q.questionText,
+        weight: q.weight,
+        isLifeCritical: q.isLifeCritical,
+        allowNA: q.allowNA,
+        requireCommentOnNC: q.requireCommentOnNC,
+        isScoreable: q.isScoreable,
+        requirePhotoOnNc: q.requirePhotoOnNc,
+        autoCreateCa: q.autoCreateCa,
+    });
+}
+
+async function toggleAutoCreateCa(section: DraftSectionDto, q: DraftQuestionDto) {
+    if (!selectedVersionId.value) return;
+    q.autoCreateCa = !q.autoCreateCa;
+    await adminStore.updateQuestion(selectedVersionId.value, q.versionQuestionId, {
+        questionText: q.questionText,
+        weight: q.weight,
+        isLifeCritical: q.isLifeCritical,
+        allowNA: q.allowNA,
+        requireCommentOnNC: q.requireCommentOnNC,
+        isScoreable: q.isScoreable,
+        requirePhotoOnNc: q.requirePhotoOnNc,
+        autoCreateCa: q.autoCreateCa,
     });
 }
 
@@ -785,6 +835,8 @@ async function saveQuestionText(section: DraftSectionDto, q: DraftQuestionDto) {
         allowNA: q.allowNA,
         requireCommentOnNC: q.requireCommentOnNC,
         isScoreable: q.isScoreable,
+        requirePhotoOnNc: q.requirePhotoOnNc,
+        autoCreateCa: q.autoCreateCa,
     });
 }
 

@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Stronghold.AppDashboard.Api.Domain.Audit.Admin;
@@ -16,6 +17,8 @@ namespace Stronghold.AppDashboard.Api.Controllers;
 public record ReopenAuditRequest(string? Reason);
 public record CloseAuditRequest(string? Notes);
 public record SetScoreTargetRequest(decimal? ScoreTarget);
+public record SetAuditFrequencyRequest(int? AuditFrequencyDays);
+public record SetRequireClosurePhotoRequest(bool RequireClosurePhoto);
 
 [Route(Constants.Routes.ApiTemplate)]
 public class AuditController : V1ControllerBase
@@ -304,16 +307,85 @@ public class AuditController : V1ControllerBase
     [HttpGet("audits/corrective-actions")]
     [ProducesResponseType(typeof(List<CorrectiveActionListItemDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<CorrectiveActionListItemDto>>> GetCorrectiveActions(
-        [FromQuery] int? divisionId,
-        [FromQuery] string? status)
+        [FromQuery] int?    divisionId,
+        [FromQuery] string? status,
+        [FromQuery] string? searchText,
+        [FromQuery] string? assignedTo,
+        [FromQuery] string? source,
+        [FromQuery] bool    overdueOnly = false)
     {
         return await TryExecuteAsync<ActionResult<List<CorrectiveActionListItemDto>>>(
             async () =>
             {
                 await GetUser();
-                return Ok(await Mediator.Send(new GetCorrectiveActions { DivisionId = divisionId, Status = status }));
+                return Ok(await Mediator.Send(new GetCorrectiveActions
+                {
+                    DivisionId  = divisionId,
+                    Status      = status,
+                    SearchText  = searchText,
+                    AssignedTo  = assignedTo,
+                    Source      = source,
+                    OverdueOnly = overdueOnly,
+                }));
             },
             ex => Error<List<CorrectiveActionListItemDto>>(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPut("audits/corrective-actions/{id:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateCorrectiveAction([FromRoute] int id, [FromBody] UpdateCorrectiveActionRequest body)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                var user = await GetUser();
+                await Mediator.Send(new UpdateCorrectiveAction
+                {
+                    CorrectiveActionId = id,
+                    Description        = body.Description,
+                    AssignedTo         = body.AssignedTo,
+                    AssignedToUserId   = body.AssignedToUserId,
+                    DueDate            = body.DueDate,
+                    UpdatedBy          = user.Email!,
+                });
+                return NoContent();
+            },
+            ex => ex is InvalidOperationException || ex is ArgumentException || ex is KeyNotFoundException
+                ? Task.FromResult<IActionResult>(ex is KeyNotFoundException ? NotFound(ex.Message) : BadRequest(ex.Message))
+                : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPost("audits/corrective-actions/bulk")]
+    [ProducesResponseType(typeof(BulkUpdateCorrectiveActionsResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<BulkUpdateCorrectiveActionsResult>> BulkUpdateCorrectiveActions(
+        [FromBody] BulkUpdateCorrectiveActionsRequest body)
+    {
+        return await TryExecuteAsync<ActionResult<BulkUpdateCorrectiveActionsResult>>(
+            async () =>
+            {
+                var user = await GetUser();
+                var result = await Mediator.Send(new BulkUpdateCorrectiveActions
+                {
+                    CorrectiveActionIds = body.CorrectiveActionIds,
+                    Action              = body.Action,
+                    NewStatus           = body.NewStatus,
+                    ClosureNotes        = body.ClosureNotes,
+                    NewAssignee         = body.NewAssignee,
+                    NewAssigneeUserId   = body.NewAssigneeUserId,
+                    UpdatedBy           = user.Email!,
+                });
+                return Ok(result);
+            },
+            ex => ex is ArgumentException
+                ? Task.FromResult<ActionResult<BulkUpdateCorrectiveActionsResult>>(BadRequest(ex.Message))
+                : Error<BulkUpdateCorrectiveActionsResult>(ex)
         );
     }
 
@@ -362,6 +434,40 @@ public class AuditController : V1ControllerBase
             ex => ex is InvalidOperationException || ex is ArgumentException
                 ? Task.FromResult<IActionResult>(BadRequest(ex.Message))
                 : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPost("audits/corrective-actions/{id:int}/photos")]
+    [ProducesResponseType(typeof(CorrectiveActionPhotoDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UploadCaClosurePhoto([FromRoute] int id, IFormFile file, [FromForm] string? caption)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("No file provided.");
+
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                var user  = await GetUser();
+                using var ms = new System.IO.MemoryStream();
+                await file.CopyToAsync(ms);
+                var result = await Mediator.Send(new UploadCaClosurePhoto
+                {
+                    CorrectiveActionId = id,
+                    FileName           = file.FileName,
+                    FileData           = ms.ToArray(),
+                    UploadedBy         = user.Email!,
+                    Caption            = caption,
+                });
+                return Ok(result);
+            },
+            ex => ex is InvalidOperationException
+                ? Task.FromResult<IActionResult>(BadRequest(ex.Message))
+                : ex is KeyNotFoundException
+                    ? Task.FromResult<IActionResult>(NotFound(ex.Message))
+                    : Error(ex)
         );
     }
 
@@ -517,6 +623,8 @@ public class AuditController : V1ControllerBase
                     AllowNA = body.AllowNA,
                     RequireCommentOnNC = body.RequireCommentOnNC,
                     IsScoreable = body.IsScoreable,
+                    RequirePhotoOnNc = body.RequirePhotoOnNc,
+                    AutoCreateCa = body.AutoCreateCa,
                     UpdatedBy = user.Email!
                 });
                 return NoContent();
@@ -1164,6 +1272,23 @@ public class AuditController : V1ControllerBase
         );
     }
 
+    // ── Reports — Compliance Status ──────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("reports/compliance-status")]
+    [ProducesResponseType(typeof(List<ComplianceStatusDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<ComplianceStatusDto>>> GetComplianceStatus()
+    {
+        return await TryExecuteAsync<ActionResult<List<ComplianceStatusDto>>>(
+            async () =>
+            {
+                await GetUser();
+                return Ok(await Mediator.Send(new GetComplianceStatus()));
+            },
+            ex => Error<List<ComplianceStatusDto>>(ex)
+        );
+    }
+
     // ── Reports — Generate PDF ────────────────────────────────────────────────
 
     [MapToApiVersion(Constants.ApiVersions.V1)]
@@ -1526,6 +1651,52 @@ public class AuditController : V1ControllerBase
                 : ex is KeyNotFoundException
                     ? Task.FromResult<IActionResult>(NotFound(ex.Message))
                     : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPut("admin/divisions/{id:int}/audit-frequency")]
+    [ProducesResponseType(typeof(DivisionScoreTargetDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetDivisionAuditFrequency([FromRoute] int id, [FromBody] SetAuditFrequencyRequest body)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                return Ok(await Mediator.Send(new SetDivisionAuditFrequency
+                {
+                    DivisionId = id,
+                    AuditFrequencyDays = body.AuditFrequencyDays,
+                }));
+            },
+            ex => ex.Message.Contains("not found")
+                    ? Task.FromResult<IActionResult>(NotFound(ex.Message))
+                    : ex is ArgumentException
+                        ? Task.FromResult<IActionResult>(BadRequest(ex.Message))
+                        : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPut("audits/divisions/{id:int}/require-closure-photo")]
+    [ProducesResponseType(typeof(DivisionScoreTargetDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetDivisionRequireClosurePhoto([FromRoute] int id, [FromBody] SetRequireClosurePhotoRequest body)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                return Ok(await Mediator.Send(new SetDivisionClosurePhotoRequirement
+                {
+                    DivisionId          = id,
+                    RequireClosurePhoto = body.RequireClosurePhoto,
+                }));
+            },
+            ex => ex.Message.Contains("not found")
+                ? Task.FromResult<IActionResult>(NotFound(ex.Message))
+                : Error(ex)
         );
     }
 

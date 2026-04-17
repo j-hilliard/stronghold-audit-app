@@ -46,6 +46,19 @@ public class AuditQuestion : AuditableEntity
     /// </summary>
     public bool IsLifeCritical { get; set; } = false;
 
+    /// <summary>
+    /// When true, the auditor must attach at least one photo when marking this question NonConforming.
+    /// Submit is blocked server-side if NC + no photos. Frontend shows an amber badge as an early warning.
+    /// </summary>
+    public bool RequirePhotoOnNc { get; set; } = false;
+
+    /// <summary>
+    /// When true, a NonConforming response to this question automatically creates a CorrectiveAction
+    /// at submit time (idempotent — one auto-CA per AuditId+QuestionId, see filtered unique index).
+    /// If the NC is corrected before resubmit, the auto-CA is Voided (not deleted).
+    /// </summary>
+    public bool AutoCreateCa { get; set; } = false;
+
     /// <summary>True when admin removes this from active templates. Never set IsDeleted = true on questions.</summary>
     public bool IsArchived { get; set; }
     public DateTime? ArchivedAt { get; set; }

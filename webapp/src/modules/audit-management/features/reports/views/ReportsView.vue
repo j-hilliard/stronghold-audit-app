@@ -127,11 +127,69 @@
             </div>
         </div>
 
+        <!-- Active filter context bar -->
+        <div v-if="activeFilterChips.length > 0 && report" class="px-4 py-2 flex items-center gap-2 flex-wrap border-b border-slate-700/50">
+            <span class="text-xs text-slate-500">Showing:</span>
+            <template v-for="chip in activeFilterChips" :key="chip.key">
+                <span v-if="chip.key !== 'section'"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-slate-700 border border-slate-600 text-slate-300">
+                    {{ chip.label }}
+                </span>
+                <button v-else @click="clearSectionFilter"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-700/30 border border-blue-500/40 text-blue-300 hover:bg-blue-700/50 transition-colors">
+                    {{ chip.label }}
+                    <i class="pi pi-times text-[10px]" />
+                </button>
+            </template>
+            <span class="text-xs text-slate-500">·</span>
+            <span class="text-xs text-slate-400">
+                {{ report.totalAudits }} audit{{ report.totalAudits !== 1 ? 's' : '' }}<template v-if="filterSection"> with NCs in this section</template>
+            </span>
+        </div>
+
         <div v-if="loading" class="flex justify-center py-16">
             <ProgressSpinner />
         </div>
 
         <div v-else-if="report" class="p-4 space-y-4">
+
+            <!-- Compliance Status Row (2C-1+2): one chip per division with a schedule set -->
+            <div
+                v-if="complianceStatus.some(d => d.status !== 'NoSchedule')"
+                class="rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-3"
+            >
+                <div class="flex items-center gap-2 mb-2">
+                    <i class="pi pi-calendar text-slate-400 text-xs" />
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Audit Schedule</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <div
+                        v-for="div in complianceStatus.filter(d => d.status !== 'NoSchedule')"
+                        :key="div.divisionId"
+                        :title="complianceStatusTooltip(div)"
+                        class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border"
+                        :class="{
+                            'bg-emerald-900/40 border-emerald-700/50 text-emerald-300': div.status === 'OnTrack',
+                            'bg-yellow-900/40 border-yellow-700/50 text-yellow-300': div.status === 'DueSoon',
+                            'bg-red-900/40 border-red-700/50 text-red-300': div.status === 'Overdue',
+                            'bg-slate-700/40 border-slate-600/50 text-slate-400': div.status === 'NeverAudited',
+                        }"
+                    >
+                        <i
+                            class="text-[10px]"
+                            :class="{
+                                'pi pi-check-circle': div.status === 'OnTrack',
+                                'pi pi-clock': div.status === 'DueSoon',
+                                'pi pi-exclamation-triangle': div.status === 'Overdue',
+                                'pi pi-minus-circle': div.status === 'NeverAudited',
+                            }"
+                        />
+                        {{ div.divisionCode }}
+                        <span class="opacity-70">·</span>
+                        <span>{{ complianceStatusLabel(div) }}</span>
+                    </div>
+                </div>
+            </div>
 
             <!-- Hidden widgets restore banner -->
             <div v-if="hiddenCount > 0" class="flex items-center gap-3 px-1">
@@ -155,6 +213,7 @@
                     <button @click.stop="hideSection('kpiTotalAudits')" class="kpi-hide-btn" title="Hide"><i class="pi pi-times" /></button>
                     <div class="text-3xl font-bold text-white">{{ displayTotalAudits }}</div>
                     <div class="text-xs text-slate-400 mt-1">Total Audits</div>
+                    <div v-if="filterSection" class="text-xs text-blue-400/70 mt-0.5">in {{ filterSection }} section</div>
                     <div v-if="trendDeltas.auditCountDelta !== null" class="text-xs mt-1"
                         :class="trendDeltas.auditCountDelta >= 0 ? 'text-emerald-400' : 'text-red-400'">
                         {{ trendDeltas.auditCountDelta >= 0 ? '↑' : '↓' }}
@@ -174,6 +233,7 @@
                         {{ report.avgScorePercent != null ? `${displayAvgScore}%` : '—' }}
                     </div>
                     <div class="text-xs text-slate-400 mt-1">Avg Conformance</div>
+                    <div v-if="filterSection" class="text-xs text-blue-400/70 mt-0.5">{{ filterSection }} audits only</div>
                     <div v-if="trendDeltas.scoreDelta !== null" class="text-xs mt-1"
                         :class="trendDeltas.scoreDelta >= 0 ? 'text-emerald-400' : 'text-red-400'">
                         {{ trendDeltas.scoreDelta >= 0 ? '↑' : '↓' }}
@@ -272,17 +332,22 @@
             <!-- Per-section KPI cards -->
             <div v-if="sectionKpiCards.length > 0 && !hidden.sectionCards" class="space-y-2">
                 <div class="flex items-center justify-between gap-3 px-1">
-                    <div class="flex items-center gap-3 flex-wrap">
-                        <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Findings Per Audit — by Section</div>
-                        <button
-                            v-if="filterSection"
-                            @click="clearSectionFilter"
-                            data-testid="report-section-clear"
-                            class="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-600/20 border border-blue-500/40 text-blue-300 hover:bg-blue-600/30 transition-colors"
-                        >
-                            <i class="pi pi-times text-xs" />
-                            Clear: {{ filterSection }}
-                        </button>
+                    <div class="flex flex-col gap-0.5">
+                        <div class="flex items-center gap-3 flex-wrap">
+                            <div class="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                                Section NC Breakdown<template v-if="filterDivisionId"> for {{ store.divisions.find(d => d.id === filterDivisionId)?.code }}</template>
+                            </div>
+                            <button
+                                v-if="filterSection"
+                                @click="clearSectionFilter"
+                                data-testid="report-section-clear"
+                                class="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-600/20 border border-blue-500/40 text-blue-300 hover:bg-blue-600/30 transition-colors"
+                            >
+                                <i class="pi pi-times text-xs" />
+                                Clear: {{ filterSection }}
+                            </button>
+                        </div>
+                        <div class="text-xs text-slate-500">Click a section to drill in and see only those audits</div>
                     </div>
                     <button @click="hideSection('sectionCards')" class="section-collapse-btn" title="Hide section">
                         <i class="pi pi-eye-slash" />
@@ -299,18 +364,21 @@
                             'rounded-lg p-3 border text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 flex flex-col',
                             filterSection === card.name
                                 ? 'bg-blue-900/40 border-blue-500 ring-1 ring-blue-500/60'
-                                : 'bg-slate-800 border-slate-700 hover:border-slate-500',
+                                : 'bg-slate-800 hover:border-slate-500',
+                            filterSection && filterSection !== card.name ? 'opacity-40' : '',
                             sectionRateBorder(card.rate, filterSection === card.name),
                         ]"
                     >
-                        <div :class="['text-xl font-bold', sectionRateColor(card.rate)]">
-                            {{ card.rate.toFixed(2) }}
-                        </div>
-                        <div class="text-xs text-slate-400 mt-0.5">NCs / audit</div>
-                        <div class="text-xs text-slate-200 mt-1.5 font-medium leading-tight line-clamp-2 flex-1">
+                        <div class="text-xs text-slate-200 font-semibold leading-tight line-clamp-2 flex-1">
                             {{ card.shortName }}
                         </div>
-                        <div class="text-xs text-slate-500 mt-0.5">{{ card.ncCount }} NCs</div>
+                        <div class="text-xs text-slate-500 mt-1.5">
+                            {{ card.ncCount }} NCs across {{ report?.totalAudits ?? 0 }} audits
+                        </div>
+                        <div class="flex items-baseline gap-1 mt-1">
+                            <span :class="['text-lg font-bold', sectionRateColor(card.rate)]">{{ card.rate.toFixed(2) }}</span>
+                            <span class="text-xs text-slate-400">avg NCs per audit</span>
+                        </div>
                     </button>
                 </div>
             </div>
@@ -373,6 +441,25 @@
                     </div>
                 </template>
             </Card>
+
+            <!-- ── Tab strip ────────────────────────────────────────────────── -->
+            <div ref="tabBarEl" class="border-b border-slate-700 flex items-center gap-1 px-1 pt-2">
+                <button
+                    v-for="tab in TABS"
+                    :key="tab.key"
+                    @click="activeTab = tab.key"
+                    :class="['tab-btn', activeTab === tab.key ? 'tab-btn--active' : '']"
+                >
+                    {{ tab.label }}
+                    <span v-if="tab.key === 'action-items' && caAgingStats.overdueCount > 0"
+                        class="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                        {{ caAgingStats.overdueCount }}
+                    </span>
+                </button>
+            </div>
+
+            <!-- ── Tab: Analysis ────────────────────────────────────────────── -->
+            <template v-if="activeTab === 'analysis'">
 
             <!-- NC by Section chart -->
             <Card v-if="(report.sectionBreakdown?.length ?? 0) > 0 && !hidden.ncSection">
@@ -438,6 +525,11 @@
                     </div>
                 </template>
             </Card>
+
+            </template><!-- /analysis: NC by Section + Top Locations -->
+
+            <!-- ── Tab: Action Items ─────────────────────────────────────────── -->
+            <template v-if="activeTab === 'action-items'">
 
             <!-- Open Corrective Actions -->
             <Card v-if="(report.openCorrectiveActions?.length ?? 0) > 0 && !hidden.openCAs">
@@ -517,6 +609,11 @@
                 </template>
             </Card>
 
+            </template><!-- /action-items -->
+
+            <!-- ── Tab: Analysis (continued: Quarterly Trend) ────────────────── -->
+            <template v-if="activeTab === 'analysis'">
+
             <!-- Quarterly trend chart -->
             <Card v-if="quarterlyTrendData.length > 1 && !hidden.quarterlyTrend">
                 <template #title>
@@ -547,6 +644,11 @@
                     </div>
                 </template>
             </Card>
+
+            </template><!-- /analysis: Quarterly Trend -->
+
+            <!-- ── Tab: Performance ──────────────────────────────────────────── -->
+            <template v-if="activeTab === 'performance'">
 
             <!-- Auditor performance -->
             <Card v-if="auditorStats.length > 0 && !hidden.auditorPerf">
@@ -599,6 +701,11 @@
                     </div>
                 </template>
             </Card>
+
+            </template><!-- /performance -->
+
+            <!-- ── Tab: History ──────────────────────────────────────────────── -->
+            <template v-if="activeTab === 'history'">
 
             <!-- Audit table -->
             <Card v-if="!hidden.auditDetail" ref="auditDetailCard">
@@ -695,6 +802,9 @@
                     </div>
                 </template>
             </Card>
+
+            </template><!-- /history -->
+
         </div>
 
         <div v-else class="p-4 text-center text-slate-400 py-16">
@@ -718,7 +828,7 @@ import Button from 'primevue/button';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
 import { useApiStore } from '@/stores/apiStore';
-import { AuditClient, type AuditReportDto } from '@/apiclient/auditClient';
+import { AuditClient, type AuditReportDto, type ComplianceStatusDto } from '@/apiclient/auditClient';
 
 const router = useRouter();
 const route = useRoute();
@@ -727,6 +837,7 @@ const apiStore = useApiStore();
 
 const loading = ref(false);
 const report = ref<AuditReportDto | null>(null);
+const complianceStatus = ref<ComplianceStatusDto[]>([]);
 const exportingQs = ref(false);
 const exportingNcr = ref(false);
 const filterDivisionId = ref<number | null>(null);
@@ -763,14 +874,16 @@ function drillByAuditor(auditor: string) {
     drillAuditor.value = auditor;
     drillLocation.value = null;
     collapsed.auditDetail = false;
-    scrollToAuditDetail();
+    activeTab.value = 'history';
+    scrollToTabs();
 }
 
 function drillByLocation(location: string) {
     drillLocation.value = location;
     drillAuditor.value = null;
     collapsed.auditDetail = false;
-    scrollToAuditDetail();
+    activeTab.value = 'history';
+    scrollToTabs();
 }
 
 const drillNcOnly = ref(false);
@@ -782,7 +895,8 @@ function drillByNcOnly() {
     drillAuditor.value = null;
     drillLocation.value = null;
     collapsed.auditDetail = false;
-    scrollToAuditDetail();
+    activeTab.value = 'history';
+    scrollToTabs();
 }
 
 function drillByWarnOnly() {
@@ -791,7 +905,8 @@ function drillByWarnOnly() {
     drillAuditor.value = null;
     drillLocation.value = null;
     collapsed.auditDetail = false;
-    scrollToAuditDetail();
+    activeTab.value = 'history';
+    scrollToTabs();
 }
 
 function drillAllAudits() {
@@ -800,7 +915,8 @@ function drillAllAudits() {
     drillAuditor.value = null;
     drillLocation.value = null;
     collapsed.auditDetail = false;
-    scrollToAuditDetail();
+    activeTab.value = 'history';
+    scrollToTabs();
 }
 
 const filteredAuditRows = computed(() => {
@@ -901,6 +1017,40 @@ const trendChartTitle = computed(() => {
     return `${ctx}Conformance Trend (${period})`;
 });
 
+// ── Active filter chips for context bar ───────────────────────────────────────
+const activeFilterChips = computed(() => {
+    const chips: { label: string; key: string }[] = [];
+    if (filterDivisionId.value) {
+        const div = store.divisions.find(d => d.id === filterDivisionId.value);
+        if (div) chips.push({ label: `${div.code} division`, key: 'division' });
+    }
+    if (filterStatus.value) chips.push({ label: filterStatus.value, key: 'status' });
+    if (filterDateFrom.value || filterDateTo.value) {
+        const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        const from = filterDateFrom.value ? fmt(filterDateFrom.value) : '';
+        const to = filterDateTo.value ? fmt(filterDateTo.value) : '';
+        const label = from && to ? `${from} – ${to}` : from ? `From ${from}` : `To ${to}`;
+        chips.push({ label, key: 'dates' });
+    }
+    if (filterSection.value) chips.push({ label: filterSection.value, key: 'section' });
+    return chips;
+});
+
+// ── Bottom tabs ────────────────────────────────────────────────────────────────
+const TABS = [
+    { key: 'action-items', label: 'Action Items' },
+    { key: 'history',      label: 'Audit History' },
+    { key: 'analysis',     label: 'Analysis' },
+    { key: 'performance',  label: 'Performance' },
+] as const;
+
+const activeTab = ref<'action-items' | 'history' | 'analysis' | 'performance'>('action-items');
+const tabBarEl = ref<HTMLElement | null>(null);
+
+function scrollToTabs() {
+    nextTick(() => tabBarEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
+
 // ── Active filter description for chart subtitles ─────────────────────────────
 const activeFilterDesc = computed(() => {
     const parts: string[] = [];
@@ -970,8 +1120,31 @@ function clearSectionFilter() {
     loadReport();
 }
 
+function complianceStatusLabel(div: ComplianceStatusDto): string {
+    if (div.status === 'NeverAudited') return 'Never audited';
+    if (div.daysUntilDue == null || div.daysSinceLastAudit == null) return '';
+    if (div.status === 'Overdue') return `${Math.abs(div.daysUntilDue)}d overdue`;
+    if (div.status === 'DueSoon') return `Due in ${div.daysUntilDue}d`;
+    return `Due in ${div.daysUntilDue}d`;
+}
+
+function complianceStatusTooltip(div: ComplianceStatusDto): string {
+    if (div.status === 'NeverAudited') return `${div.divisionName} — no audits on record`;
+    const lastDate = div.lastAuditDate ?? '—';
+    const freq = div.frequencyDays != null ? `every ${div.frequencyDays}d` : '';
+    return `${div.divisionName} · Last audit: ${lastDate} · Schedule: ${freq}`;
+}
+
+async function loadComplianceStatus() {
+    try {
+        complianceStatus.value = await getClient().getComplianceStatus();
+    } catch {
+        // Non-blocking — compliance row is supplementary
+    }
+}
+
 onMounted(async () => {
-    await Promise.all([store.loadDivisions(), loadReport()]);
+    await Promise.all([store.loadDivisions(), loadReport(), loadComplianceStatus()]);
 });
 
 // ── Item 1: CSV Export ────────────────────────────────────────────────────────
@@ -1609,5 +1782,30 @@ const ncCategoryChartOptions = computed(() => ({
 .auditor-link:hover {
     color: #90cdf4;
     text-decoration-color: #90cdf4;
+}
+
+/* ── Tab strip ───────────────────────────────────────────────────────────────── */
+.tab-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #94a3b8;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+    white-space: nowrap;
+}
+.tab-btn:hover {
+    color: #e2e8f0;
+}
+.tab-btn--active {
+    color: #63b3ed;
+    border-bottom-color: #63b3ed;
+    font-weight: 600;
 }
 </style>

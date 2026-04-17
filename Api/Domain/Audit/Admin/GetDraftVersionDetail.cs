@@ -83,6 +83,8 @@ public class GetDraftVersionDetailHandler : IRequestHandler<GetDraftVersionDetai
                         IsScoreable = vq.IsScoreable,
                         IsArchived = vq.Question.IsArchived,
                         IsLifeCritical = vq.Question.IsLifeCritical,
+                        RequirePhotoOnNc = vq.Question.RequirePhotoOnNc,
+                        AutoCreateCa = vq.Question.AutoCreateCa,
                         ResponseTypeId = vq.Question.ResponseTypeId,
                         ResponseTypeCode = vq.Question.ResponseType?.Code,
                         Weight = vq.Weight ?? vq.Question.Weight,

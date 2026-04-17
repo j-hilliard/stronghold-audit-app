@@ -33,11 +33,22 @@ public class CloseCorrectiveActionHandler : IRequestHandler<CloseCorrectiveActio
     public async Task<Unit> Handle(CloseCorrectiveAction request, CancellationToken cancellationToken)
     {
         var ca = await _context.CorrectiveActions
+            .Include(c => c.Audit!).ThenInclude(a => a.Division)
             .FirstOrDefaultAsync(c => c.Id == request.CorrectiveActionId, cancellationToken)
             ?? throw new ArgumentException($"Corrective action {request.CorrectiveActionId} not found.");
 
         if (ca.Status == "Closed")
             throw new InvalidOperationException("Corrective action is already closed.");
+
+        // Enforce per-division closure photo requirement
+        if (ca.Audit?.Division?.RequireClosurePhoto == true)
+        {
+            var hasPhoto = await _context.CorrectiveActionPhotos
+                .AnyAsync(p => p.CorrectiveActionId == ca.Id, cancellationToken);
+            if (!hasPhoto)
+                throw new InvalidOperationException(
+                    "A closure photo is required before this corrective action can be closed.");
+        }
 
         DateOnly? completedDate = null;
         if (!string.IsNullOrWhiteSpace(request.Payload.CompletedDate) &&

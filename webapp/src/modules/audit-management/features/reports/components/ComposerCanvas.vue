@@ -1,4 +1,6 @@
 <template>
+    <!-- Outer wrapper: canvas scroll area + footer bar stacked vertically -->
+    <div class="flex flex-col flex-1 min-h-0">
     <!-- Dark canvas area — document page floats inside -->
     <div ref="scrollEl" class="flex-1 overflow-auto composer-canvas py-8 relative" style="background: #2a3142;">
 
@@ -6,6 +8,7 @@
         <div
             ref="pageEl"
             class="document-page mx-auto shadow-2xl print-page relative"
+            data-testid="composer-document-page"
             style="width: 794px; background: #0f172a; border-radius: 4px; padding: 0;"
             :style="[pageZoomStyle, pageHeightStyle]"
             @click.self="$emit('select', null)"
@@ -98,18 +101,45 @@
             </div>
         </div>
 
-        <!-- Zoom controls -->
-        <div class="zoom-controls print:hidden">
-            <button @click="zoomOut" :disabled="zoom <= 50" class="zoom-btn" title="Zoom out"><i class="pi pi-minus text-xs" /></button>
-            <span class="zoom-pct">{{ zoom }}%</span>
-            <button @click="zoomIn"  :disabled="zoom >= 150" class="zoom-btn" title="Zoom in"><i class="pi pi-plus text-xs" /></button>
-            <button @click="zoom = 100" class="zoom-btn zoom-reset" title="Reset zoom"><i class="pi pi-refresh text-xs" /></button>
+    </div>
+
+    <!-- Footer bar: page nav left, zoom right — sits BELOW the canvas, never overlaps it -->
+    <div class="canvas-footer print:hidden" data-testid="composer-canvas-footer">
+        <div class="canvas-footer-inner" data-testid="composer-canvas-footer-inner">
+            <!-- Page navigation -->
+            <div class="page-nav" data-testid="composer-page-nav">
+                <button @click="goPrev" :disabled="currentPage <= 1" class="page-nav-btn" title="Previous page">
+                    <i class="pi pi-chevron-left text-xs" />
+                </button>
+                <span class="page-nav-label" data-testid="composer-page-label">Page {{ currentPage }} of {{ pageCount }}</span>
+                <button @click="goNext" :disabled="currentPage >= pageCount" class="page-nav-btn" title="Next page">
+                    <i class="pi pi-chevron-right text-xs" />
+                </button>
+                <div class="page-nav-sep" />
+                <button
+                    @click="addPage"
+                    class="page-nav-add"
+                    data-testid="composer-add-page"
+                    title="Add a new blank page after the last page"
+                >
+                    <i class="pi pi-plus text-xs" /> Add Page
+                </button>
+            </div>
+
+            <!-- Zoom controls -->
+            <div class="zoom-controls" data-testid="composer-zoom-controls">
+                <button @click="zoomOut" :disabled="zoom <= 50" class="zoom-btn" title="Zoom out"><i class="pi pi-minus text-xs" /></button>
+                <span class="zoom-pct">{{ zoom }}%</span>
+                <button @click="zoomIn"  :disabled="zoom >= 150" class="zoom-btn" title="Zoom in"><i class="pi pi-plus text-xs" /></button>
+                <button @click="zoom = 100" class="zoom-btn zoom-reset" title="Reset zoom"><i class="pi pi-refresh text-xs" /></button>
+            </div>
         </div>
     </div>
+    </div><!-- /outer flex column -->
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, ref, computed } from 'vue';
+import { defineAsyncComponent, ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import type { ReportBlock, BlockType, BlockLayout } from '../types/report-block';
 
 const props = defineProps<{
@@ -142,18 +172,54 @@ const pageZoomStyle = computed(() => {
 function zoomIn()  { const n = ZOOM_STEPS.find(s => s > zoom.value); if (n) zoom.value = n; }
 function zoomOut() { const p = [...ZOOM_STEPS].reverse().find(s => s < zoom.value); if (p) zoom.value = p; }
 
-// ── Page height — grows to contain all blocks ─────────────────────────────────
+// ── Page height — grows to contain all blocks or forced page count ────────────
 const MIN_PAGE_H = 1123;
+
+/** User can click "Add Page" to force extra blank pages. */
+const forcedMinPages = ref(1);
+
 const pageContentH = computed(() => {
-    if (!props.blocks.length) return MIN_PAGE_H;
+    const fromForced = MIN_PAGE_H * forcedMinPages.value;
+    if (!props.blocks.length) return fromForced;
     const maxBottom = Math.max(...props.blocks.map(b => (b.layout?.y ?? 0) + (b.layout?.height || 160)));
-    return Math.max(MIN_PAGE_H, maxBottom + 80);
+    return Math.max(MIN_PAGE_H, maxBottom + 80, fromForced);
 });
 const pageHeightStyle = computed(() => ({ height: `${pageContentH.value}px` }));
 const extraPageGuides = computed(() => {
     const count = Math.floor(pageContentH.value / MIN_PAGE_H);
     return Array.from({ length: count }, (_, i) => i + 1);
 });
+
+// ── Page navigation ────────────────────────────────────────────────────────────
+const pageCount = computed(() => Math.ceil(pageContentH.value / MIN_PAGE_H));
+const currentPage = ref(1);
+
+function scrollToPage(n: number) {
+    if (!scrollEl.value) return;
+    const scale = zoom.value / 100;
+    const targetY = (n - 1) * MIN_PAGE_H * scale + 32; // 32px = py-8 top padding
+    scrollEl.value.scrollTo({ top: targetY, behavior: 'smooth' });
+    currentPage.value = Math.max(1, Math.min(n, pageCount.value));
+}
+
+function goPrev() { scrollToPage(currentPage.value - 1); }
+function goNext() { scrollToPage(currentPage.value + 1); }
+
+function addPage() {
+    forcedMinPages.value = pageCount.value + 1;
+    nextTick(() => scrollToPage(forcedMinPages.value));
+}
+
+function onCanvasScroll() {
+    if (!scrollEl.value) return;
+    const scale = zoom.value / 100;
+    // 32px top padding offset
+    const scrolled = Math.max(0, scrollEl.value.scrollTop - 32);
+    currentPage.value = Math.min(pageCount.value, Math.floor(scrolled / (MIN_PAGE_H * scale)) + 1);
+}
+
+onMounted(() => scrollEl.value?.addEventListener('scroll', onCanvasScroll, { passive: true }));
+onUnmounted(() => scrollEl.value?.removeEventListener('scroll', onCanvasScroll));
 
 // Blocks sorted by zIndex so higher z renders on top
 const sortedBlocks = computed(() =>
@@ -171,7 +237,7 @@ function wrapperStyle(block: ReportBlock): Record<string, string> {
         height: l.height > 0 ? `${l.height}px` : 'auto',
         zIndex: String(l.zIndex ?? 1),
     };
-    if (s?.backgroundColor && block.type !== 'cover') style.backgroundColor = s.backgroundColor;
+    if (s?.backgroundColor && block.type !== 'cover' && block.type !== 'cover-page') style.backgroundColor = s.backgroundColor;
     if (s?.textColor)   style.color       = s.textColor;
     if (s?.borderColor) style.borderColor = s.borderColor;
     return style;
@@ -275,6 +341,7 @@ function onResizeEnd() {
 // ── Block components ──────────────────────────────────────────────────────────
 const blockComponents: Record<BlockType, ReturnType<typeof defineAsyncComponent>> = {
     'cover':               defineAsyncComponent(() => import('./blocks/CoverBlock.vue')),
+    'cover-page':          defineAsyncComponent(() => import('./blocks/CoverPageBlock.vue')),
     'heading':             defineAsyncComponent(() => import('./blocks/HeadingBlock.vue')),
     'kpi-grid':            defineAsyncComponent(() => import('./blocks/KpiGridBlock.vue')),
     'chart-bar':           defineAsyncComponent(() => import('./blocks/BarChartBlock.vue')),
@@ -298,8 +365,8 @@ function blockProps(block: ReportBlock) {
 }
 
 function paddingClass(block: ReportBlock) {
-    // Cover blocks are always full-bleed — no gap between selection ring and content
-    if (block.type === 'cover') return 'p-0';
+    // Cover and full-page cover blocks are always full-bleed
+    if (block.type === 'cover' || block.type === 'cover-page') return 'p-0';
     switch (block.style?.padding) {
         case 'none': return 'p-0';
         case 'sm':   return 'p-2';
@@ -413,12 +480,27 @@ function paddingClass(block: ReportBlock) {
 .rh-sw { bottom: -5px; left: -5px;  cursor: sw-resize; }
 .rh-w  { top: calc(50% - 5px); left: -5px; cursor: w-resize; }
 
-/* ── Zoom controls ── */
-.zoom-controls {
-    position: sticky;
-    bottom: 12px;
-    float: right;
-    margin-right: 12px;
+/* ── Footer bar (holds page-nav + zoom side by side, never overlaps canvas) ── */
+.canvas-footer {
+    display: flex;
+    align-items: center;
+    background: #1a2236;
+    border-top: 1px solid #2d3a4f;
+    padding: 4px 0;
+    flex-shrink: 0;
+}
+.canvas-footer-inner {
+    width: min(794px, 100%);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 32px;
+}
+
+/* ── Page navigation bar ── */
+.page-nav {
     display: flex;
     align-items: center;
     gap: 2px;
@@ -426,8 +508,64 @@ function paddingClass(block: ReportBlock) {
     border: 1px solid #334155;
     border-radius: 6px;
     padding: 3px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-    z-index: 20;
+}
+.page-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    background: transparent;
+    color: #94a3b8;
+    border: none;
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s;
+}
+.page-nav-btn:hover:not(:disabled) { background: #334155; color: #e2e8f0; }
+.page-nav-btn:disabled { opacity: 0.3; cursor: default; }
+.page-nav-label {
+    font-size: 11px;
+    color: #94a3b8;
+    padding: 0 6px;
+    min-width: 80px;
+    text-align: center;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.page-nav-sep {
+    width: 1px;
+    height: 18px;
+    background: #334155;
+    margin: 0 2px;
+}
+.page-nav-add {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px;
+    height: 24px;
+    border-radius: 4px;
+    background: #1d4ed8;
+    color: #e2e8f0;
+    border: none;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background 0.1s;
+}
+.page-nav-add:hover { background: #2563eb; }
+
+/* ── Zoom controls ── */
+.zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 3px;
 }
 .zoom-btn {
     display: flex;
@@ -454,8 +592,14 @@ function paddingClass(block: ReportBlock) {
 }
 .zoom-reset { border-left: 1px solid #334155; border-radius: 0 4px 4px 0; }
 
+@media (max-width: 900px) {
+    .canvas-footer-inner {
+        width: 100%;
+    }
+}
+
 @media print {
-    .zoom-controls { display: none; }
+    .canvas-footer { display: none; }
     .rh { display: none; }
     .block-btn { display: none; }
 }

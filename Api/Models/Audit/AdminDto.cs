@@ -57,6 +57,10 @@ public class DraftQuestionDto
     public bool IsArchived { get; set; }
     /// <summary>If true, a NonConforming answer auto-fails the entire audit.</summary>
     public bool IsLifeCritical { get; set; }
+    /// <summary>If true, auditor must attach a photo when marking NonConforming.</summary>
+    public bool RequirePhotoOnNc { get; set; }
+    /// <summary>If true, a NonConforming response auto-creates a CorrectiveAction at submit time.</summary>
+    public bool AutoCreateCa { get; set; }
     public int? ResponseTypeId { get; set; }
     public string? ResponseTypeCode { get; set; }
     /// <summary>Effective weight: version-level override if set, else question default.</summary>
@@ -129,6 +133,10 @@ public class UpdateQuestionRequest
     public bool AllowNA { get; set; } = true;
     public bool RequireCommentOnNC { get; set; } = true;
     public bool IsScoreable { get; set; } = true;
+    /// <summary>When true, auditor must attach at least one photo on NonConforming.</summary>
+    public bool RequirePhotoOnNc { get; set; } = false;
+    /// <summary>When true, a NonConforming response auto-creates a CorrectiveAction at submit time.</summary>
+    public bool AutoCreateCa { get; set; } = false;
 }
 
 public class BatchUpdateQuestionWeightsRequest

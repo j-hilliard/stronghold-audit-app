@@ -44,6 +44,7 @@ public class AppDbContext : DbContext
     public DbSet<ScheduledReport> ScheduledReports { get; set; } = null!;
     public DbSet<QuestionLogicRule> QuestionLogicRules { get; set; } = null!;
     public DbSet<FindingPhoto> FindingPhotos { get; set; } = null!;
+    public DbSet<CorrectiveActionPhoto> CorrectiveActionPhotos { get; set; } = null!;
 
     // Safety schema
     public DbSet<IncidentReport> IncidentReports { get; set; } = null!;
@@ -370,7 +371,7 @@ public class AppDbContext : DbContext
             b.HasIndex(e => new { e.TemplateId, e.VersionNumber }).IsUnique().HasFilter("[IsDeleted] = 0");
             // Filtered unique index: only one Active version per template at a time
             b.HasIndex(e => new { e.TemplateId, e.Status }).IsUnique().HasFilter("[IsDeleted] = 0 AND [Status] = 'Active'");
-            b.HasCheckConstraint("CK_AuditTemplateVersion_Status", "[Status] IN ('Draft', 'Active', 'Superseded')");
+            b.ToTable("AuditTemplateVersion", "audit", t => t.HasCheckConstraint("CK_AuditTemplateVersion_Status", "[Status] IN ('Draft', 'Active', 'Superseded')"));
             b.HasQueryFilter(e => !e.IsDeleted);
         });
 
@@ -440,8 +441,11 @@ public class AppDbContext : DbContext
             b.HasIndex(e => e.DivisionId);
             b.HasIndex(e => e.Status);
             b.HasIndex(e => e.CreatedBy);
-            b.HasCheckConstraint("CK_Audit_Status", "[Status] IN ('Draft', 'Submitted', 'Reopened', 'Closed')");
-            b.HasCheckConstraint("CK_Audit_AuditType", "[AuditType] IN ('JobSite', 'Facility')");
+            b.ToTable("Audit", "audit", t =>
+            {
+                t.HasCheckConstraint("CK_Audit_Status", "[Status] IN ('Draft', 'Submitted', 'Reopened', 'Closed')");
+                t.HasCheckConstraint("CK_Audit_AuditType", "[AuditType] IN ('JobSite', 'Facility')");
+            });
             b.HasQueryFilter(e => !e.IsDeleted);
         });
 
@@ -497,7 +501,7 @@ public class AppDbContext : DbContext
             b.HasIndex(e => e.AuditId);
             // One response per question per audit
             b.HasIndex(e => new { e.AuditId, e.QuestionId }).IsUnique().HasFilter("[IsDeleted] = 0");
-            b.HasCheckConstraint("CK_AuditResponse_Status", "[Status] IS NULL OR [Status] IN ('Conforming', 'NonConforming', 'Warning', 'NA')");
+            b.ToTable("AuditResponse", "audit", t => t.HasCheckConstraint("CK_AuditResponse_Status", "[Status] IS NULL OR [Status] IN ('Conforming', 'NonConforming', 'Warning', 'NA')"));
             b.HasQueryFilter(e => !e.IsDeleted);
         });
 
@@ -532,11 +536,14 @@ public class AppDbContext : DbContext
                     v => v.HasValue ? DateOnly.FromDateTime(v.Value) : (DateOnly?)null)
                 .HasColumnType("date");
             b.Property(e => e.Status).IsRequired().HasMaxLength(20);
+            b.Property(e => e.Source).IsRequired().HasMaxLength(20).HasDefaultValue("Manual");
             b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
             b.Property(e => e.UpdatedBy).HasMaxLength(200);
             b.Property(e => e.DeletedBy).HasMaxLength(200);
-            b.HasOne(e => e.Finding).WithMany(f => f.CorrectiveActions).HasForeignKey(e => e.FindingId).OnDelete(DeleteBehavior.Restrict);
-            b.HasCheckConstraint("CK_CorrectiveAction_Status", "[Status] IN ('Open', 'InProgress', 'Closed')");
+            b.HasOne(e => e.Finding).WithMany(f => f.CorrectiveActions).HasForeignKey(e => e.FindingId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne(e => e.Question).WithMany().HasForeignKey(e => e.QuestionId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne(e => e.Audit).WithMany().HasForeignKey(e => e.AuditId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
+            b.ToTable("CorrectiveAction", "audit", t => t.HasCheckConstraint("CK_CorrectiveAction_Status", "[Status] IN ('Open', 'InProgress', 'Closed', 'Voided', 'Overdue')"));
             b.HasQueryFilter(e => !e.IsDeleted);
         });
 
@@ -718,7 +725,7 @@ public class AppDbContext : DbContext
             b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
             b.HasOne(e => e.Division).WithMany().HasForeignKey(e => e.DivisionId).OnDelete(DeleteBehavior.Restrict).IsRequired(false);
             b.HasIndex(e => new { e.IsActive, e.NextRunAt });
-            b.HasCheckConstraint("CK_ScheduledReport_Frequency", "[Frequency] IN ('Daily', 'Weekly', 'Monthly', 'Quarterly')");
+            b.ToTable("ScheduledReport", "audit", t => t.HasCheckConstraint("CK_ScheduledReport_Frequency", "[Frequency] IN ('Daily', 'Weekly', 'Monthly', 'Quarterly')"));
         });
 
         modelBuilder.Entity<QuestionLogicRule>(b =>
@@ -731,7 +738,7 @@ public class AppDbContext : DbContext
             b.HasOne(e => e.TriggerVersionQuestion).WithMany().HasForeignKey(e => e.TriggerVersionQuestionId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne(e => e.TargetSection).WithMany().HasForeignKey(e => e.TargetSectionId).OnDelete(DeleteBehavior.Restrict).IsRequired(false);
             b.HasIndex(e => e.TemplateVersionId);
-            b.HasCheckConstraint("CK_QuestionLogicRule_Action", "[Action] IN ('HideSection', 'ShowSection')");
+            b.ToTable("QuestionLogicRule", "audit", t => t.HasCheckConstraint("CK_QuestionLogicRule_Action", "[Action] IN ('HideSection', 'ShowSection')"));
         });
 
         modelBuilder.Entity<FindingPhoto>(b =>
@@ -745,6 +752,18 @@ public class AppDbContext : DbContext
             b.HasOne(e => e.Audit).WithMany().HasForeignKey(e => e.AuditId).OnDelete(DeleteBehavior.Cascade);
             b.HasOne(e => e.Question).WithMany().HasForeignKey(e => e.QuestionId).OnDelete(DeleteBehavior.Restrict);
             b.HasIndex(e => new { e.AuditId, e.QuestionId });
+        });
+
+        modelBuilder.Entity<CorrectiveActionPhoto>(b =>
+        {
+            b.ToTable("CorrectiveActionPhoto", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.FileName).IsRequired().HasMaxLength(500);
+            b.Property(e => e.FilePath).IsRequired().HasMaxLength(1000);
+            b.Property(e => e.UploadedBy).IsRequired().HasMaxLength(256);
+            b.Property(e => e.Caption).HasMaxLength(500);
+            b.HasOne(e => e.CorrectiveAction).WithMany().HasForeignKey(e => e.CorrectiveActionId).OnDelete(DeleteBehavior.Cascade);
+            b.HasIndex(e => e.CorrectiveActionId);
         });
     }
 

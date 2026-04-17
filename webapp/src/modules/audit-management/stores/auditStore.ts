@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { useApiStore } from '@/stores/apiStore';
+import { useUserStore } from '@/stores/userStore';
 import {
     AuditClient,
     type DivisionDto,
@@ -11,6 +12,7 @@ import {
     type AuditListItemDto,
     type AuditReviewDto,
     type LogicRuleDto,
+    type RepeatFindingDto,
 } from '@/apiclient/auditClient';
 
 // ── Local types ───────────────────────────────────────────────────────────────
@@ -26,6 +28,10 @@ export interface ResponseState {
     allowNA: boolean;
     requireCommentOnNC: boolean;
     isScoreable: boolean;
+    /** When true, a photo must be attached before submit if status = NonConforming */
+    requirePhotoOnNc: boolean;
+    /** When true, a NonConforming answer triggers auto-CA creation on submit */
+    autoCreateCa: boolean;
 }
 
 interface LocalDraft {
@@ -88,6 +94,9 @@ export const useAuditStore = defineStore('audit', () => {
 
     const audits = ref<AuditListItemDto[]>([]);
     const review = ref<AuditReviewDto | null>(null);
+
+    /** questionIds that are repeat findings for the current audit's division (last 180 days). */
+    const repeatFindingQuestionIds = ref<Set<number>>(new Set());
 
     const loading = ref(false);      // audit form loading (loadAudit)
     const listLoading = ref(false);  // dashboard list loading
@@ -219,6 +228,8 @@ export const useAuditStore = defineStore('audit', () => {
                         allowNA: q.allowNA,
                         requireCommentOnNC: q.requireCommentOnNC,
                         isScoreable: q.isScoreable,
+                        requirePhotoOnNc: q.requirePhotoOnNc ?? false,
+                        autoCreateCa: q.autoCreateCa ?? false,
                     });
                 }
             }
@@ -308,6 +319,30 @@ export const useAuditStore = defineStore('audit', () => {
             auditId.value = audit.id;
             auditStatus.value = audit.status;
             header.value = audit.header ?? {};
+
+            // 2A-5: Pre-fill audit metadata on new Draft audits
+            if (audit.status === 'Draft') {
+                const userStore = useUserStore();
+                const now = new Date();
+                if (!header.value.auditDate) {
+                    const yyyy = now.getFullYear();
+                    const mm = String(now.getMonth() + 1).padStart(2, '0');
+                    const dd = String(now.getDate()).padStart(2, '0');
+                    header.value = { ...header.value, auditDate: `${yyyy}-${mm}-${dd}` };
+                }
+                if (!header.value.time) {
+                    const hh = String(now.getHours()).padStart(2, '0');
+                    const min = String(now.getMinutes()).padStart(2, '0');
+                    header.value = { ...header.value, time: `${hh}:${min}` };
+                }
+                if (!header.value.auditor) {
+                    const fullName = userStore.userFullName.trim();
+                    if (fullName) {
+                        header.value = { ...header.value, auditor: fullName };
+                    }
+                }
+            }
+
             template.value = tpl;
             enabledOptionalGroupKeys.value = audit.enabledOptionalGroupKeys ?? [];
 
@@ -333,6 +368,15 @@ export const useAuditStore = defineStore('audit', () => {
             }
 
             isDirty.value = false;
+
+            // Load repeat findings (non-blocking — badge is supplementary)
+            getClient().getRepeatFindings(id)
+                .then((findings: RepeatFindingDto[]) => {
+                    repeatFindingQuestionIds.value = new Set(findings.map(f => f.questionId));
+                })
+                .catch(() => {
+                    repeatFindingQuestionIds.value = new Set();
+                });
         } catch {
             toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load audit.', life: 4000 });
         } finally {
@@ -505,6 +549,7 @@ export const useAuditStore = defineStore('audit', () => {
         hasPendingDraft.value = false;
         _pendingDraft.value = null;
         review.value = null;
+        repeatFindingQuestionIds.value = new Set();
     }
 
     return {
@@ -517,6 +562,7 @@ export const useAuditStore = defineStore('audit', () => {
         responses,
         audits,
         review,
+        repeatFindingQuestionIds,
         loading,
         listLoading,
         reviewLoading,

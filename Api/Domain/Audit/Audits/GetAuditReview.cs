@@ -152,6 +152,7 @@ public class GetAuditReviewHandler : IRequestHandler<GetAuditReview, AuditReview
                 .Select(f => new AuditFindingDto
                 {
                     Id = f.Id,
+                    QuestionId = f.QuestionId,
                     QuestionText = f.QuestionTextSnapshot,
                     Comment = f.Description,
                     CorrectedOnSite = f.CorrectedOnSite,

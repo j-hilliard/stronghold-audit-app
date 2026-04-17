@@ -462,6 +462,12 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Property<bool>("IsLifeCritical")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("RequirePhotoOnNc")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("AutoCreateCa")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsRequired")
                         .HasColumnType("bit");
 
@@ -968,8 +974,17 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Property<bool>("EvidenceRequired")
                         .HasColumnType("bit");
 
-                    b.Property<int>("FindingId")
+                    b.Property<int?>("FindingId")
                         .HasColumnType("int");
+
+                    b.Property<int?>("QuestionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Manual");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -992,7 +1007,7 @@ namespace Stronghold.AppDashboard.Data.Migrations
 
                     b.ToTable("CorrectiveAction", "audit", t =>
                         {
-                            t.HasCheckConstraint("CK_CorrectiveAction_Status", "[Status] IN ('Open', 'InProgress', 'Closed')");
+                            t.HasCheckConstraint("CK_CorrectiveAction_Status", "[Status] IN ('Open', 'InProgress', 'Closed', 'Voided', 'Overdue')");
                         });
                 });
 
@@ -1042,6 +1057,12 @@ namespace Stronghold.AppDashboard.Data.Migrations
 
                     b.Property<decimal?>("ScoreTarget")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("AuditFrequencyDays")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("RequireClosurePhoto")
+                        .HasColumnType("bit");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -1181,6 +1202,71 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.HasIndex("AuditId", "QuestionId");
 
                     b.ToTable("FindingPhoto", "audit");
+                });
+
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.CorrectiveActionPhoto", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Caption")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("CorrectiveActionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UploadedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CorrectiveActionId");
+
+                    b.ToTable("CorrectiveActionPhoto", "audit");
                 });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.NewsletterTemplate", b =>
@@ -2749,6 +2835,17 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Navigation("Audit");
 
                     b.Navigation("Question");
+                });
+
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.CorrectiveActionPhoto", b =>
+                {
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.CorrectiveAction", "CorrectiveAction")
+                        .WithMany()
+                        .HasForeignKey("CorrectiveActionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CorrectiveAction");
                 });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.NewsletterTemplate", b =>

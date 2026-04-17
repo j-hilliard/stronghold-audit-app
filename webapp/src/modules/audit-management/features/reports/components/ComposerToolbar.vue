@@ -1,5 +1,5 @@
 <template>
-    <div class="w-52 shrink-0 bg-slate-800 border-r border-slate-700 flex flex-col overflow-y-auto composer-left-rail">
+    <div class="w-56 shrink-0 bg-slate-800 border-r border-slate-700 flex flex-col overflow-y-auto composer-left-rail">
         <!-- Generate button -->
         <div class="p-3 border-b border-slate-700 space-y-2">
             <button
@@ -38,7 +38,7 @@
             <button
                 @click="$emit('print')"
                 data-testid="composer-print"
-                class="w-full flex items-center justify-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded transition-colors"
+                class="w-full flex items-center justify-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs whitespace-nowrap rounded transition-colors"
             >
                 <i class="pi pi-print text-xs" /> Print / Export PDF
             </button>
@@ -47,7 +47,7 @@
         <!-- Theme picker -->
         <div class="px-3 pt-3 pb-2 border-b border-slate-700">
             <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Theme</div>
-            <div class="flex items-center gap-1.5 flex-wrap">
+            <div class="grid grid-cols-6 gap-1.5">
                 <button
                     v-for="theme in REPORT_THEMES"
                     :key="theme.id"
@@ -71,7 +71,7 @@
                 class="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded text-sm text-slate-300 hover:bg-slate-700 transition-colors"
             >
                 <i :class="item.icon" class="text-xs text-slate-500 w-4" />
-                {{ item.label }}
+                <span class="truncate">{{ item.label }}</span>
             </button>
 
             <!-- Bar Chart — section picker -->
@@ -82,7 +82,7 @@
                     :class="openPicker === 'bar' ? 'bg-slate-700 text-white' : 'text-slate-300 hover:bg-slate-700'"
                 >
                     <i class="pi pi-chart-bar text-xs text-slate-500 w-4" />
-                    <span class="flex-1">Bar Chart</span>
+                    <span class="flex-1 truncate" title="Bar Chart">Bar Chart</span>
                     <i class="pi text-xs text-slate-500" :class="openPicker === 'bar' ? 'pi-chevron-up' : 'pi-chevron-down'" />
                 </button>
 
@@ -125,7 +125,7 @@
                     :class="openPicker === 'line' ? 'bg-slate-700 text-white' : 'text-slate-300 hover:bg-slate-700'"
                 >
                     <i class="pi pi-chart-line text-xs text-slate-500 w-4" />
-                    <span class="flex-1">Trend Chart</span>
+                    <span class="flex-1 truncate" title="Trend Chart">Trend Chart</span>
                     <i class="pi text-xs text-slate-500" :class="openPicker === 'line' ? 'pi-chevron-up' : 'pi-chevron-down'" />
                 </button>
 
@@ -158,7 +158,7 @@
                     :class="openPicker === 'findings' ? 'bg-slate-700 text-white' : 'text-slate-300 hover:bg-slate-700'"
                 >
                     <i class="pi pi-list text-xs text-slate-500 w-4" />
-                    <span class="flex-1">Findings Category</span>
+                    <span class="flex-1 truncate" title="Findings Category">Findings Category</span>
                     <i class="pi text-xs text-slate-500" :class="openPicker === 'findings' ? 'pi-chevron-up' : 'pi-chevron-down'" />
                 </button>
                 <div v-if="openPicker === 'findings'" class="ml-2 mt-1 space-y-px">
@@ -192,7 +192,7 @@
                 class="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded text-sm text-slate-300 hover:bg-slate-700 transition-colors"
             >
                 <i :class="item.icon" class="text-xs text-slate-500 w-4" />
-                {{ item.label }}
+                <span class="truncate">{{ item.label }}</span>
             </button>
         </div>
 
@@ -249,8 +249,21 @@ function pick(type: BlockType, sectionName: string | undefined) {
     emit('add-block', type, sectionName);
 }
 
+/**
+ * Feature flag — set to false to hide the full cover-page entry from the
+ * block palette without removing the block type from the data model.
+ *
+ * TODO(page-first): Remove this flag (and the conditional below) once the
+ * cover-page block migrates to the page-first architecture. At that point,
+ * adding a cover page will be a "Add Page" action, not a palette item.
+ */
+const ENABLE_FULL_COVER_PAGE = true;
+
 // Palette items before the chart pickers
 const simplePalette: { type: BlockType; label: string; icon: string }[] = [
+    ...(ENABLE_FULL_COVER_PAGE
+        ? [{ type: 'cover-page' as BlockType, label: 'Full Cover Page', icon: 'pi pi-file' }]
+        : []),
     { type: 'cover',    label: 'Cover Page',   icon: 'pi pi-image' },
     { type: 'heading',  label: 'Heading',       icon: 'pi pi-bars' },
     { type: 'kpi-grid', label: 'KPI Cards',     icon: 'pi pi-th-large' },

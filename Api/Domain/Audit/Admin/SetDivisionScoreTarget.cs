@@ -14,6 +14,10 @@ public class DivisionScoreTargetDto
     public string DivisionCode { get; set; } = null!;
     public string DivisionName { get; set; } = null!;
     public decimal? ScoreTarget { get; set; }
+    /// <summary>How often this division is expected to audit, in days. Null = no schedule set.</summary>
+    public int? AuditFrequencyDays { get; set; }
+    /// <summary>When true, closing a CA in this division requires at least one closure photo.</summary>
+    public bool RequireClosurePhoto { get; set; }
 }
 
 // ── Get all divisions with current targets ─────────────────────────────────────
@@ -33,10 +37,12 @@ public class GetDivisionScoreTargetsHandler : IRequestHandler<GetDivisionScoreTa
             .OrderBy(d => d.Name)
             .Select(d => new DivisionScoreTargetDto
             {
-                DivisionId = d.Id,
-                DivisionCode = d.Code,
-                DivisionName = d.Name,
-                ScoreTarget = d.ScoreTarget,
+                DivisionId         = d.Id,
+                DivisionCode       = d.Code,
+                DivisionName       = d.Name,
+                ScoreTarget        = d.ScoreTarget,
+                AuditFrequencyDays = d.AuditFrequencyDays,
+                RequireClosurePhoto = d.RequireClosurePhoto,
             })
             .ToListAsync(ct);
     }
@@ -74,6 +80,77 @@ public class SetDivisionScoreTargetHandler : IRequestHandler<SetDivisionScoreTar
             DivisionCode = division.Code,
             DivisionName = division.Name,
             ScoreTarget = division.ScoreTarget,
+        };
+    }
+}
+
+// ── Set audit frequency ───────────────────────────────────────────────────────
+
+[AllowedAuthorizationRole(AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
+public class SetDivisionAuditFrequency : IRequest<DivisionScoreTargetDto>
+{
+    public int DivisionId { get; set; }
+    /// <summary>Days between audits, or null to clear the schedule.</summary>
+    public int? AuditFrequencyDays { get; set; }
+}
+
+public class SetDivisionAuditFrequencyHandler : IRequestHandler<SetDivisionAuditFrequency, DivisionScoreTargetDto>
+{
+    private readonly AppDbContext _db;
+    public SetDivisionAuditFrequencyHandler(AppDbContext db) => _db = db;
+
+    public async Task<DivisionScoreTargetDto> Handle(SetDivisionAuditFrequency request, CancellationToken ct)
+    {
+        if (request.AuditFrequencyDays.HasValue && request.AuditFrequencyDays.Value <= 0)
+            throw new ArgumentException("AuditFrequencyDays must be a positive integer.");
+
+        var division = await _db.Divisions.FirstOrDefaultAsync(d => d.Id == request.DivisionId, ct)
+            ?? throw new KeyNotFoundException($"Division {request.DivisionId} not found.");
+
+        division.AuditFrequencyDays = request.AuditFrequencyDays;
+        await _db.SaveChangesAsync(ct);
+
+        return new DivisionScoreTargetDto
+        {
+            DivisionId = division.Id,
+            DivisionCode = division.Code,
+            DivisionName = division.Name,
+            ScoreTarget = division.ScoreTarget,
+            AuditFrequencyDays = division.AuditFrequencyDays,
+        };
+    }
+}
+
+// ── Set closure photo requirement ─────────────────────────────────────────────
+
+[AllowedAuthorizationRole(AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
+public class SetDivisionClosurePhotoRequirement : IRequest<DivisionScoreTargetDto>
+{
+    public int  DivisionId          { get; set; }
+    public bool RequireClosurePhoto { get; set; }
+}
+
+public class SetDivisionClosurePhotoRequirementHandler : IRequestHandler<SetDivisionClosurePhotoRequirement, DivisionScoreTargetDto>
+{
+    private readonly AppDbContext _db;
+    public SetDivisionClosurePhotoRequirementHandler(AppDbContext db) => _db = db;
+
+    public async Task<DivisionScoreTargetDto> Handle(SetDivisionClosurePhotoRequirement request, CancellationToken ct)
+    {
+        var division = await _db.Divisions.FirstOrDefaultAsync(d => d.Id == request.DivisionId, ct)
+            ?? throw new KeyNotFoundException($"Division {request.DivisionId} not found.");
+
+        division.RequireClosurePhoto = request.RequireClosurePhoto;
+        await _db.SaveChangesAsync(ct);
+
+        return new DivisionScoreTargetDto
+        {
+            DivisionId          = division.Id,
+            DivisionCode        = division.Code,
+            DivisionName        = division.Name,
+            ScoreTarget         = division.ScoreTarget,
+            AuditFrequencyDays  = division.AuditFrequencyDays,
+            RequireClosurePhoto = division.RequireClosurePhoto,
         };
     }
 }

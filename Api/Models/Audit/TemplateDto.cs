@@ -61,4 +61,8 @@ public class TemplateQuestionDto
     public bool IsScoreable { get; set; }
     /// <summary>When true a NonConforming answer auto-fails the whole audit.</summary>
     public bool IsLifeCritical { get; set; }
+    /// <summary>When true, auditor must attach at least one photo when marking NonConforming.</summary>
+    public bool RequirePhotoOnNc { get; set; }
+    /// <summary>When true, a NonConforming response auto-creates a CorrectiveAction at submit time.</summary>
+    public bool AutoCreateCa { get; set; }
 }

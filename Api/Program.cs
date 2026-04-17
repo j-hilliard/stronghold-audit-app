@@ -158,10 +158,16 @@ builder.Services.AddSingleton<IPublicClientApplication>(sp =>
 
 // Versioning
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddApiVersioning();
-builder.Services.AddVersionedApiExplorer(opt =>
+builder.Services.AddApiVersioning(opt =>
 {
-    opt.GroupNameFormat = "'v'V";
+    opt.DefaultApiVersion = new Asp.Versioning.ApiVersion(1, 0);
+    opt.AssumeDefaultVersionWhenUnspecified = true;
+    opt.ReportApiVersions = true;
+})
+.AddMvc()
+.AddApiExplorer(opt =>
+{
+    opt.GroupNameFormat = "'v'VVV";
     opt.SubstituteApiVersionInUrl = true;
 });
 
@@ -173,9 +179,8 @@ builder.Services.AddOpenApiDocument(
         configure.Version = "v1";
         configure.DocumentName = "v1";
         configure.ApiGroupNames = new[] { "v1" };
-        configure.FlattenInheritanceHierarchy = false;
         configure.Title = "Stronghold Audit App API";
-        configure.SchemaProcessors.Add(
+        configure.SchemaSettings.SchemaProcessors.Add(
             serviceProvider.GetService<FluentValidationSchemaProcessor>()
         );
         configure.OperationProcessors.Add(new AspNetCoreOperationSecurityScopeProcessor("OAuth2"));
@@ -255,7 +260,7 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Local"))
     app.UseOpenApi();
     app.UseMigrationsEndPoint();
     app.UseDeveloperExceptionPage();
-    app.UseSwaggerUi3(settings =>
+    app.UseSwaggerUi(settings =>
     {
         settings.OAuth2Client = new OAuth2ClientSettings
         {
@@ -288,13 +293,23 @@ if (!AppConfigExtensions.IsRunningForNswagCodegen())
     var services = scope.ServiceProvider;
     var context = services.GetRequiredService<AppDbContext>();
 
-    if (app.Environment.IsEnvironment("Local") || app.Environment.IsDevelopment())
+    if (app.Environment.IsEnvironment("Local"))
     {
+        // Local dev: auto-migrate so individual developers don't need to run EF CLI manually.
+        // Also seeds full dev data (users, divisions, templates, etc.).
         context.Database.Migrate();
+        DbInitializer.Initialize(context);
+    }
+    else if (app.Environment.IsDevelopment())
+    {
+        // Development (Azure slot): migrations are applied by the CI/CD pipeline BEFORE the app
+        // starts. The app only seeds reference data — never auto-migrates shared environments.
         DbInitializer.Initialize(context);
     }
     else if (app.Environment.IsProduction())
     {
+        // Production: same as Development — pipeline handles migrations.
+        // Production-mode seed skips dev-only data and dummy records.
         DbInitializer.Initialize(context, true);
     }
 }
