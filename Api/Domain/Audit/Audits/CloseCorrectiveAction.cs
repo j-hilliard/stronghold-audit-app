@@ -11,7 +11,8 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
     AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.Auditor, AuthorizationRole.AuditAdmin, AuthorizationRole.NormalUser)]
 public class CloseCorrectiveAction : IRequest<Unit>
 {
     public int CorrectiveActionId { get; set; }
@@ -69,6 +70,8 @@ public class CloseCorrectiveActionHandler : IRequestHandler<CloseCorrectiveActio
         ca.Description = string.IsNullOrWhiteSpace(request.Payload.Notes)
             ? ca.Description
             : $"{ca.Description}\n\nResolution: {request.Payload.Notes}";
+        if (!string.IsNullOrWhiteSpace(request.Payload.RootCause))
+            ca.RootCause = request.Payload.RootCause;
         ca.CompletedDate = completedDate ?? DateOnly.FromDateTime(now);
         ca.ClosedDate = now;
         ca.UpdatedAt = now;

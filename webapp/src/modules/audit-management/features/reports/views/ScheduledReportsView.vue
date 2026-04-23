@@ -146,7 +146,7 @@
             </template>
         </Dialog>
 
-        <ConfirmDialog />
+
         <Toast />
     </div>
 </template>
@@ -161,7 +161,6 @@ import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
 import Tag from 'primevue/tag';
 import ProgressSpinner from 'primevue/progressspinner';
-import ConfirmDialog from 'primevue/confirmdialog';
 import Toast from 'primevue/toast';
 import { useConfirm } from 'primevue/useconfirm';
 import { useToast } from 'primevue/usetoast';
@@ -271,10 +270,10 @@ function confirmDelete(s: any) {
         header: 'Delete Schedule',
         icon: 'pi pi-exclamation-triangle',
         acceptClass: 'p-button-danger',
-        accept: async () => {
-            await apiStore.api.delete(`/v1/reports/scheduled/${s.id}`);
-            await load();
-            toast.add({ severity: 'success', summary: 'Deleted', life: 3000 });
+        accept: () => {
+            apiStore.api.delete(`/v1/reports/scheduled/${s.id}`)
+                .then(() => load())
+                .then(() => toast.add({ severity: 'success', summary: 'Deleted', life: 3000 }));
         },
     });
 }

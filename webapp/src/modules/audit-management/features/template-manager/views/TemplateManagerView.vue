@@ -191,7 +191,7 @@
                             <template #item="{ element: section }">
                                 <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
                                     <!-- Section header -->
-                                    <div class="px-3 py-2.5 bg-slate-750 border-b border-slate-700 flex items-center gap-2 flex-wrap">
+                                    <div class="px-3 py-2.5 bg-slate-750 border-b border-slate-700 flex items-center gap-2 min-w-0">
                                         <span class="section-drag-handle cursor-grab text-slate-500 hover:text-slate-300 pi pi-bars shrink-0" title="Drag to reorder" />
 
                                         <template v-if="editingSectionId === section.id">
@@ -275,49 +275,62 @@
                                                     >{{ q.questionText }}</span>
                                                 </template>
 
-                                                <!-- Question weight (editable) -->
-                                                <div class="flex items-center gap-0.5 shrink-0" title="Question weight within this section (all questions must sum to 100%)">
-                                                    <input
-                                                        type="number"
-                                                        v-model.number="q.weight"
-                                                        @change="saveQuestionWeight(section, q)"
-                                                        min="0" max="100" step="1"
-                                                        class="w-12 bg-slate-700 border border-slate-600 rounded px-1 py-0.5 text-xs text-slate-200 text-center focus:outline-none focus:border-blue-400"
+                                                <!-- Right-side controls: fixed-width per cell so all rows column-align -->
+                                                <div class="flex items-center shrink-0 ml-1">
+                                                    <!-- Weight -->
+                                                    <div class="flex items-center gap-0.5 w-[3.75rem]" title="Question weight within this section (all questions must sum to 100%)">
+                                                        <input
+                                                            type="number"
+                                                            v-model.number="q.weight"
+                                                            @change="saveQuestionWeight(section, q)"
+                                                            min="0" max="100" step="1"
+                                                            class="w-10 bg-slate-700 border border-slate-600 rounded px-1 py-0.5 text-xs text-slate-200 text-center focus:outline-none focus:border-blue-400"
+                                                        />
+                                                        <span class="text-[10px] text-slate-500">%</span>
+                                                    </div>
+                                                    <!-- Life Critical -->
+                                                    <button
+                                                        @click="toggleLifeCritical(section, q)"
+                                                        :class="q.isLifeCritical ? 'text-red-400 hover:text-red-300' : 'text-slate-600 hover:text-slate-400'"
+                                                        title="Life Critical — NonConforming auto-fails entire audit"
+                                                        class="pi pi-exclamation-triangle text-xs w-5 text-center transition-colors"
                                                     />
-                                                    <span class="text-[10px] text-slate-500">%</span>
+                                                    <!-- Require Photo -->
+                                                    <button
+                                                        @click="toggleRequirePhotoOnNc(section, q)"
+                                                        :class="q.requirePhotoOnNc ? 'text-amber-400 hover:text-amber-300' : 'text-slate-600 hover:text-slate-400'"
+                                                        title="Require Photo on NC — auditor must attach a photo when NonConforming"
+                                                        class="pi pi-camera text-xs w-5 text-center transition-colors"
+                                                    />
+                                                    <!-- Auto-Create CA -->
+                                                    <button
+                                                        @click="toggleAutoCreateCa(section, q)"
+                                                        :class="q.autoCreateCa ? 'text-blue-400 hover:text-blue-300' : 'text-slate-600 hover:text-slate-400'"
+                                                        title="Auto-Create CA — NonConforming response auto-creates a corrective action on submit"
+                                                        class="pi pi-ticket text-xs w-5 text-center transition-colors"
+                                                    />
+                                                    <!-- N/A — fixed width, dimmed when off -->
+                                                    <span
+                                                        class="w-6 text-center text-[10px] transition-colors"
+                                                        :class="q.allowNA ? 'text-slate-500' : 'text-slate-700'"
+                                                        title="N/A allowed"
+                                                    >N/A</span>
+                                                    <!-- Cmnt — fixed width, dimmed when off -->
+                                                    <span
+                                                        class="w-8 text-center text-[10px] transition-colors"
+                                                        :class="q.requireCommentOnNC ? 'text-slate-500' : 'text-slate-700'"
+                                                        title="Comment required on NC"
+                                                    >Cmnt</span>
+                                                    <!-- Unscored — fixed width, invisible when scored -->
+                                                    <span
+                                                        class="w-12 text-center text-[10px] transition-colors"
+                                                        :class="!q.isScoreable ? 'text-amber-600' : 'text-transparent select-none'"
+                                                        title="Not scored"
+                                                    >Unscored</span>
+                                                    <!-- Edit / Delete (hover only) -->
+                                                    <button @click="startEditQuestion(q)" class="opacity-0 group-hover:opacity-100 w-5 text-center text-slate-400 hover:text-blue-300 pi pi-pencil text-xs transition-opacity" title="Edit question text" />
+                                                    <button @click="onRemoveQuestion(section.id, q.versionQuestionId)" class="opacity-0 group-hover:opacity-100 w-5 text-center text-red-400 hover:text-red-300 pi pi-trash text-xs transition-opacity" title="Remove question" />
                                                 </div>
-
-                                                <!-- Life Critical toggle -->
-                                                <button
-                                                    @click="toggleLifeCritical(section, q)"
-                                                    :class="q.isLifeCritical ? 'text-red-400 hover:text-red-300' : 'text-slate-600 hover:text-slate-400'"
-                                                    title="Life Critical — NonConforming auto-fails entire audit"
-                                                    class="pi pi-exclamation-triangle text-xs shrink-0 transition-colors"
-                                                />
-
-                                                <!-- Require Photo on NC toggle -->
-                                                <button
-                                                    @click="toggleRequirePhotoOnNc(section, q)"
-                                                    :class="q.requirePhotoOnNc ? 'text-amber-400 hover:text-amber-300' : 'text-slate-600 hover:text-slate-400'"
-                                                    title="Require Photo on NC — auditor must attach a photo when NonConforming"
-                                                    class="pi pi-camera text-xs shrink-0 transition-colors"
-                                                />
-
-                                                <!-- Auto-Create CA toggle -->
-                                                <button
-                                                    @click="toggleAutoCreateCa(section, q)"
-                                                    :class="q.autoCreateCa ? 'text-blue-400 hover:text-blue-300' : 'text-slate-600 hover:text-slate-400'"
-                                                    title="Auto-Create CA — NonConforming response auto-creates a corrective action on submit"
-                                                    class="pi pi-ticket text-xs shrink-0 transition-colors"
-                                                />
-
-                                                <div class="flex gap-1.5 shrink-0 text-[10px] text-slate-600">
-                                                    <span v-if="q.allowNA" title="N/A allowed">N/A</span>
-                                                    <span v-if="q.requireCommentOnNC" title="Comment required on NC">Cmnt</span>
-                                                    <span v-if="!q.isScoreable" title="Not scored" class="text-amber-600">Unscored</span>
-                                                </div>
-                                                <button @click="startEditQuestion(q)" class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-300 pi pi-pencil text-xs shrink-0 transition-opacity" title="Edit question text" />
-                                                <button @click="onRemoveQuestion(section.id, q.versionQuestionId)" class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 pi pi-trash text-xs shrink-0 transition-opacity" title="Remove question" />
                                             </div>
                                         </template>
                                     </draggable>

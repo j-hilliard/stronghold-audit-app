@@ -11,7 +11,8 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
     AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.ReadOnlyViewer,
     AuthorizationRole.ExecutiveViewer, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.Auditor, AuthorizationRole.AuditAdmin, AuthorizationRole.Executive)]
 public class GetAuditList : IRequest<List<AuditListItemDto>>
 {
     public int? DivisionId { get; set; }
@@ -39,6 +40,7 @@ public class GetAuditListHandler : IRequestHandler<GetAuditList, List<AuditListI
         var query = _context.Audits
             .Include(a => a.Division)
             .Include(a => a.Header)
+            .Where(a => !a.IsDeleted)
             .AsQueryable();
 
         // Division scope: scoped users only see their assigned divisions
@@ -78,7 +80,8 @@ public class GetAuditListHandler : IRequestHandler<GetAuditList, List<AuditListI
             Auditor = a.Header?.Auditor,
             AuditDate = a.Header?.AuditDate?.ToString("yyyy-MM-dd"),
             JobNumber = a.Header?.JobNumber,
-            Location = a.Header?.Location
+            Location = a.Header?.Location,
+            TrackingNumber = a.TrackingNumber
         }).ToList();
     }
 }

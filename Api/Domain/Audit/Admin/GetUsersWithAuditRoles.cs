@@ -7,7 +7,10 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Admin;
 
-[AllowedAuthorizationRole(AuthorizationRole.Administrator, AuthorizationRole.TemplateAdmin)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.Administrator, AuthorizationRole.TemplateAdmin, AuthorizationRole.AuditAdmin,
+    AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
+    AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.Auditor, AuthorizationRole.NormalUser)]
 public class GetUsersWithAuditRoles : IRequest<List<UserAuditRoleDto>> { }
 
 public class GetUsersWithAuditRolesHandler : IRequestHandler<GetUsersWithAuditRoles, List<UserAuditRoleDto>>

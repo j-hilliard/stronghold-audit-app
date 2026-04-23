@@ -49,7 +49,7 @@ public class UserProfile : Profile
             .ForMember(user => user.UserRoles, expression => expression.Ignore());
 
         CreateMap<Data.Models.User, User>()
-            .ForMember(user => user.Roles, expression => expression.Ignore());
+            .ForMember(user => user.Roles, expression => expression.MapFrom(src => src.UserRoles));
 
         CreateMap<UserRole, Data.Models.UserRole>();
         CreateMap<Data.Models.UserRole, UserRole>();

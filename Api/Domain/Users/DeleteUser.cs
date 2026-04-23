@@ -6,7 +6,7 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Users;
 
-[AllowedAuthorizationRole(AuthorizationRole.Administrator)]
+[AllowedAuthorizationRole(AuthorizationRole.Administrator, AuthorizationRole.ITAdmin)]
 public class DeleteUser : IRequest<bool?>
 {
     public int UserId { get; set; }

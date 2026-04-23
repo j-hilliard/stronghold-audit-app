@@ -22,7 +22,8 @@ public class CorrectiveActionPhotoDto
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
     AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.Auditor, AuthorizationRole.AuditAdmin, AuthorizationRole.NormalUser)]
 public class UploadCaClosurePhoto : IRequest<CorrectiveActionPhotoDto>
 {
     public int    CorrectiveActionId { get; set; }

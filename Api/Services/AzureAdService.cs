@@ -7,26 +7,42 @@ namespace Stronghold.AppDashboard.Api.Services;
 public class AzureAdHelper
 {
     private readonly GraphServiceClient _graphClient;
+    private readonly ILogger<AzureAdHelper> _logger;
 
-    public AzureAdHelper(IConfiguration configuration)
+    public AzureAdHelper(
+        IConfiguration configuration,
+        IWebHostEnvironment environment,
+        ILogger<AzureAdHelper> logger
+    )
     {
+        _logger = logger;
+
         var tenantId = configuration["AzureAd:TenantId"];
         var clientId = configuration["AzureAd:ClientId"];
         var appRegSecret = configuration["AppRegSecretForGraphAccess"];
 
-        if (string.IsNullOrWhiteSpace(tenantId))
-            throw new ArgumentException(
-                "TenantId is not configured correctly. Please check your configuration."
-            );
+        if (string.IsNullOrWhiteSpace(tenantId) || string.IsNullOrWhiteSpace(clientId))
+        {
+            if (environment.IsEnvironment("Local"))
+            {
+                _logger.LogWarning(
+                    "AzureAdHelper: TenantId/ClientId missing in Local environment. Graph lookups are disabled."
+                );
+                _graphClient = null!;
+                return;
+            }
 
-        if (string.IsNullOrWhiteSpace(clientId))
             throw new ArgumentException(
-                "ClientId is not configured correctly. Please check your configuration."
+                "TenantId/ClientId are not configured correctly. Please check your AzureAd configuration."
             );
+        }
 
         if (string.IsNullOrWhiteSpace(appRegSecret))
         {
             // Local dev — Graph access not configured; methods will return null.
+            _logger.LogInformation(
+                "AzureAdHelper: AppRegSecretForGraphAccess is not set. Graph lookups are disabled."
+            );
             _graphClient = null!;
             return;
         }
@@ -37,7 +53,7 @@ public class AzureAdHelper
 
     public async Task<AdUserInfo?> GetAdUserInfoByObjectIdAsync(Guid objectId)
     {
-        if (objectId == Guid.Empty)
+        if (objectId == Guid.Empty || _graphClient == null)
             return null;
 
         try
@@ -82,7 +98,7 @@ public class AzureAdHelper
 
     public async Task<AdGroupInfo?> GetAdGroupInfoByGroupNameAsync(string groupName)
     {
-        if (string.IsNullOrWhiteSpace(groupName))
+        if (string.IsNullOrWhiteSpace(groupName) || _graphClient == null)
             return null;
 
         try
@@ -124,7 +140,7 @@ public class AzureAdHelper
     {
         var users = new List<AdUserInfo>();
 
-        if (groupObjectId == Guid.Empty)
+        if (groupObjectId == Guid.Empty || _graphClient == null)
             return users;
 
         try

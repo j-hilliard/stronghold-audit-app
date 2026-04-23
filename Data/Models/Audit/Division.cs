@@ -35,6 +35,36 @@ public class Division : AuditableEntity
     /// </summary>
     public bool RequireClosurePhoto { get; set; } = false;
 
+    // ── SLA configuration ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Default CA due-date window in days for Normal-priority CAs.
+    /// When set, CreateCorrectiveAction auto-computes DueDate = today + SlaNormalDays if none is supplied.
+    /// </summary>
+    public int? SlaNormalDays { get; set; }
+
+    /// <summary>
+    /// Due-date window in days for Urgent-priority CAs (faster SLA).
+    /// </summary>
+    public int? SlaUrgentDays { get; set; }
+
+    /// <summary>
+    /// Number of days past DueDate before a CA is considered "escalated".
+    /// 0 = escalate immediately on becoming overdue. Null = no escalation threshold.
+    /// </summary>
+    public int? SlaEscalateAfterDays { get; set; }
+
+    /// <summary>
+    /// Email address (or semicolon-separated list) to notify when a CA passes its escalation threshold.
+    /// </summary>
+    public string? EscalationEmail { get; set; }
+
+    /// <summary>
+    /// OPU number from NAV/ERP system (e.g. "E465" for ETS, "E464" for CSL).
+    /// Used for cross-referencing with finance/operations systems.
+    /// </summary>
+    public string? OPUNumber { get; set; }
+
     // Navigation
     public ICollection<AuditTemplate> Templates { get; set; } = new List<AuditTemplate>();
     public ICollection<EmailRoutingRule> EmailRoutingRules { get; set; } = new List<EmailRoutingRule>();

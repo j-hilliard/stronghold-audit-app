@@ -3,8 +3,9 @@
         <BasePageHeader
             icon="pi pi-eye"
             :title="review ? `${review.divisionCode} Audit Review` : 'Audit Review'"
-            :subtitle="review ? `${review.divisionName} — ${review.status}` : ''"
+            :subtitle="review ? `${review.divisionName} — ${review.status}${review.trackingNumber ? ` · ${review.trackingNumber}` : ''}` : ''"
         >
+            <Tag v-if="review?.reviewedAt" value="Distributed" severity="success" class="text-xs" />
             <Button
                 label="Back to Form"
                 icon="pi pi-arrow-left"
@@ -20,13 +21,14 @@
                 @click="printPage"
             />
             <Button
-                v-if="review && review.reviewEmailRouting.length > 0"
-                label="Send for Review"
-                icon="pi pi-envelope"
-                @click="openEmailClient"
+                v-if="review && userStore.isAuditAdmin"
+                label="Send Distribution"
+                icon="pi pi-send"
+                :loading="distributionLoadingPreview"
+                @click="openDistributionDialog"
             />
             <Button
-                v-if="review && (review.status === 'Submitted' || review.status === 'Closed')"
+                v-if="review && userStore.isAuditAdmin && (review.status === 'Submitted' || review.status === 'Closed')"
                 label="Reopen"
                 icon="pi pi-refresh"
                 severity="warning"
@@ -34,7 +36,14 @@
                 @click="showReopenDialog = true"
             />
             <Button
-                v-if="review && (review.status === 'Submitted' || review.status === 'Reopened')"
+                v-if="review && review.status === 'Reopened'"
+                label="Submit for Review"
+                icon="pi pi-send"
+                severity="info"
+                @click="router.push(`/audit-management/audits/${route.params.id}`)"
+            />
+            <Button
+                v-if="review && userStore.isAuditAdmin && (review.status === 'Submitted' || review.status === 'Reopened')"
                 label="Close Audit"
                 icon="pi pi-check-circle"
                 severity="success"
@@ -76,7 +85,7 @@
             <ProgressSpinner />
         </div>
 
-        <div v-else-if="review" class="p-4 space-y-4">
+        <div v-else-if="review" class="p-4 space-y-4 audit-review-content">
 
             <!-- ── Life-Critical Failure Banner ───────────────────────────────── -->
             <div
@@ -110,7 +119,7 @@
                 class="rounded-lg border border-sky-800 bg-sky-950/40 overflow-hidden"
             >
                 <button
-                    class="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-sky-900/20 transition-colors"
+                    class="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-sky-900/20 transition-colors no-print"
                     @click="showAiSummary = !showAiSummary"
                 >
                     <div class="flex items-center gap-2">
@@ -181,6 +190,40 @@
                             <div class="h-full rounded-full transition-all duration-700" :class="barColor" :style="{ width: `${review.scorePercent}%` }" />
                         </div>
                     </div>
+                </template>
+            </Card>
+
+            <!-- ── Findings Summary (AuditAdmin editable, others read-only) ──── -->
+            <Card v-if="userStore.isAuditAdmin || review.reviewSummary">
+                <template #title>
+                    <div class="flex items-center justify-between">
+                        <span class="text-base font-semibold text-white">Findings Summary</span>
+                        <span v-if="!userStore.isAuditAdmin" class="text-xs text-slate-500 italic">Read-only</span>
+                    </div>
+                </template>
+                <template #content>
+                    <div v-if="userStore.isAuditAdmin" class="space-y-3 no-print">
+                        <Textarea
+                            v-model="reviewSummaryDraft"
+                            rows="5"
+                            class="w-full text-sm"
+                            placeholder="Write a findings narrative to include in the distribution email…"
+                            autoResize
+                        />
+                        <div class="flex items-center gap-3">
+                            <Button
+                                label="Save Summary"
+                                icon="pi pi-save"
+                                size="small"
+                                :loading="summarySaving"
+                                :disabled="reviewSummaryDraft === (review.reviewSummary ?? '')"
+                                @click="submitSaveSummary"
+                            />
+                            <span class="text-xs text-slate-500">Saved text appears in the distribution email.</span>
+                        </div>
+                    </div>
+                    <p v-if="userStore.isAuditAdmin" class="print-only text-sm leading-relaxed whitespace-pre-wrap">{{ reviewSummaryDraft || 'No findings summary written.' }}</p>
+                    <p v-else class="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{{ review.reviewSummary }}</p>
                 </template>
             </Card>
 
@@ -257,7 +300,7 @@
                         <div
                             v-for="(item, idx) in review.nonConformingItems"
                             :key="item.id"
-                            class="border border-red-800 rounded-lg p-3 bg-red-950/20"
+                            class="finding-card border border-red-800 rounded-lg p-3 bg-red-950/20"
                         >
                             <!-- Finding header -->
                             <div class="flex items-start justify-between gap-2">
@@ -279,11 +322,12 @@
                                     <span v-else class="text-xs bg-slate-700 border border-slate-600 text-slate-400 rounded px-1.5 py-0.5">Not Corrected</span>
                                     <Button
                                         v-if="!item.correctedOnSite"
-                                        label="Assign CA"
-                                        icon="pi pi-plus"
+                                        :label="item.correctiveActions.length > 0 ? 'Reassign CA' : 'Assign CA'"
+                                        :icon="item.correctiveActions.length > 0 ? 'pi pi-refresh' : 'pi pi-plus'"
                                         size="small"
                                         severity="warning"
                                         outlined
+                                        class="no-print"
                                         @click="openAssignModal(item)"
                                     />
                                 </div>
@@ -312,6 +356,7 @@
                                             size="small"
                                             severity="success"
                                             outlined
+                                            class="no-print"
                                             @click="openCloseModal(ca)"
                                         />
                                     </div>
@@ -339,7 +384,7 @@
                         <div
                             v-for="(item, idx) in review.warningItems"
                             :key="item.questionId"
-                            class="border border-amber-800 rounded-lg p-3 bg-amber-950/20"
+                            class="warning-card border border-amber-800 rounded-lg p-3 bg-amber-950/20"
                         >
                             <p class="text-sm text-slate-200">
                                 <span class="text-slate-500 mr-1">{{ idx + 1 }}.</span>
@@ -357,7 +402,7 @@
                     <div class="flex items-center justify-between">
                         <span class="text-base font-semibold text-white">Full Audit Record</span>
                         <button
-                            class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1"
+                            class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 no-print"
                             @click="showFullRecord = !showFullRecord"
                         >
                             <i :class="showFullRecord ? 'pi pi-chevron-up' : 'pi pi-chevron-down'" />
@@ -392,21 +437,207 @@
                 </template>
             </Card>
 
-            <!-- Email routing info -->
-            <Card v-if="review.reviewEmailRouting.length > 0">
-                <template #title><span class="text-base font-semibold text-white">Review Recipients</span></template>
+            <!-- ── Distribution Recipients ─────────────────────────────────── -->
+            <Card v-if="review.reviewEmailRouting.length > 0 || (review.distributionRecipients?.length ?? 0) > 0 || userStore.isAuditAdmin" class="distribution-section">
+                <template #title>
+                    <span class="text-base font-semibold text-white">Distribution Recipients</span>
+                </template>
                 <template #content>
-                    <ul class="text-sm text-slate-300 space-y-1">
-                        <li v-for="r in review.reviewEmailRouting" :key="r.emailAddress" class="flex items-center gap-2">
-                            <i class="pi pi-envelope text-slate-500 text-xs" />{{ r.emailAddress }}
-                        </li>
-                    </ul>
+                    <div class="space-y-4">
+                        <!-- Auto recipients -->
+                        <div v-if="review.reviewEmailRouting.length > 0">
+                            <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Auto (Division Routing)</p>
+                            <ul class="space-y-1">
+                                <li v-for="r in review.reviewEmailRouting" :key="r.emailAddress" class="flex items-center gap-2 text-sm text-slate-300">
+                                    <i class="pi pi-envelope text-slate-500 text-xs" />{{ r.emailAddress }}
+                                </li>
+                            </ul>
+                        </div>
+                        <!-- Per-audit additions -->
+                        <div v-if="(review.distributionRecipients?.length ?? 0) > 0 || userStore.isAuditAdmin">
+                            <div class="flex items-center justify-between mb-1">
+                                <p class="text-xs text-slate-500 uppercase tracking-wide">Additional Recipients</p>
+                                <Button
+                                    v-if="userStore.isAuditAdmin"
+                                    label="Add People"
+                                    icon="pi pi-plus"
+                                    size="small"
+                                    text
+                                    class="!py-0 !text-xs no-print"
+                                    @click="openAddRecipientsDialog"
+                                />
+                            </div>
+                            <ul v-if="review.distributionRecipients?.length" class="space-y-1">
+                                <li v-for="r in review.distributionRecipients" :key="r.id" class="flex items-center gap-2 text-sm text-slate-300">
+                                    <i class="pi pi-user text-slate-500 text-xs" />
+                                    <span class="flex-1">{{ r.emailAddress }}<span v-if="r.name" class="text-slate-500"> — {{ r.name }}</span></span>
+                                    <Button
+                                        v-if="userStore.isAuditAdmin"
+                                        icon="pi pi-times"
+                                        severity="danger"
+                                        text
+                                        size="small"
+                                        class="!p-1"
+                                        :loading="removingRecipientId === r.id"
+                                        @click="removeRecipient(r.id)"
+                                    />
+                                </li>
+                            </ul>
+                            <p v-else-if="!userStore.isAuditAdmin" class="text-sm text-slate-500 italic">No additional recipients added.</p>
+                        </div>
+                    </div>
                 </template>
             </Card>
         </div>
 
         <div v-else class="p-4 text-center text-slate-400">Review not available.</div>
     </div>
+
+    <!-- Add Recipients dialog -->
+    <Dialog v-model:visible="showAddRecipientsDialog" modal header="Add Distribution Recipients" :style="{ width: '540px' }">
+        <div class="space-y-4 pt-1">
+            <!-- Search + Division filter -->
+            <div class="flex gap-2">
+                <InputText
+                    v-model="addRecipientsSearch"
+                    placeholder="Search by name or email..."
+                    class="text-sm flex-1"
+                    autofocus
+                />
+                <select
+                    v-model="addRecipientsDivisionFilter"
+                    class="bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500 w-36"
+                >
+                    <option value="">All Companies</option>
+                    <option v-for="div in dialogDivisionOptions" :key="div" :value="div">{{ div }}</option>
+                </select>
+            </div>
+
+            <!-- Routing list -->
+            <div class="max-h-64 overflow-y-auto space-y-1 border border-slate-700 rounded-lg p-2 bg-slate-900/50">
+                <p v-if="filteredRoutingForDialog.length === 0" class="text-sm text-slate-500 italic py-2 text-center">No matches found.</p>
+                <label
+                    v-for="entry in filteredRoutingForDialog"
+                    :key="entry.emailAddress"
+                    class="flex items-center gap-3 px-3 py-2 rounded cursor-pointer hover:bg-slate-700/50 transition-colors"
+                    :class="{ 'bg-slate-700/30': dialogSelectedEmails.includes(entry.emailAddress) }"
+                >
+                    <input
+                        type="checkbox"
+                        :value="entry.emailAddress"
+                        v-model="dialogSelectedEmails"
+                        class="accent-blue-500 w-4 h-4 shrink-0"
+                    />
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm text-slate-200 truncate">{{ nameFromEmail(entry.emailAddress) }}</p>
+                        <p class="text-xs text-slate-500 truncate">{{ entry.emailAddress }} &middot; {{ entry.divisionCode }}</p>
+                    </div>
+                </label>
+            </div>
+
+            <!-- Manual entry for someone not in the list -->
+            <div class="border-t border-slate-700 pt-3 space-y-2">
+                <p class="text-xs text-slate-400 font-semibold uppercase tracking-wide">Not in the list? Add manually:</p>
+                <div class="flex gap-2">
+                    <InputText v-model="manualEmail" placeholder="email@example.com" class="text-sm flex-1" />
+                    <InputText v-model="manualName" placeholder="Name (optional)" class="text-sm w-36" />
+                </div>
+            </div>
+        </div>
+        <template #footer>
+            <Button label="Cancel" severity="secondary" text @click="closeAddRecipientsDialog" />
+            <Button
+                label="Add Selected"
+                icon="pi pi-check"
+                :loading="addingRecipient"
+                :disabled="dialogSelectedEmails.length === 0 && !manualEmail.trim()"
+                @click="submitAddRecipients"
+            />
+        </template>
+    </Dialog>
+
+    <!-- Send Distribution Email dialog — preview-first -->
+    <Dialog v-model:visible="showDistributionDialog" modal header="Send Distribution Email" :style="{ width: '720px', maxHeight: '90vh' }">
+        <div class="flex flex-col gap-4 pt-2" v-if="review && distributionPreview">
+
+            <!-- Subject — editable -->
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-slate-400 font-medium uppercase tracking-wide">Email Subject</label>
+                <InputText v-model="editableSubject" class="w-full font-mono text-sm" />
+            </div>
+
+            <!-- Recipients -->
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-slate-400 font-medium uppercase tracking-wide">Recipients ({{ distributionPreview.recipients.length }})</label>
+                <div class="bg-slate-800/50 rounded p-3 text-xs text-slate-400 space-y-1 max-h-28 overflow-y-auto">
+                    <div v-for="email in distributionPreview.recipients" :key="email" class="flex items-center gap-2">
+                        <i class="pi pi-envelope text-xs" />{{ email }}
+                    </div>
+                    <p v-if="distributionPreview.recipients.length === 0" class="text-amber-400 text-xs">
+                        No recipients configured. Add recipients in the Distribution Recipients section below before sending.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Findings Summary — editable -->
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-slate-400 font-medium uppercase tracking-wide">Findings Summary <span class="text-slate-500 normal-case font-normal">(edit before sending)</span></label>
+                <Textarea
+                    v-model="distributionSummaryEdit"
+                    rows="3"
+                    class="w-full text-sm"
+                    placeholder="Write a findings narrative to include in the distribution email…"
+                    autoResize
+                />
+            </div>
+
+            <!-- Attachment selection -->
+            <div v-if="review.attachments?.length" class="flex flex-col gap-1">
+                <label class="text-xs text-slate-400 font-medium uppercase tracking-wide">Attachments</label>
+                <div class="space-y-1 max-h-32 overflow-y-auto bg-slate-800/30 rounded p-2">
+                    <label
+                        v-for="att in review.attachments"
+                        :key="att.id"
+                        class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer hover:text-white"
+                    >
+                        <input
+                            type="checkbox"
+                            :value="att.id"
+                            v-model="selectedAttachmentIds"
+                            :disabled="!att.hasFile"
+                            class="accent-sky-500"
+                        />
+                        <span :class="{ 'text-slate-500': !att.hasFile }">
+                            {{ att.fileName }}
+                            <span class="text-xs text-slate-500 ml-1">({{ formatBytes(att.fileSizeBytes) }})</span>
+                            <span v-if="!att.hasFile" class="text-xs text-red-500 ml-1">file not found</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Email body preview — always visible -->
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-slate-400 font-medium uppercase tracking-wide">Email Preview</label>
+                <div
+                    class="border border-slate-700 rounded overflow-auto bg-white"
+                    style="max-height: 340px; min-height: 120px;"
+                    v-html="distributionPreview.bodyHtml"
+                />
+            </div>
+        </div>
+        <template #footer>
+            <Button label="Cancel" severity="secondary" text @click="showDistributionDialog = false" />
+            <Button
+                label="Send Distribution Email"
+                icon="pi pi-send"
+                severity="success"
+                :loading="distributionSending"
+                :disabled="(distributionPreview?.recipients.length ?? 0) === 0"
+                @click="submitDistributionEmail"
+            />
+        </template>
+    </Dialog>
 
     <!-- Assign CA modal -->
     <Dialog v-model:visible="showAssign" header="Assign Corrective Action" modal style="width: 480px">
@@ -425,7 +656,7 @@
             </div>
             <div>
                 <label class="text-xs text-slate-400 block mb-1">Due Date</label>
-                <InputText v-model="assignForm.dueDate" class="w-full text-sm" placeholder="YYYY-MM-DD" />
+                <InputText v-model="assignForm.dueDate" type="date" class="w-full text-sm" />
             </div>
         </div>
         <template #footer>
@@ -442,8 +673,8 @@
                 <Textarea v-model="closeForm.notes" rows="3" class="w-full text-sm" placeholder="Describe how this was resolved..." autoResize />
             </div>
             <div>
-                <label class="text-xs text-slate-400 block mb-1">Completion Date</label>
-                <InputText v-model="closeForm.completedDate" class="w-full text-sm" placeholder="YYYY-MM-DD (leave blank for today)" />
+                <label class="text-xs text-slate-400 block mb-1">Completion Date <span class="text-slate-600">(defaults to today)</span></label>
+                <InputText v-model="closeForm.completedDate" type="date" class="w-full text-sm" />
             </div>
         </div>
         <template #footer>
@@ -454,7 +685,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import ProgressSpinner from 'primevue/progressspinner';
@@ -467,18 +698,249 @@ import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import AuditAttachments from '@/modules/audit-management/features/audit-form/components/AuditAttachments.vue';
 import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
 import { useApiStore } from '@/stores/apiStore';
-import { AuditClient, type AuditFindingDto, type CorrectiveActionDto } from '@/apiclient/auditClient';
+import { useUserStore } from '@/stores/userStore';
+import { AuditClient, type AuditFindingDto, type CorrectiveActionDto, type EmailRoutingRuleDto, type DistributionPreviewDto } from '@/apiclient/auditClient';
 
 const router = useRouter();
 const route = useRoute();
 const store = useAuditStore();
 const apiStore = useApiStore();
+const userStore = useUserStore();
 const toast = useToast();
 
 const review = computed(() => store.review);
 const saving = ref(false);
 const showFullRecord = ref(false);
 const showAiSummary = ref(true); // expanded by default
+
+// ── Review Summary ────────────────────────────────────────────────────────────
+const reviewSummaryDraft = ref('');
+const summarySaving = ref(false);
+
+watch(() => review.value?.reviewSummary, (val) => {
+    reviewSummaryDraft.value = val ?? '';
+}, { immediate: true });
+
+async function submitSaveSummary() {
+    const id = Number(route.params.id);
+    summarySaving.value = true;
+    try {
+        await store.saveReviewSummary(id, reviewSummaryDraft.value || null);
+        toast.add({ severity: 'success', summary: 'Saved', detail: 'Findings summary saved.', life: 2500 });
+    } catch {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to save summary.', life: 4000 });
+    } finally {
+        summarySaving.value = false;
+    }
+}
+
+// ── Distribution Recipients ───────────────────────────────────────────────────
+const addingRecipient = ref(false);
+const removingRecipientId = ref<number | null>(null);
+
+// Add recipients dialog
+const showAddRecipientsDialog = ref(false);
+const addRecipientsSearch = ref('');
+const addRecipientsDivisionFilter = ref('');
+const dialogSelectedEmails = ref<string[]>([]);
+const manualEmail = ref('');
+const manualName = ref('');
+
+// All active routing entries (loaded on mount) — source for the dialog list
+const allRoutingEntries = ref<EmailRoutingRuleDto[]>([]);
+
+// Unique sorted division codes from the routing table for the filter dropdown
+const dialogDivisionOptions = computed(() =>
+    [...new Set(allRoutingEntries.value.filter(r => r.isActive).map(r => r.divisionCode))].sort()
+);
+
+// Derive a human-readable name from an email address (brian.smith@... → "Brian Smith")
+function nameFromEmail(email: string): string {
+    const local = email.split('@')[0] ?? '';
+    return local.split(/[._-]/).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+}
+
+const filteredRoutingForDialog = computed(() => {
+    const already = new Set((review.value?.distributionRecipients ?? []).map(r => r.emailAddress));
+    const q = addRecipientsSearch.value.toLowerCase();
+    const div = addRecipientsDivisionFilter.value;
+    return allRoutingEntries.value.filter(r => {
+        if (!r.isActive || already.has(r.emailAddress)) return false;
+        if (div && r.divisionCode !== div) return false;
+        if (q) {
+            const derivedName = nameFromEmail(r.emailAddress).toLowerCase();
+            if (!r.emailAddress.toLowerCase().includes(q) && !derivedName.includes(q)) return false;
+        }
+        return true;
+    });
+});
+
+function closeAddRecipientsDialog() {
+    showAddRecipientsDialog.value = false;
+    addRecipientsSearch.value = '';
+    addRecipientsDivisionFilter.value = '';
+    dialogSelectedEmails.value = [];
+    manualEmail.value = '';
+    manualName.value = '';
+}
+
+function openAddRecipientsDialog() {
+    // Default to the current audit's division so the list is pre-filtered
+    addRecipientsDivisionFilter.value = review.value?.divisionCode ?? '';
+    showAddRecipientsDialog.value = true;
+}
+
+async function submitAddRecipients() {
+    const id = Number(route.params.id);
+    addingRecipient.value = true;
+    try {
+        // Add all checked routing entries
+        for (const email of dialogSelectedEmails.value) {
+            await store.addDistributionRecipient(id, email, undefined);
+        }
+        // Add manual entry if provided
+        if (manualEmail.value.trim()) {
+            await store.addDistributionRecipient(id, manualEmail.value.trim(), manualName.value.trim() || undefined);
+        }
+        const total = dialogSelectedEmails.value.length + (manualEmail.value.trim() ? 1 : 0);
+        toast.add({ severity: 'success', summary: 'Added', detail: `${total} recipient(s) added.`, life: 2500 });
+        closeAddRecipientsDialog();
+    } catch {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to add recipients.', life: 4000 });
+    } finally {
+        addingRecipient.value = false;
+    }
+}
+
+async function removeRecipient(recipientId: number) {
+    const id = Number(route.params.id);
+    removingRecipientId.value = recipientId;
+    try {
+        await store.removeDistributionRecipient(id, recipientId);
+        toast.add({ severity: 'success', summary: 'Removed', detail: 'Recipient removed.', life: 2000 });
+    } catch {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to remove recipient.', life: 4000 });
+    } finally {
+        removingRecipientId.value = null;
+    }
+}
+
+// ── Send Distribution Email ───────────────────────────────────────────────────
+const showDistributionDialog = ref(false);
+const distributionLoadingPreview = ref(false);
+const distributionSending = ref(false);
+const distributionPreview = ref<DistributionPreviewDto | null>(null);
+const distributionSummaryEdit = ref('');
+const editableSubject = ref('');
+const selectedAttachmentIds = ref<number[]>([]);
+
+function escapeHtml(input: string): string {
+    return input
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function buildFallbackDistributionPreview(auditId: number): DistributionPreviewDto | null {
+    if (!review.value) return null;
+
+    const division = review.value.divisionCode || 'Audit';
+    const trackingOrJob = review.value.trackingNumber || review.value.header?.jobNumber || `Audit ${auditId}`;
+    const auditDate = review.value.header?.auditDate ? ` — ${review.value.header.auditDate}` : '';
+    const recipients = (review.value.distributionRecipients ?? [])
+        .map(r => r.emailAddress)
+        .filter((v): v is string => Boolean(v && v.trim()))
+        .map(v => v.trim());
+    const findingsSummary = reviewSummaryDraft.value || review.value.reviewSummary || null;
+    const safeSummary = findingsSummary ? escapeHtml(findingsSummary) : 'No findings summary provided.';
+    const location = review.value.header?.location ? escapeHtml(review.value.header.location) : 'N/A';
+    const auditor = review.value.header?.auditor ? escapeHtml(review.value.header.auditor) : 'N/A';
+
+    return {
+        subject: `${division} Audit Distribution — ${trackingOrJob}${auditDate}`,
+        recipients,
+        findingsSummary,
+        bodyHtml: `
+            <div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.5;color:#111827">
+                <h2 style="margin:0 0 8px 0;">${escapeHtml(division)} Audit Distribution</h2>
+                <p style="margin:0 0 4px 0;"><strong>Reference:</strong> ${escapeHtml(trackingOrJob)}</p>
+                <p style="margin:0 0 4px 0;"><strong>Location:</strong> ${location}</p>
+                <p style="margin:0 0 12px 0;"><strong>Auditor:</strong> ${auditor}</p>
+                <h3 style="margin:0 0 6px 0;">Findings Summary</h3>
+                <div style="padding:10px;border:1px solid #d1d5db;border-radius:6px;white-space:pre-wrap;">${safeSummary}</div>
+            </div>
+        `,
+    };
+}
+
+async function openDistributionDialog() {
+    const id = Number(route.params.id);
+    distributionLoadingPreview.value = true;
+    try {
+        const preview = await store.getDistributionPreview(id, selectedAttachmentIds.value);
+        distributionPreview.value = preview;
+        distributionSummaryEdit.value = preview.findingsSummary ?? '';
+        editableSubject.value = preview.subject;
+        showDistributionDialog.value = true;
+    } catch (e: any) {
+        const status = e?.response?.status;
+        // Backward compatibility: if backend is not yet running the new preview endpoint,
+        // build a local preview so users can still send distribution emails.
+        if (status !== 403 && status !== 401) {
+            const fallback = buildFallbackDistributionPreview(id);
+            if (fallback) {
+                distributionPreview.value = fallback;
+                distributionSummaryEdit.value = fallback.findingsSummary ?? '';
+                editableSubject.value = fallback.subject;
+                showDistributionDialog.value = true;
+                toast.add({
+                    severity: 'warn',
+                    summary: 'Preview Fallback',
+                    detail: 'Live preview endpoint unavailable. Using local preview mode.',
+                    life: 4500,
+                });
+                return;
+            }
+        }
+
+        const detail = status === 403
+            ? 'You do not have permission to preview distribution emails.'
+            : status === 404
+            ? 'Audit not found.'
+            : (typeof e?.response?.data === 'string' ? e.response.data : null)
+              ?? e?.message
+              ?? 'Failed to load distribution preview.';
+        toast.add({ severity: 'error', summary: 'Error', detail, life: 6000 });
+    } finally {
+        distributionLoadingPreview.value = false;
+    }
+}
+
+async function submitDistributionEmail() {
+    const id = Number(route.params.id);
+    distributionSending.value = true;
+    try {
+        // Save edited summary back to the audit so the email uses the updated text
+        await store.saveReviewSummary(id, distributionSummaryEdit.value || null);
+        await store.sendDistributionEmail(id, selectedAttachmentIds.value, editableSubject.value || undefined);
+        showDistributionDialog.value = false;
+        distributionPreview.value = null;
+        selectedAttachmentIds.value = [];
+        toast.add({ severity: 'success', summary: 'Sent', detail: 'Distribution email sent successfully.', life: 4000 });
+    } catch {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to send distribution email.', life: 5000 });
+    } finally {
+        distributionSending.value = false;
+    }
+}
+
+function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 /** O(1) set for repeat-finding badge lookups */
 const repeatFindingIdSet = computed(() => new Set(review.value?.repeatFindingQuestionIds ?? []));
@@ -527,7 +989,12 @@ async function submitCloseAudit() {
         closeAuditNotes.value = '';
         await store.loadReview(id);
     } catch (e: unknown) {
-        toast.add({ severity: 'error', summary: 'Error', detail: (e as Error)?.message ?? 'Failed to close.', life: 4000 });
+        // Extract the server error message for the open-CA gate (400 BadRequest with plain string body)
+        const axiosErr = e as { response?: { status?: number; data?: unknown } };
+        const serverMsg = typeof axiosErr?.response?.data === 'string'
+            ? axiosErr.response.data
+            : (e as Error)?.message ?? 'Failed to close audit.';
+        toast.add({ severity: 'error', summary: 'Cannot Close Audit', detail: serverMsg, life: 6000 });
     } finally {
         auditActionSaving.value = false;
     }
@@ -592,6 +1059,13 @@ async function submitClose() {
 onMounted(async () => {
     const id = Number(route.params.id);
     if (!isNaN(id)) await store.loadReview(id);
+
+    // Load email routing entries for the recipient autocomplete suggestions
+    if (userStore.isAuditAdmin) {
+        try {
+            allRoutingEntries.value = await getClient().getEmailRouting();
+        } catch { /* non-fatal */ }
+    }
 });
 
 const scoreDisplay = computed(() => {
@@ -669,29 +1143,9 @@ async function printPage() {
     const wasOpen = showFullRecord.value;
     showFullRecord.value = true;
     await nextTick();
-    window.print();
+    sessionStorage.setItem('print-review-data', JSON.stringify(review.value));
+    window.open(`/audit-management/print-review/${route.params.id}`, '_blank');
     showFullRecord.value = wasOpen;
 }
 
-function openEmailClient() {
-    if (!review.value) return;
-    const r = review.value;
-    const to = r.reviewEmailRouting.map(x => x.emailAddress).join(';');
-    const subject = encodeURIComponent(`[For Review] ${r.divisionCode} Compliance Audit`);
-    const hdr = r.header;
-    const headerLines = [
-        hdr?.auditDate ? `Date: ${hdr.auditDate}` : '',
-        hdr?.auditor ? `Auditor: ${hdr.auditor}` : '',
-        hdr?.jobNumber ? `Job #: ${hdr.jobNumber}` : '',
-        hdr?.location ? `Location: ${hdr.location}` : '',
-    ].filter(Boolean).join('\n');
-    const ncLines = r.nonConformingItems
-        .map((item, i) => `${i + 1}. ${item.questionText}` + (item.correctedOnSite ? ' [Corrected On-Site]' : '') + (item.comment ? `\n   Comment: ${item.comment}` : ''))
-        .join('\n');
-    const body = encodeURIComponent(
-        `${r.divisionName} Compliance Audit\nScore: ${scoreDisplay.value}\nStatus: ${r.status}\n\n${headerLines}\n\n` +
-        (r.nonConformingItems.length > 0 ? `Non-Conforming Items (${r.nonConformingItems.length}):\n${ncLines}\n` : 'No non-conforming items.\n'),
-    );
-    window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank');
-}
 </script>

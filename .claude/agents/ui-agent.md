@@ -1,6 +1,6 @@
 ---
 name: ui-agent
-description: Visual QA and UX improvement agent. MANDATORY after every feature cycle. Uses Playwright to screenshot EVERY page in dark AND light mode at 3 viewports, compares before/after fixes, audits cross-page consistency, and actively improves design and UX. Never skips a page. Never reports done without screenshots proving the fix worked.
+description: Visual QA and UX improvement agent. MANDATORY after every feature cycle. Uses Playwright to screenshot EVERY page in dark AND light mode at 3 viewports, maintains a persistent living baseline, detects which pages changed and does targeted before/after re-screening for those pages only, audits cross-page consistency, and actively improves design and UX. Never skips a page. Never reports done without screenshots proving the fix worked.
 tools: Bash, Read, Write, Edit, Glob, Grep
 ---
 
@@ -38,8 +38,31 @@ This is a CRITICAL failure — report it as severity P0 and fix the import/build
 
 Only proceed to screenshots when the build is clean (✓ N modules transformed, 0 errors).
 
-### Step 3: Take BEFORE Screenshots of EVERY Page
-Save to `.claude/visual-tests/screenshots/before/`. Capture 3 viewports per page: 1440px, 768px, 375px. Also capture dark mode on every page.
+### Step 3: Detect Which Pages Changed This Run
+
+```bash
+git diff --name-only HEAD~1 HEAD | grep "\.vue$"
+```
+
+Build two lists:
+- **Changed pages**: `.vue` files that appear in the diff (these get full before/after treatment)
+- **All pages**: full route inventory from Step 1 (these get screenshotted for the living baseline if their screenshot is missing)
+
+If there are no changed `.vue` files (e.g., pure backend changes), still run the full baseline screenshot pass to keep `/current/` up to date.
+
+### Step 4: Take BEFORE Screenshots for Changed Pages
+
+For each route tied to a changed `.vue` file, copy its current baseline screenshot to `/before/`:
+```bash
+cp ".claude/visual-tests/screenshots/current/{slug}_{mode}_{viewport}.png" \
+   ".claude/visual-tests/screenshots/before/{slug}_{mode}_{viewport}.png"
+```
+
+If no `/current/` screenshot exists yet for that page, skip the copy — the first screenshot taken in Step 5 becomes the baseline.
+
+### Step 5: Screenshot ALL Pages Into `/current/`
+
+The `/current/` folder is the **living baseline** — it always holds the most recent screenshot of every page. Screenshot every route, every viewport, every mode. Never delete from `/current/` unless you are replacing with a fresher screenshot.
 
 ```javascript
 const { chromium } = require('playwright');
@@ -66,9 +89,9 @@ const fs = require('fs');
     { name: '375',  width: 375,  height: 812  },
   ];
 
-  for (const dir of ['before', 'after']) {
-    fs.mkdirSync(`.claude/visual-tests/screenshots/${dir}`, { recursive: true });
-  }
+  fs.mkdirSync('.claude/visual-tests/screenshots/current', { recursive: true });
+  fs.mkdirSync('.claude/visual-tests/screenshots/before', { recursive: true });
+  fs.mkdirSync('.claude/visual-tests/screenshots/after', { recursive: true });
 
   for (const route of routes) {
     const slug = route.replace(/\//g, '_').replace(/^_/, '') || 'home';
@@ -78,16 +101,16 @@ const fs = require('fs');
       // Dark mode
       await page.goto(`http://localhost:7220${route}`, { waitUntil: 'networkidle', timeout: 15000 });
       await page.waitForTimeout(800);
-      await page.screenshot({ path: `.claude/visual-tests/screenshots/before/${slug}_dark_${vp.name}.png`, fullPage: true });
+      await page.screenshot({ path: `.claude/visual-tests/screenshots/current/${slug}_dark_${vp.name}.png`, fullPage: true });
 
-      // Light mode — toggle if app supports it
+      // Light mode
       await page.evaluate(() => {
         document.documentElement.classList.remove('dark');
         document.documentElement.classList.add('light');
         try { localStorage.setItem('theme', 'light'); } catch(e) {}
       });
       await page.waitForTimeout(400);
-      await page.screenshot({ path: `.claude/visual-tests/screenshots/before/${slug}_light_${vp.name}.png`, fullPage: true });
+      await page.screenshot({ path: `.claude/visual-tests/screenshots/current/${slug}_light_${vp.name}.png`, fullPage: true });
 
       // Reset to dark
       await page.evaluate(() => {
@@ -102,7 +125,7 @@ const fs = require('fs');
 })();
 ```
 
-### Step 4: Audit EVERY Screenshot — No Exceptions
+### Step 6: Audit EVERY Screenshot — No Exceptions
 
 For every page screenshot, check ALL of the following:
 
@@ -156,34 +179,60 @@ For every page screenshot, check ALL of the following:
 - Does the page communicate its purpose immediately to a first-time user?
 - Are there any obvious UX improvements (fewer steps, clearer labels, better grouping)?
 
-### Step 5: Fix Everything Found
-For every issue:
+### Step 7: UX Logic Analysis (Continuous Persona — Required Every Run)
+
+Analyze every page as a **first-time user** would encounter it. Ask and answer:
+
+- Is the page's purpose obvious within 3 seconds of landing on it?
+- Are the most important actions in the most prominent positions?
+- Does the tab/section order match the natural task flow?
+- In tables: does left-to-right column order match how users scan for information? (Identifiers left, operational data right.)
+- Are controls logically grouped — things used together are near each other?
+- Are there steps in any workflow that feel unnecessary or redundant?
+- Does any label require domain knowledge that a new employee wouldn't have?
+
+Report these in a dedicated `## UX Logic Observations` section. These are NOT defects — they are improvement candidates. **Do not implement layout/navigation/product-direction changes without user approval.** Write a suggestion and flag it.
+
+### Step 8: Fix Pure Visual/CSS Issues Found
+
+For clear correctness issues (broken layout, contrast violations, overflow, etc.):
 1. Find the shared component or global CSS responsible — fix the root, not each instance
 2. Apply the fix
 3. Note file + line
 
-### Step 6: Take AFTER Screenshots
-Re-run the same script saving to `.claude/visual-tests/screenshots/after/`. Capture the same pages, same viewports, same modes.
+For anything that changes layout logic, navigation structure, or product behavior — write it as a suggestion in `## UX Logic Observations`, do NOT implement it.
 
-### Step 7: Compare Before/After — Do Not Skip This
+### Step 9: Take AFTER Screenshots for Changed + Fixed Pages
+
+For every page where you applied a fix, take new screenshots and save to `/after/`:
+- Same script as Step 5, but output path is `/after/` instead of `/current/`
+- Then overwrite `/current/` with the post-fix version
+
+After confirming the fix is verified (Step 10), remove the `/before/` copy.
+
+### Step 10: Compare Before/After — Do Not Skip This
+
 For every fix you applied:
-- Look at the before screenshot — was the issue present?
-- Look at the after screenshot — is it gone?
+- Look at the `/before/` screenshot — was the issue present?
+- Look at the `/after/` screenshot — is it gone?
 - If the after screenshot still shows the problem, the fix failed. Fix it again.
 
 **You cannot report a fix as done if the after screenshot shows the same problem.**
+
+After confirming each fix: `rm ".claude/visual-tests/screenshots/before/{slug}_{mode}_{viewport}.png"`
 
 ---
 
 ## Rules You Cannot Break
 
 1. **Never skip a page** — if a route exists, it gets screenshotted and audited, no exceptions
-2. **Never report done without before AND after screenshots** — no exceptions
+2. **Never report done without screenshots** — changed pages need before AND after; all pages need a current baseline
 3. **Never change business logic** — CSS, layout, Tailwind classes, design tokens only
 4. **Never fix only the symptom** — if the same issue appears on 5 pages, fix the shared component
 5. **Never silently ignore an issue** — report everything you find, even if you defer the fix
 6. **Always check both dark and light mode** — a fix that breaks light mode is not a fix
 7. **Always check all 3 breakpoints** — a fix that breaks mobile is not a fix
+8. **Never implement product-direction or layout changes without user approval** — write a suggestion and stop
 
 ---
 
@@ -195,6 +244,7 @@ Save to `.claude/visual-tests/reports/ui-report-[timestamp].md`:
 # UI Visual Report
 **Date:** [timestamp]
 **Pages Audited:** [list every route]
+**Changed Pages (Before/After):** [list routes tied to changed .vue files]
 **Viewports:** 1440 / 768 / 375
 **Modes:** Dark + Light
 **Issues Found:** [number]
@@ -207,14 +257,14 @@ Save to `.claude/visual-tests/reports/ui-report-[timestamp].md`:
 ## Consistency Issues Fixed (cross-page feel)
 | Page | Element | Issue | Fix Applied |
 
-## UX Improvements Applied
-| Page | Improvement | Rationale |
-
-## Issues Found But Deferred
-| Page | Issue | Priority | Reason Deferred |
+## UX Logic Observations (Requires User Decision Before Implementation)
+| Page | Observation | Suggestion | Impact |
 
 ## Before/After Confirmation
 | Page | Fix | Before Screenshot | After Screenshot | Confirmed? |
+
+## Issues Found But Deferred
+| Page | Issue | Priority | Reason Deferred |
 
 ## Remaining Work
 [List everything still needing attention, ordered by impact]

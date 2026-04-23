@@ -28,18 +28,24 @@
             </div>
         </div>
         <div v-if="staticMenuMobileActive" class="layout-mask modal-in" @click="staticMenuMobileActive = false"></div>
+        <DevRoleSwitcher v-if="isDev" />
+        <ConfirmDialog />
     </div>
 </template>
 
 <script setup lang="ts">
 import PrimeVueToast from 'primevue/toast';
+import ConfirmDialog from 'primevue/confirmdialog';
 import { useToast } from 'primevue/usetoast';
 import EventBus from '@/layout/event-bus.ts';
 import TheMenu from '@/components/layout/TheMenu.vue';
 import TheTopBar from '@/components/layout/TheTopBar.vue';
+import DevRoleSwitcher from '@/components/layout/DevRoleSwitcher.vue';
 import { useAppStore } from '@/stores/appStore.ts';
 import { ref, computed, onBeforeMount, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
+
+const isDev = import.meta.env.DEV;
 
 const menuTheme = ref('dim');
 const menuClick = ref(false);

@@ -10,7 +10,7 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Templates;
 
 // ── Get rules for a version ────────────────────────────────────────────────────
 
-[AllowedAuthorizationRole(AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
+[AllowedAuthorizationRole(AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator, AuthorizationRole.AuditAdmin)]
 public class GetLogicRules : IRequest<List<LogicRuleDto>>
 {
     public int TemplateVersionId { get; set; }
@@ -42,7 +42,7 @@ public class GetLogicRulesHandler : IRequestHandler<GetLogicRules, List<LogicRul
 
 // ── Upsert ─────────────────────────────────────────────────────────────────────
 
-[AllowedAuthorizationRole(AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
+[AllowedAuthorizationRole(AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator, AuthorizationRole.AuditAdmin)]
 public class UpsertLogicRule : IRequest<LogicRuleDto>
 {
     public SaveLogicRuleRequest Rule { get; set; } = null!;
@@ -83,7 +83,7 @@ public class UpsertLogicRuleHandler : IRequestHandler<UpsertLogicRule, LogicRule
 
 // ── Delete ─────────────────────────────────────────────────────────────────────
 
-[AllowedAuthorizationRole(AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
+[AllowedAuthorizationRole(AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator, AuthorizationRole.AuditAdmin)]
 public class DeleteLogicRule : IRequest<Unit>
 {
     public int Id { get; set; }

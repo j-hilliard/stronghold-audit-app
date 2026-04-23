@@ -14,7 +14,7 @@
 withDefaults(defineProps<{
     label?: string;
     disabled?: boolean;
-    errors?: { $message: string; [key: string] }[];
+    errors?: Array<{ $message: string | { toString(): string } }>;
 }>(), {
     label: '',
     disabled: false,

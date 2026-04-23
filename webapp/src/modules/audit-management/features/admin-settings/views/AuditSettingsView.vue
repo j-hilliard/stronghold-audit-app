@@ -6,17 +6,17 @@
             icon="pi pi-cog"
         />
 
-        <div class="p-4 max-w-5xl">
+        <div class="p-4 max-w-6xl">
             <!-- Tab bar -->
-            <div class="flex gap-1 mb-5 border-b border-slate-700">
+            <div class="flex gap-0.5 mb-5 border-b border-slate-700">
                 <button
                     v-for="tab in TABS"
                     :key="tab.key"
                     @click="activeTab = tab.key"
-                    class="px-4 py-2 text-sm font-medium transition-colors"
+                    class="px-5 py-2.5 text-sm font-medium transition-colors rounded-t -mb-px"
                     :class="activeTab === tab.key
-                        ? 'border-b-2 border-blue-500 text-blue-400'
-                        : 'text-slate-400 hover:text-slate-200'"
+                        ? 'border border-slate-700 border-b-transparent bg-slate-800 text-blue-400'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'"
                 >
                     {{ tab.label }}
                 </button>
@@ -66,8 +66,8 @@
                 </div>
 
                 <!-- Recipient table for selected division -->
-                <div v-if="activeDivisionGroup" class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-                    <table class="w-full text-sm">
+                <div v-if="activeDivisionGroup" class="bg-slate-800 border border-slate-700 rounded-lg overflow-x-auto">
+                    <table class="w-full text-sm" style="min-width: 420px;">
                         <thead>
                             <tr class="border-b border-slate-700 text-slate-400 text-xs uppercase tracking-wide">
                                 <th class="px-4 py-2 text-left">Name</th>
@@ -194,16 +194,14 @@
                 </div>
 
                 <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-                    <table class="w-full text-sm">
+                    <table class="w-full text-sm table-fixed">
                         <thead>
                             <tr class="border-b border-slate-700 text-slate-400 text-xs uppercase tracking-wide">
-                                <th class="px-4 py-2 text-left">Division</th>
-                                <th class="px-4 py-2 text-left">Code</th>
-                                <th class="px-4 py-2 text-center w-40">Score Target (%)</th>
-                                <th class="px-4 py-2 w-24 text-center">Target</th>
-                                <th class="px-4 py-2 text-center w-44">Audit Frequency (days)</th>
-                                <th class="px-4 py-2 w-24 text-center">Frequency</th>
-                                <th class="px-4 py-2 text-center w-44" title="Require at least one photo when closing a corrective action">Require Closure Photo</th>
+                                <th class="px-3 py-3 text-left w-40">Division</th>
+                                <th class="px-3 py-3 text-center w-44">Score Target (%)</th>
+                                <th class="px-3 py-3 text-center w-44">Audit Frequency (days)</th>
+                                <th class="px-3 py-3 text-center w-36" title="Require at least one photo when closing a corrective action">Closure Photo</th>
+                                <th class="px-3 py-3 text-center" title="SLA due-date window per priority level">SLA (Normal / Urgent / Escalate days + Email)</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-700/50">
@@ -212,50 +210,52 @@
                                 :key="row.divisionId"
                                 class="hover:bg-slate-700/30 transition-colors"
                             >
-                                <td class="px-4 py-2 text-slate-200">{{ row.divisionName }}</td>
-                                <td class="px-4 py-2 text-slate-400 font-mono text-xs">{{ row.divisionCode }}</td>
-                                <td class="px-4 py-2 text-center">
-                                    <input
-                                        v-model.number="row.pendingTarget"
-                                        type="number"
-                                        min="0"
-                                        max="100"
-                                        step="1"
-                                        placeholder="—"
-                                        class="w-20 text-center bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                                    />
-                                    <span class="text-slate-400 ml-1 text-xs">%</span>
+                                <td class="px-3 py-3 text-slate-200">
+                                    <div>{{ row.divisionName }}</div>
+                                    <div class="text-slate-500 font-mono text-[11px] mt-0.5">{{ row.divisionCode }}</div>
                                 </td>
-                                <td class="px-4 py-2 text-center">
-                                    <button
-                                        @click="saveTarget(row)"
-                                        :disabled="row.saving || row.pendingTarget === (row.scoreTarget ?? null)"
-                                        class="px-3 py-1 text-xs bg-blue-700 hover:bg-blue-600 text-white rounded disabled:opacity-40 transition-colors"
-                                    >
-                                        {{ row.saving ? 'Saving…' : 'Save' }}
-                                    </button>
+                                <td class="px-3 py-3">
+                                    <div class="flex items-center justify-center gap-2">
+                                        <input
+                                            v-model.number="row.pendingTarget"
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            step="1"
+                                            placeholder="—"
+                                            class="w-16 text-center bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                                        />
+                                        <span class="text-slate-400 text-xs">%</span>
+                                        <button
+                                            @click="saveTarget(row)"
+                                            :disabled="row.saving || row.pendingTarget === (row.scoreTarget ?? null)"
+                                            class="px-2.5 py-1 text-xs bg-blue-700 hover:bg-blue-600 text-white rounded disabled:opacity-40 transition-colors whitespace-nowrap"
+                                        >
+                                            {{ row.saving ? 'Saving…' : 'Save' }}
+                                        </button>
+                                    </div>
                                 </td>
-                                <td class="px-4 py-2 text-center">
-                                    <input
-                                        v-model.number="row.pendingFrequency"
-                                        type="number"
-                                        min="1"
-                                        step="1"
-                                        placeholder="—"
-                                        class="w-20 text-center bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                                    />
-                                    <span class="text-slate-400 ml-1 text-xs">days</span>
+                                <td class="px-3 py-3">
+                                    <div class="flex items-center justify-center gap-2">
+                                        <input
+                                            v-model.number="row.pendingFrequency"
+                                            type="number"
+                                            min="1"
+                                            step="1"
+                                            placeholder="—"
+                                            class="w-16 text-center bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                                        />
+                                        <span class="text-slate-400 text-xs">days</span>
+                                        <button
+                                            @click="saveFrequency(row)"
+                                            :disabled="row.savingFrequency || (row.pendingFrequency ?? null) === (row.auditFrequencyDays ?? null)"
+                                            class="px-2.5 py-1 text-xs bg-blue-700 hover:bg-blue-600 text-white rounded disabled:opacity-40 transition-colors whitespace-nowrap"
+                                        >
+                                            {{ row.savingFrequency ? 'Saving…' : 'Save' }}
+                                        </button>
+                                    </div>
                                 </td>
-                                <td class="px-4 py-2 text-center">
-                                    <button
-                                        @click="saveFrequency(row)"
-                                        :disabled="row.savingFrequency || (row.pendingFrequency ?? null) === (row.auditFrequencyDays ?? null)"
-                                        class="px-3 py-1 text-xs bg-blue-700 hover:bg-blue-600 text-white rounded disabled:opacity-40 transition-colors"
-                                    >
-                                        {{ row.savingFrequency ? 'Saving…' : 'Save' }}
-                                    </button>
-                                </td>
-                                <td class="px-4 py-2 text-center">
+                                <td class="px-3 py-3 text-center">
                                     <label class="inline-flex items-center gap-2 cursor-pointer">
                                         <input
                                             type="checkbox"
@@ -264,12 +264,64 @@
                                             class="w-4 h-4 accent-blue-500 cursor-pointer"
                                             @change="toggleClosurePhoto(row, ($event.target as HTMLInputElement).checked)"
                                         />
-                                        <span class="text-xs text-slate-400">{{ row.savingClosurePhoto ? 'Saving…' : '' }}</span>
+                                        <span v-if="row.savingClosurePhoto" class="text-xs text-slate-400">Saving…</span>
                                     </label>
+                                </td>
+                                <!-- SLA configuration -->
+                                <td class="px-3 py-2">
+                                    <div class="flex flex-col gap-1.5">
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="text-[10px] text-slate-500 w-14 shrink-0">Normal</span>
+                                            <input
+                                                v-model.number="row.pendingSlaNormal"
+                                                type="number"
+                                                min="1"
+                                                step="1"
+                                                placeholder="14"
+                                                class="w-14 text-center bg-slate-700 border border-slate-600 rounded px-1.5 py-0.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                                            />
+                                            <span class="text-[10px] text-slate-500">d</span>
+                                            <span class="text-[10px] text-slate-500 w-10 shrink-0 ml-1">Urgent</span>
+                                            <input
+                                                v-model.number="row.pendingSlaUrgent"
+                                                type="number"
+                                                min="1"
+                                                step="1"
+                                                placeholder="7"
+                                                class="w-14 text-center bg-slate-700 border border-slate-600 rounded px-1.5 py-0.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                                            />
+                                            <span class="text-[10px] text-slate-500">d</span>
+                                        </div>
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="text-[10px] text-slate-500 w-14 shrink-0">Escalate</span>
+                                            <input
+                                                v-model.number="row.pendingSlaEscalate"
+                                                type="number"
+                                                min="1"
+                                                step="1"
+                                                placeholder="—"
+                                                class="w-14 text-center bg-slate-700 border border-slate-600 rounded px-1.5 py-0.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                                            />
+                                            <span class="text-[10px] text-slate-500 shrink-0">d via</span>
+                                            <input
+                                                v-model="row.pendingEscalationEmail"
+                                                type="email"
+                                                placeholder="email"
+                                                class="flex-1 bg-slate-700 border border-slate-600 rounded px-1.5 py-0.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                                            />
+                                        </div>
+                                        <button
+                                            @click="saveSla(row)"
+                                            :disabled="row.savingSla"
+                                            class="self-end px-2.5 py-0.5 text-xs bg-blue-700 hover:bg-blue-600 text-white rounded disabled:opacity-40 transition-colors whitespace-nowrap"
+                                        >
+                                            {{ row.savingSla ? 'Saving…' : 'Save SLA' }}
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                             <tr v-if="!targetRows.length">
-                                <td colspan="7" class="px-4 py-6 text-center text-slate-500 italic">Loading divisions…</td>
+                                <td colspan="5" class="px-4 py-6 text-center text-slate-500 italic">Loading divisions…</td>
                             </tr>
                         </tbody>
                     </table>
@@ -291,13 +343,13 @@
                     </button>
                 </div>
 
-                <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-                    <table class="w-full text-sm">
+                <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-x-auto">
+                    <table class="w-full text-sm" style="min-width: 500px;">
                         <thead>
                             <tr class="border-b border-slate-700 text-slate-400 text-xs uppercase tracking-wide">
-                                <th class="px-4 py-2 text-left">Name</th>
-                                <th class="px-4 py-2 text-left">Email</th>
-                                <th class="px-4 py-2 text-left w-56">Audit Role</th>
+                                <th class="px-4 py-3 text-left">Name</th>
+                                <th class="px-4 py-3 text-left">Email</th>
+                                <th class="px-4 py-3 text-left w-56">Audit Role</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-700/50">
@@ -422,6 +474,15 @@ interface TargetRow {
     saving: boolean;
     requireClosurePhoto: boolean;
     savingClosurePhoto: boolean;
+    slaNormalDays: number | null;
+    pendingSlaNormal: number | null | undefined;
+    slaUrgentDays: number | null;
+    pendingSlaUrgent: number | null | undefined;
+    slaEscalateAfterDays: number | null;
+    pendingSlaEscalate: number | null | undefined;
+    escalationEmail: string | null;
+    pendingEscalationEmail: string | null | undefined;
+    savingSla: boolean;
 }
 
 const targetRows = ref<TargetRow[]>([]);
@@ -430,17 +491,26 @@ async function loadScoreTargets() {
     try {
         const dtos = await getClient().getDivisionScoreTargets();
         targetRows.value = dtos.map(d => ({
-            divisionId:         d.divisionId,
-            divisionCode:       d.divisionCode,
-            divisionName:       d.divisionName,
-            scoreTarget:        d.scoreTarget ?? null,
-            pendingTarget:      d.scoreTarget ?? null,
-            auditFrequencyDays: d.auditFrequencyDays ?? null,
-            pendingFrequency:   d.auditFrequencyDays ?? null,
-            savingFrequency:    false,
-            saving:             false,
-            requireClosurePhoto:  d.requireClosurePhoto ?? false,
-            savingClosurePhoto:   false,
+            divisionId:            d.divisionId,
+            divisionCode:          d.divisionCode,
+            divisionName:          d.divisionName,
+            scoreTarget:           d.scoreTarget ?? null,
+            pendingTarget:         d.scoreTarget ?? null,
+            auditFrequencyDays:    d.auditFrequencyDays ?? null,
+            pendingFrequency:      d.auditFrequencyDays ?? null,
+            savingFrequency:       false,
+            saving:                false,
+            requireClosurePhoto:   d.requireClosurePhoto ?? false,
+            savingClosurePhoto:    false,
+            slaNormalDays:         d.slaNormalDays ?? null,
+            pendingSlaNormal:      d.slaNormalDays ?? null,
+            slaUrgentDays:         d.slaUrgentDays ?? null,
+            pendingSlaUrgent:      d.slaUrgentDays ?? null,
+            slaEscalateAfterDays:  d.slaEscalateAfterDays ?? null,
+            pendingSlaEscalate:    d.slaEscalateAfterDays ?? null,
+            escalationEmail:       d.escalationEmail ?? null,
+            pendingEscalationEmail: d.escalationEmail ?? null,
+            savingSla:             false,
         }));
     } catch {
         // Non-fatal — tab will show "Loading divisions…"
@@ -492,6 +562,33 @@ async function toggleClosurePhoto(row: TargetRow, value: boolean) {
         toast.add({ severity: 'error', summary: 'Error', detail: 'Could not save closure photo setting.', life: 4000 });
     } finally {
         row.savingClosurePhoto = false;
+    }
+}
+
+async function saveSla(row: TargetRow) {
+    row.savingSla = true;
+    try {
+        const toInt = (v: number | null | undefined) =>
+            v != null && !Number.isNaN(Number(v)) && Number(v) > 0 ? Number(v) : null;
+        const dto = await getClient().setDivisionSla(row.divisionId, {
+            slaNormalDays:        toInt(row.pendingSlaNormal),
+            slaUrgentDays:        toInt(row.pendingSlaUrgent),
+            slaEscalateAfterDays: toInt(row.pendingSlaEscalate),
+            escalationEmail:      row.pendingEscalationEmail?.trim() || null,
+        });
+        row.slaNormalDays        = dto.slaNormalDays        ?? null;
+        row.slaUrgentDays        = dto.slaUrgentDays        ?? null;
+        row.slaEscalateAfterDays = dto.slaEscalateAfterDays ?? null;
+        row.escalationEmail      = dto.escalationEmail      ?? null;
+        row.pendingSlaNormal     = row.slaNormalDays;
+        row.pendingSlaUrgent     = row.slaUrgentDays;
+        row.pendingSlaEscalate   = row.slaEscalateAfterDays;
+        row.pendingEscalationEmail = row.escalationEmail;
+        toast.add({ severity: 'success', summary: 'Saved', detail: `${row.divisionCode} SLA updated.`, life: 2500 });
+    } catch {
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Could not save SLA settings.', life: 4000 });
+    } finally {
+        row.savingSla = false;
     }
 }
 

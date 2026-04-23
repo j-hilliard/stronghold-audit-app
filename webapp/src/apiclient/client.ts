@@ -2358,6 +2358,36 @@ export class UserClient {
         return Promise.resolve<void>(null as any);
     }
 
+    createUser(user: Partial<User>, cancelToken?: CancelToken | undefined): Promise<User> {
+        const url_ = (this.baseUrl + "/v1/User").replace(/[?&]$/, "");
+        const content_ = JSON.stringify(user);
+        const options_: AxiosRequestConfig = {
+            data: content_,
+            method: "POST",
+            url: url_,
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            cancelToken
+        };
+        return this.instance.request(options_).catch((_error: any) => {
+            if (isAxiosError(_error) && _error.response) return _error.response;
+            else throw _error;
+        }).then((_response: AxiosResponse) => {
+            const status = _response.status;
+            const _headers: any = {};
+            if (_response.headers && typeof _response.headers === "object") {
+                for (const k in _response.headers) {
+                    if (_response.headers.hasOwnProperty(k)) _headers[k] = _response.headers[k];
+                }
+            }
+            if (status === 200 || status === 201) {
+                return User.fromJS(_response.data);
+            } else if (status !== 200 && status !== 204) {
+                return throwException("An unexpected server error occurred.", status, _response.data, _headers);
+            }
+            return Promise.resolve<User>(null as any);
+        });
+    }
+
     activateUser(userId: number, cancelToken?: CancelToken | undefined): Promise<void> {
         let url_ = this.baseUrl + "/v1/User/ActivateUser/{userId}";
         if (userId === undefined || userId === null)

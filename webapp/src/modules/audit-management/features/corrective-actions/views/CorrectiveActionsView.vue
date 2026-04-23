@@ -1,20 +1,32 @@
 <template>
-    <div class="flex flex-col gap-4 p-4 min-h-0">
+    <div class="flex flex-col min-h-0">
+
+        <!-- ── Page Header ────────────────────────────────────────────────────── -->
+        <BasePageHeader
+            icon="pi pi-check-square"
+            title="Corrective Actions"
+            subtitle="Track and resolve non-conformance corrective actions"
+        >
+            <Button icon="pi pi-refresh" outlined size="small" :loading="loading" @click="() => load()" />
+            <Button icon="pi pi-file-excel" label="Export" outlined size="small" :loading="exportingXlsx" @click="exportExcel" />
+        </BasePageHeader>
+
+        <div class="flex flex-col gap-4 p-4 min-h-0 flex-1">
 
         <!-- ── Filter Bar ─────────────────────────────────────────────────────── -->
         <div class="flex flex-wrap gap-2 items-end">
             <!-- Search -->
             <div class="flex flex-col gap-1 flex-1 min-w-[200px]">
                 <label class="text-xs text-slate-400 font-medium">Search</label>
-                <span class="p-input-icon-left w-full">
-                    <i class="pi pi-search" />
+                <div class="relative w-full">
+                    <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none z-10" />
                     <InputText
                         v-model="filterSearch"
                         placeholder="Description, assignee, question…"
-                        class="w-full"
-                        @keyup.enter="load"
+                        class="w-full pl-9"
+                        @keyup.enter="loadFiltered"
                     />
-                </span>
+                </div>
             </div>
 
             <!-- Division -->
@@ -28,7 +40,7 @@
                     placeholder="All Divisions"
                     show-clear
                     class="w-48"
-                    @change="load"
+                    @change="loadFiltered"
                 />
             </div>
 
@@ -43,7 +55,7 @@
                     placeholder="All Statuses"
                     show-clear
                     class="w-40"
-                    @change="load"
+                    @change="loadFiltered"
                 />
             </div>
 
@@ -58,7 +70,22 @@
                     placeholder="All Sources"
                     show-clear
                     class="w-40"
-                    @change="load"
+                    @change="loadFiltered"
+                />
+            </div>
+
+            <!-- Priority -->
+            <div class="flex flex-col gap-1">
+                <label class="text-xs text-slate-400 font-medium">Priority</label>
+                <Dropdown
+                    v-model="filterPriority"
+                    :options="priorityOptions"
+                    option-label="label"
+                    option-value="value"
+                    placeholder="All"
+                    show-clear
+                    class="w-32"
+                    @change="loadFiltered"
                 />
             </div>
 
@@ -69,35 +96,30 @@
                 size="small"
                 :outlined="!filterOverdueOnly"
                 class="self-end"
-                @click="filterOverdueOnly = !filterOverdueOnly; load()"
+                @click="filterOverdueOnly = !filterOverdueOnly; loadFiltered()"
             />
-
-            <div class="flex gap-2 self-end ml-auto">
-                <Button icon="pi pi-refresh" outlined size="small" :loading="loading" @click="load" />
-                <Button icon="pi pi-file-excel" label="Export" outlined size="small" :loading="exportingXlsx" @click="exportExcel" />
-            </div>
         </div>
 
         <!-- ── KPI Cards ──────────────────────────────────────────────────────── -->
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <div class="kpi-card bg-slate-800 border border-slate-700 rounded-lg p-4">
-                <div class="text-2xl font-bold text-white">{{ displayTotal }}</div>
+        <div class="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3">
+            <div class="kpi-card bg-slate-800 border border-slate-700 rounded-lg px-3 py-3 sm:p-4">
+                <div class="text-xl sm:text-2xl font-bold text-white">{{ displayTotal }}</div>
                 <div class="text-xs text-slate-400 mt-1">Total</div>
             </div>
-            <div class="kpi-card bg-slate-800 border border-slate-700 rounded-lg p-4">
-                <div class="text-2xl font-bold text-blue-400">{{ displayOpen }}</div>
+            <div class="kpi-card bg-slate-800 border border-slate-700 rounded-lg px-3 py-3 sm:p-4">
+                <div class="text-xl sm:text-2xl font-bold text-blue-400">{{ displayOpen }}</div>
                 <div class="text-xs text-slate-400 mt-1">Open</div>
             </div>
-            <div class="kpi-card bg-slate-800 border border-slate-700 rounded-lg p-4">
-                <div class="text-2xl font-bold text-amber-400">{{ displayInProgress }}</div>
-                <div class="text-xs text-slate-400 mt-1">In Progress</div>
+            <div class="kpi-card bg-slate-800 border border-slate-700 rounded-lg px-3 py-3 sm:p-4">
+                <div class="text-xl sm:text-2xl font-bold text-amber-400">{{ displayInProgress }}</div>
+                <div class="text-xs text-slate-400 mt-1">In&nbsp;Progress</div>
             </div>
-            <div class="kpi-card bg-slate-800 border border-slate-700 rounded-lg p-4 kpi-card--danger">
-                <div class="text-2xl font-bold text-red-400">{{ displayOverdue }}</div>
+            <div class="kpi-card bg-slate-800 border border-slate-700 rounded-lg px-3 py-3 sm:p-4 kpi-card--danger">
+                <div class="text-xl sm:text-2xl font-bold text-red-400">{{ displayOverdue }}</div>
                 <div class="text-xs text-slate-400 mt-1">Overdue</div>
             </div>
-            <div class="kpi-card bg-slate-800 border border-slate-700 rounded-lg p-4">
-                <div class="text-2xl font-bold text-emerald-400">{{ displayClosed }}</div>
+            <div class="kpi-card bg-slate-800 border border-slate-700 rounded-lg px-3 py-3 sm:p-4">
+                <div class="text-xl sm:text-2xl font-bold text-emerald-400">{{ displayClosed }}</div>
                 <div class="text-xs text-slate-400 mt-1">Closed</div>
             </div>
         </div>
@@ -133,7 +155,11 @@
             @row-dblclick="(e: any) => goToAudit(e.data.auditId)"
         >
             <template #empty>
-                <div class="text-center text-slate-400 py-8">No corrective actions found.</div>
+                <div class="flex flex-col items-center justify-center py-16 gap-3">
+                    <i class="pi pi-check-circle text-4xl text-slate-600" />
+                    <p class="text-slate-400 font-medium">No corrective actions found</p>
+                    <p class="text-xs text-slate-500">Try adjusting your filters or search terms</p>
+                </div>
             </template>
 
             <!-- Checkbox column -->
@@ -147,16 +173,45 @@
                 </template>
             </Column>
 
+            <!-- Audit Tracking # -->
+            <Column field="auditTrackingNumber" header="Audit #" sortable style="min-width:120px">
+                <template #body="{ data }">
+                    <span v-if="data.auditTrackingNumber" class="font-mono text-xs font-semibold text-blue-300">{{ data.auditTrackingNumber }}</span>
+                    <span v-else class="text-slate-500 text-xs">—</span>
+                </template>
+            </Column>
+
+            <!-- Audit Date -->
+            <Column field="auditDate" header="Audit Date" sortable style="min-width:100px">
+                <template #body="{ data }">
+                    <span class="text-slate-400 text-xs">{{ data.auditDate || '—' }}</span>
+                </template>
+            </Column>
+
+            <!-- Status -->
+            <Column field="status" header="Status" sortable style="min-width:120px">
+                <template #body="{ data }">
+                    <Tag :value="statusLabel(data.status)" :severity="statusSeverity(data)" />
+                </template>
+            </Column>
+
             <!-- Description -->
             <Column field="description" header="Description" style="min-width:220px">
                 <template #body="{ data }">
                     <div class="line-clamp-2 text-slate-200 text-sm">{{ data.description }}</div>
                     <div v-if="data.questionText" class="text-xs text-slate-500 mt-0.5 line-clamp-1">{{ data.questionText }}</div>
-                    <!-- Source badge -->
-                    <span
-                        v-if="data.source === 'AutoGenerated'"
-                        class="mt-1 inline-block text-[10px] px-1.5 py-0.5 rounded bg-purple-900/60 text-purple-300 font-medium"
-                    >Auto-CA</span>
+                    <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+                        <!-- Priority badge -->
+                        <span
+                            v-if="data.priority === 'Urgent'"
+                            class="inline-block text-[10px] px-1.5 py-0.5 rounded bg-red-900/60 text-red-300 font-bold uppercase tracking-wide"
+                        >Urgent</span>
+                        <!-- Source badge -->
+                        <span
+                            v-if="data.source === 'AutoGenerated'"
+                            class="inline-block text-[10px] px-1.5 py-0.5 rounded bg-purple-900/60 text-purple-300 font-medium"
+                        >Auto-CA</span>
+                    </div>
                 </template>
             </Column>
 
@@ -193,20 +248,6 @@
                 </template>
             </Column>
 
-            <!-- Status -->
-            <Column field="status" header="Status" sortable style="min-width:120px">
-                <template #body="{ data }">
-                    <Tag :value="statusLabel(data.status)" :severity="statusSeverity(data)" />
-                </template>
-            </Column>
-
-            <!-- Audit Date -->
-            <Column field="auditDate" header="Audit Date" sortable style="min-width:100px">
-                <template #body="{ data }">
-                    <span class="text-slate-400 text-xs">{{ data.auditDate || '—' }}</span>
-                </template>
-            </Column>
-
             <!-- Actions -->
             <Column header="" style="min-width:90px; text-align:right" frozen align-frozen="right">
                 <template #body="{ data }">
@@ -239,6 +280,22 @@
                 </template>
             </Column>
         </DataTable>
+
+        <!-- ── Pagination ────────────────────────────────────────────────────── -->
+        <div v-if="totalCount > pageSize" class="flex items-center justify-between pt-2 border-t border-slate-700/50">
+            <span class="text-xs text-slate-400">
+                Showing {{ (currentPage - 1) * pageSize + 1 }}–{{ Math.min(currentPage * pageSize, totalCount) }}
+                of {{ totalCount.toLocaleString() }} corrective actions
+            </span>
+            <Paginator
+                :rows="pageSize"
+                :total-records="totalCount"
+                :first="(currentPage - 1) * pageSize"
+                :rows-per-page-options="[25, 50, 100]"
+                template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+                @page="onPageChange"
+            />
+        </div>
 
         <!-- ── Close CA Dialog ───────────────────────────────────────────────── -->
         <Dialog v-model:visible="showCloseDialog" modal header="Close Corrective Action" :style="{ width: '520px' }">
@@ -287,6 +344,10 @@
                 </div>
 
                 <div class="flex flex-col gap-1">
+                    <label class="text-sm font-medium">Root Cause <span class="text-slate-400 text-xs font-normal">(optional — fills in if not already set)</span></label>
+                    <Textarea v-model="closeRootCause" placeholder="What was the root cause of this finding?" rows="2" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
                     <label class="text-sm font-medium">Resolution Notes <span class="text-red-400">*</span></label>
                     <Textarea v-model="closeNotes" placeholder="Describe what was done to resolve this action…" rows="3" class="w-full" />
                 </div>
@@ -316,8 +377,22 @@
                     <Textarea v-model="editDescription" rows="3" class="w-full" />
                 </div>
                 <div class="flex flex-col gap-1">
+                    <label class="text-sm font-medium">Root Cause</label>
+                    <Textarea v-model="editRootCause" placeholder="What was the root cause of this finding?" rows="2" class="w-full" />
+                </div>
+                <div class="flex flex-col gap-1">
                     <label class="text-sm font-medium">Assigned To</label>
-                    <InputText v-model="editAssignedTo" placeholder="Name or email" class="w-full" />
+                    <AutoComplete
+                        v-model="editAssignedTo"
+                        :suggestions="filteredUsers"
+                        :option-label="userDisplayName"
+                        placeholder="Type name or email…"
+                        class="w-full"
+                        input-class="w-full"
+                        @complete="searchUsers"
+                        @item-select="(e) => { editAssignedTo = userDisplayName(e.value); editAssignedToUserId = e.value.userId; }"
+                        @clear="editAssignedToUserId = null"
+                    />
                 </div>
                 <div class="flex flex-col gap-1">
                     <label class="text-sm font-medium">Due Date</label>
@@ -352,7 +427,18 @@
             <div class="flex flex-col gap-4">
                 <div class="flex flex-col gap-1">
                     <label class="text-sm font-medium">New Assignee</label>
-                    <InputText v-model="bulkNewAssignee" placeholder="Name or email" class="w-full" />
+                    <AutoComplete
+                        v-model="bulkNewAssignee"
+                        :suggestions="filteredUsers"
+                        :option-label="userDisplayName"
+                        placeholder="Type name or email…"
+                        class="w-full"
+                        input-class="w-full"
+                        force-selection
+                        @complete="searchUsers"
+                        @item-select="(e) => { bulkNewAssignee = userDisplayName(e.value); bulkNewAssigneeUserId = e.value.userId; }"
+                        @clear="bulkNewAssigneeUserId = null"
+                    />
                 </div>
                 <div class="flex justify-end gap-2 mt-2">
                     <Button label="Cancel" text @click="showBulkReassignDialog = false" />
@@ -360,16 +446,18 @@
                 </div>
             </div>
         </Dialog>
-    </div>
+        </div><!-- /.inner content -->
+    </div><!-- /.outer wrapper -->
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
-import type { CorrectiveActionListItemDto } from '@/apiclient/auditClient';
+import type { CorrectiveActionListItemDto, UserAuditRoleDto } from '@/apiclient/auditClient';
 import { AuditClient } from '@/apiclient/auditClient';
 import { useApiStore } from '@/stores/apiStore';
+import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 
 const router   = useRouter();
 const toast    = useToast();
@@ -384,7 +472,21 @@ const filterSearch     = ref('');
 const filterDivisionId = ref<number | null>(null);
 const filterStatus     = ref<string | null>(null);
 const filterSource     = ref<string | null>(null);
+const filterPriority   = ref<string | null>(null);
 const filterOverdueOnly = ref(false);
+
+// ── Pagination state ──────────────────────────────────────────────────────────
+const currentPage = ref(1);
+const pageSize    = ref(25);
+const totalCount  = ref(0);
+const totalPages  = computed(() => Math.ceil(totalCount.value / pageSize.value));
+
+// ── KPI counts (from server, reflects full filtered set) ─────────────────────
+const kpiTotal       = computed(() => totalCount.value);
+const kpiOpen        = ref(0);
+const kpiInProgress  = ref(0);
+const kpiOverdue     = ref(0);
+const kpiClosed      = ref(0);
 
 const divisionOptions = ref<{ label: string; value: number }[]>([]);
 const divisionsLoaded = ref(false);
@@ -401,6 +503,11 @@ const sourceOptions = [
     { label: 'Auto-Generated', value: 'AutoGenerated' },
 ];
 
+const priorityOptions = [
+    { label: 'Normal',  value: 'Normal' },
+    { label: 'Urgent',  value: 'Urgent' },
+];
+
 // ── Selection ─────────────────────────────────────────────────────────────────
 const selectedItems = ref<CorrectiveActionListItemDto[]>([]);
 
@@ -408,6 +515,7 @@ const selectedItems = ref<CorrectiveActionListItemDto[]>([]);
 const showCloseDialog    = ref(false);
 const selectedItem       = ref<CorrectiveActionListItemDto | null>(null);
 const closeNotes         = ref('');
+const closeRootCause     = ref('');
 const closeCompletedDate = ref('');
 const closeSaving        = ref(false);
 
@@ -419,12 +527,14 @@ const closurePhotoDragging  = ref(false);
 const closurePhotoInput     = ref<HTMLInputElement | null>(null);
 
 // ── Edit dialog ───────────────────────────────────────────────────────────────
-const showEditDialog  = ref(false);
-const editItem        = ref<CorrectiveActionListItemDto | null>(null);
-const editDescription = ref('');
-const editAssignedTo  = ref('');
-const editDueDate     = ref('');
-const editSaving      = ref(false);
+const showEditDialog       = ref(false);
+const editItem             = ref<CorrectiveActionListItemDto | null>(null);
+const editDescription      = ref('');
+const editRootCause        = ref('');
+const editAssignedTo       = ref('');
+const editAssignedToUserId = ref<number | null>(null);
+const editDueDate          = ref('');
+const editSaving           = ref(false);
 
 // ── Bulk action dialogs ───────────────────────────────────────────────────────
 const bulkSaving            = ref(false);
@@ -432,16 +542,39 @@ const showBulkCloseDialog   = ref(false);
 const bulkCloseNotes        = ref('');
 const showBulkReassignDialog = ref(false);
 const bulkNewAssignee       = ref('');
+const bulkNewAssigneeUserId = ref<number | null>(null);
 
-// ── KPI Counts ────────────────────────────────────────────────────────────────
-const openCount       = computed(() => items.value.filter(i => i.status === 'Open').length);
-const inProgressCount = computed(() => items.value.filter(i => i.status === 'InProgress').length);
-const overdueCount    = computed(() => items.value.filter(i => i.isOverdue).length);
-const closedCount     = computed(() => items.value.filter(i => i.status === 'Closed').length);
+// ── Assignee autocomplete ─────────────────────────────────────────────────────
+const auditUsers     = ref<UserAuditRoleDto[]>([]);
+const filteredUsers  = ref<UserAuditRoleDto[]>([]);
+
+function userDisplayName(u: UserAuditRoleDto): string {
+    const name = [u.firstName, u.lastName].filter(Boolean).join(' ');
+    return name || u.email || '';
+}
+
+function searchUsers(event: { query: string }) {
+    const q = event.query.toLowerCase();
+    filteredUsers.value = q
+        ? auditUsers.value.filter(u =>
+            userDisplayName(u).toLowerCase().includes(q) ||
+            (u.email ?? '').toLowerCase().includes(q))
+        : auditUsers.value.slice(0, 20);
+}
+
+async function loadAuditUsers() {
+    try {
+        auditUsers.value = await getClient().getUsersWithAuditRoles();
+    } catch {
+        // Non-admin roles may not have access; autocomplete degrades to free-text
+    }
+}
 
 function useCountUp(source: () => number, duration = 700) {
     const display = ref(0);
-    watch(source, (to) => {
+    watch(source, (rawTo) => {
+        // Guard: if the API returns null/undefined, treat as 0 to prevent NaN
+        const to = Number.isFinite(rawTo) ? rawTo : 0;
         const from  = display.value;
         const start = performance.now();
         function tick(now: number) {
@@ -455,33 +588,41 @@ function useCountUp(source: () => number, duration = 700) {
     return display;
 }
 
-const displayTotal      = useCountUp(() => items.value.length);
-const displayOpen       = useCountUp(() => openCount.value);
-const displayInProgress = useCountUp(() => inProgressCount.value);
-const displayOverdue    = useCountUp(() => overdueCount.value);
-const displayClosed     = useCountUp(() => closedCount.value);
+const displayTotal      = useCountUp(() => kpiTotal.value);
+const displayOpen       = useCountUp(() => kpiOpen.value);
+const displayInProgress = useCountUp(() => kpiInProgress.value);
+const displayOverdue    = useCountUp(() => kpiOverdue.value);
+const displayClosed     = useCountUp(() => kpiClosed.value);
 
 // ── Load ──────────────────────────────────────────────────────────────────────
-async function load() {
+async function load(resetPage = false) {
+    if (resetPage) currentPage.value = 1;
     loading.value = true;
     try {
         const client = getClient();
-        const [caList, divisions] = await Promise.all([
+        const [result, divisions] = await Promise.all([
             client.getCorrectiveActions({
                 divisionId:  filterDivisionId.value,
                 status:      filterStatus.value,
                 searchText:  filterSearch.value || null,
                 source:      filterSource.value,
+                priority:    filterPriority.value,
                 overdueOnly: filterOverdueOnly.value,
+                pageNumber:  currentPage.value,
+                pageSize:    pageSize.value,
             }),
             divisionsLoaded.value ? Promise.resolve(null) : client.getDivisions(),
         ]);
-        items.value = caList;
+        items.value          = result.items ?? [];
+        totalCount.value     = result.totalCount ?? 0;
+        kpiOpen.value        = result.openCount ?? 0;
+        kpiInProgress.value  = result.inProgressCount ?? 0;
+        kpiOverdue.value     = result.overdueCount ?? 0;
+        kpiClosed.value      = result.closedCount ?? 0;
         if (divisions) {
             divisionOptions.value = divisions.map(d => ({ label: `${d.code} — ${d.name}`, value: d.id }));
             divisionsLoaded.value = true;
         }
-        // Clear selection when data reloads
         selectedItems.value = [];
     } catch {
         toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load corrective actions.', life: 4000 });
@@ -489,6 +630,15 @@ async function load() {
         loading.value = false;
     }
 }
+
+function onPageChange(event: { page: number; rows: number }) {
+    currentPage.value = event.page + 1;  // PrimeVue Paginator is 0-based
+    pageSize.value    = event.rows;
+    load();
+}
+
+// Reset to page 1 when filters change
+function loadFiltered() { load(true); }
 
 // ── Table helpers ─────────────────────────────────────────────────────────────
 function rowClass(data: CorrectiveActionListItemDto) {
@@ -518,6 +668,7 @@ function goToAudit(auditId: number) {
 function openCloseDialog(item: CorrectiveActionListItemDto) {
     selectedItem.value       = item;
     closeNotes.value         = '';
+    closeRootCause.value     = item.rootCause ?? '';
     closeCompletedDate.value = new Date().toISOString().split('T')[0];
     // Reset closure photo state
     closurePhoto.value          = null;
@@ -560,6 +711,7 @@ async function submitClose() {
         await getClient().closeCorrectiveAction(selectedItem.value.id, {
             notes:         closeNotes.value,
             completedDate: closeCompletedDate.value || null,
+            rootCause:     closeRootCause.value || null,
         });
         toast.add({ severity: 'success', summary: 'Closed', detail: 'Corrective action closed.', life: 3000 });
         showCloseDialog.value = false;
@@ -574,11 +726,13 @@ async function submitClose() {
 
 // ── Edit dialog ───────────────────────────────────────────────────────────────
 function openEditDialog(item: CorrectiveActionListItemDto) {
-    editItem.value        = item;
-    editDescription.value = item.description;
-    editAssignedTo.value  = item.assignedTo ?? '';
-    editDueDate.value     = item.dueDate ?? '';
-    showEditDialog.value  = true;
+    editItem.value             = item;
+    editDescription.value      = item.description;
+    editRootCause.value        = item.rootCause ?? '';
+    editAssignedTo.value       = item.assignedTo ?? '';
+    editAssignedToUserId.value = item.assignedToUserId ?? null;
+    editDueDate.value          = item.dueDate ?? '';
+    showEditDialog.value       = true;
 }
 
 async function submitEdit() {
@@ -586,10 +740,11 @@ async function submitEdit() {
     editSaving.value = true;
     try {
         await getClient().updateCorrectiveAction(editItem.value.id, {
-            description:     editDescription.value,
-            assignedTo:      editAssignedTo.value || null,
-            assignedToUserId: editItem.value.assignedToUserId ?? null,
-            dueDate:         editDueDate.value || '',
+            description:      editDescription.value,
+            rootCause:        editRootCause.value || null,
+            assignedTo:       editAssignedTo.value || null,
+            assignedToUserId: editAssignedToUserId.value,
+            dueDate:          editDueDate.value || '',
         });
         toast.add({ severity: 'success', summary: 'Saved', detail: 'Corrective action updated.', life: 3000 });
         showEditDialog.value = false;
@@ -608,7 +763,8 @@ function openBulkCloseDialog() {
 }
 
 function openBulkReassignDialog() {
-    bulkNewAssignee.value        = '';
+    bulkNewAssignee.value       = '';
+    bulkNewAssigneeUserId.value = null;
     showBulkReassignDialog.value = true;
 }
 
@@ -658,6 +814,7 @@ async function submitBulkReassign() {
             correctiveActionIds: selectedItems.value.map(i => i.id),
             action:              'reassign',
             newAssignee:         bulkNewAssignee.value || null,
+            newAssigneeUserId:   bulkNewAssigneeUserId.value,
         });
         const msg = `${result.successCount} reassigned${result.failedIds.length ? `, ${result.failedIds.length} failed` : ''}.`;
         toast.add({ severity: result.failedIds.length ? 'warn' : 'success', summary: 'Bulk Reassign', detail: msg, life: 4000 });
@@ -675,7 +832,12 @@ async function exportExcel() {
     exportingXlsx.value = true;
     try {
         const params: Record<string, string> = {};
-        if (filterDivisionId.value) params.divisionId = String(filterDivisionId.value);
+        if (filterDivisionId.value)  params.divisionId  = String(filterDivisionId.value);
+        if (filterStatus.value)      params.status      = filterStatus.value;
+        if (filterSource.value)      params.source      = filterSource.value;
+        if (filterPriority.value)    params.priority    = filterPriority.value;
+        if (filterOverdueOnly.value) params.overdueOnly = 'true';
+        if (filterSearch.value)      params.searchText  = filterSearch.value;
         const res = await apiStore.api.get('/v1/corrective-actions/export', {
             params,
             responseType: 'blob',
@@ -693,7 +855,7 @@ async function exportExcel() {
     }
 }
 
-onMounted(load);
+onMounted(() => { load(); loadAuditUsers(); });
 </script>
 
 <style scoped>
@@ -705,10 +867,14 @@ onMounted(load);
     display: flex;
     gap: 2px;
     justify-content: flex-end;
-    opacity: 0;
+    /* Always visible on touch/mobile (no hover available); hidden-until-hover on pointer devices */
+    opacity: 1;
     transition: opacity 0.15s ease;
 }
-:deep(tr:hover) .ca-row-actions { opacity: 1; }
+@media (hover: hover) and (pointer: fine) {
+    .ca-row-actions { opacity: 0; }
+    :deep(tr:hover) .ca-row-actions { opacity: 1; }
+}
 
 .line-clamp-2 {
     display: -webkit-box;

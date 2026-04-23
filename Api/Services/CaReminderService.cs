@@ -30,13 +30,19 @@ public class CaReminderService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Wait until midnight UTC on first run
-        await WaitUntilMidnightAsync(stoppingToken);
-
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            await SendRemindersAsync(stoppingToken);
             await WaitUntilMidnightAsync(stoppingToken);
+
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await SendRemindersAsync(stoppingToken);
+                await WaitUntilMidnightAsync(stoppingToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal shutdown — host is stopping
         }
     }
 

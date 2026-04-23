@@ -69,26 +69,30 @@ namespace Stronghold.AppDashboard.Api.Controllers
             ProblemDetails? details = null
         )
         {
+            var pd = details ?? new ProblemDetails { Detail = ex.Message };
             return Task.FromResult<ActionResult<TResult>>(
                 ex switch
                 {
-                    ArgumentException => BadRequest(details),
-                    UnauthorizedAccessException => Unauthorized(details),
-                    DbUpdateException => Conflict(details),
-                    _ => StatusCode(StatusCodes.Status500InternalServerError, details),
+                    ArgumentException         => BadRequest(pd),
+                    InvalidOperationException => BadRequest(pd),
+                    UnauthorizedAccessException => Unauthorized(pd),
+                    DbUpdateException         => Conflict(pd),
+                    _ => StatusCode(StatusCodes.Status500InternalServerError, pd),
                 }
             );
         }
 
         protected Task<IActionResult> Error(Exception ex, ProblemDetails? details = null)
         {
+            var pd = details ?? new ProblemDetails { Detail = ex.Message };
             return Task.FromResult<IActionResult>(
                 ex switch
                 {
-                    ArgumentException => BadRequest(details),
-                    UnauthorizedAccessException => Unauthorized(details),
-                    DbUpdateException => Conflict(details),
-                    _ => StatusCode(StatusCodes.Status500InternalServerError, details),
+                    ArgumentException         => BadRequest(pd),
+                    InvalidOperationException => BadRequest(pd),
+                    UnauthorizedAccessException => Unauthorized(pd),
+                    DbUpdateException         => Conflict(pd),
+                    _ => StatusCode(StatusCodes.Status500InternalServerError, pd),
                 }
             );
         }

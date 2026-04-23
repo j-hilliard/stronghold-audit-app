@@ -12,7 +12,7 @@ public class SaveReviewGroupRequest
     public List<ReviewGroupMemberDto> Members { get; set; } = new();
 }
 
-[AllowedAuthorizationRole(AuthorizationRole.Administrator, AuthorizationRole.TemplateAdmin)]
+[AllowedAuthorizationRole(AuthorizationRole.Administrator, AuthorizationRole.TemplateAdmin, AuthorizationRole.AuditAdmin)]
 public class SaveReviewGroup : IRequest<Unit>
 {
     public SaveReviewGroupRequest Payload { get; set; } = null!;

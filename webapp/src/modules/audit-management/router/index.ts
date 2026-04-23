@@ -105,6 +105,32 @@ export const auditManagementRoutes = [
         },
     },
     {
+        path: 'admin/users',
+        name: 'audit-management-admin-users',
+        component: () => import('@/modules/audit-management/features/admin-users/views/AdminUsersView.vue'),
+        meta: {
+            title: 'User Management',
+            breadcrumbItems: () => [
+                { label: 'Compliance Audit' },
+                { label: 'Admin' },
+                { label: 'User Management' },
+            ],
+        },
+    },
+    {
+        path: 'admin/audit-log',
+        name: 'audit-management-admin-audit-log',
+        component: () => import('@/modules/audit-management/features/admin-audit-log/views/AdminAuditLogView.vue'),
+        meta: {
+            title: 'Audit Log',
+            breadcrumbItems: () => [
+                { label: 'Compliance Audit' },
+                { label: 'Admin' },
+                { label: 'Audit Log' },
+            ],
+        },
+    },
+    {
         path: 'newsletter/template-editor',
         name: 'audit-management-newsletter-template-editor',
         component: () => import('@/modules/audit-management/features/reports/views/NewsletterTemplateEditorView.vue'),

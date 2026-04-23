@@ -11,7 +11,8 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
     AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.ReadOnlyViewer,
     AuthorizationRole.ExecutiveViewer, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.Auditor, AuthorizationRole.AuditAdmin, AuthorizationRole.Executive)]
 public class GetAudit : IRequest<AuditDetailDto?>
 {
     public int AuditId { get; set; }
@@ -34,7 +35,7 @@ public class GetAuditHandler : IRequestHandler<GetAudit, AuditDetailDto?>
             .Include(a => a.Header)
             .Include(a => a.Responses)
             .Include(a => a.EnabledSections)
-            .FirstOrDefaultAsync(a => a.Id == request.AuditId, cancellationToken);
+            .FirstOrDefaultAsync(a => a.Id == request.AuditId && !a.IsDeleted, cancellationToken);
 
         if (audit == null) return null;
 
@@ -66,7 +67,8 @@ public class GetAuditHandler : IRequestHandler<GetAudit, AuditDetailDto?>
                 ResponsibleParty = audit.Header.ResponsibleParty,
                 Location = audit.Header.Location,
                 AuditDate = audit.Header.AuditDate?.ToString("yyyy-MM-dd"),
-                Auditor = audit.Header.Auditor
+                Auditor = audit.Header.Auditor,
+                SiteCode = audit.Header.SiteCode
             },
             Responses = audit.Responses.Select(r => new AuditResponseDto
             {
@@ -77,7 +79,8 @@ public class GetAuditHandler : IRequestHandler<GetAudit, AuditDetailDto?>
                 Comment = r.Comment,
                 CorrectedOnSite = r.CorrectedOnSite
             }).ToList(),
-            EnabledOptionalGroupKeys = audit.EnabledSections.Select(s => s.OptionalGroupKey).ToList()
+            EnabledOptionalGroupKeys = audit.EnabledSections.Select(s => s.OptionalGroupKey).ToList(),
+            TrackingNumber = audit.TrackingNumber
         };
     }
 }

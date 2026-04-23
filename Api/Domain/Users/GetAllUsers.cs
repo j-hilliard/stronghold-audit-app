@@ -8,7 +8,7 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Users;
 
-[AllowedAuthorizationRole(AuthorizationRole.Administrator)]
+[AllowedAuthorizationRole(AuthorizationRole.Administrator, AuthorizationRole.ITAdmin, AuthorizationRole.AuditAdmin)]
 public class GetAllUsers : IRequest<List<User>> { }
 
 public class GetAllUserHandler : IRequestHandler<GetAllUsers, List<User>?>
@@ -24,7 +24,10 @@ public class GetAllUserHandler : IRequestHandler<GetAllUsers, List<User>?>
 
     public async Task<List<User>?> Handle(GetAllUsers request, CancellationToken cancellationToken)
     {
-        var users = await _context.Users.ToListAsync(cancellationToken);
+        var users = await _context.Users
+            .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+            .ToListAsync(cancellationToken);
         return _mapper.Map<List<User>?>(users);
     }
 }

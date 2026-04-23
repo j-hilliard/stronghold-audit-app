@@ -18,11 +18,19 @@ public class DivisionScoreTargetDto
     public int? AuditFrequencyDays { get; set; }
     /// <summary>When true, closing a CA in this division requires at least one closure photo.</summary>
     public bool RequireClosurePhoto { get; set; }
+    /// <summary>Days until a Normal-priority CA is due. Null = use system default (14).</summary>
+    public int? SlaNormalDays { get; set; }
+    /// <summary>Days until an Urgent-priority CA is due. Null = use system default (7).</summary>
+    public int? SlaUrgentDays { get; set; }
+    /// <summary>Days open before a CA is escalated. Null = no escalation.</summary>
+    public int? SlaEscalateAfterDays { get; set; }
+    /// <summary>Email address that receives escalation notices. Null = no escalation email.</summary>
+    public string? EscalationEmail { get; set; }
 }
 
 // ── Get all divisions with current targets ─────────────────────────────────────
 
-[AllowedAuthorizationRole(AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
+[AllowedAuthorizationRole(AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator, AuthorizationRole.AuditAdmin)]
 public class GetDivisionScoreTargets : IRequest<List<DivisionScoreTargetDto>> { }
 
 public class GetDivisionScoreTargetsHandler : IRequestHandler<GetDivisionScoreTargets, List<DivisionScoreTargetDto>>
@@ -37,12 +45,16 @@ public class GetDivisionScoreTargetsHandler : IRequestHandler<GetDivisionScoreTa
             .OrderBy(d => d.Name)
             .Select(d => new DivisionScoreTargetDto
             {
-                DivisionId         = d.Id,
-                DivisionCode       = d.Code,
-                DivisionName       = d.Name,
-                ScoreTarget        = d.ScoreTarget,
-                AuditFrequencyDays = d.AuditFrequencyDays,
-                RequireClosurePhoto = d.RequireClosurePhoto,
+                DivisionId           = d.Id,
+                DivisionCode         = d.Code,
+                DivisionName         = d.Name,
+                ScoreTarget          = d.ScoreTarget,
+                AuditFrequencyDays   = d.AuditFrequencyDays,
+                RequireClosurePhoto  = d.RequireClosurePhoto,
+                SlaNormalDays        = d.SlaNormalDays,
+                SlaUrgentDays        = d.SlaUrgentDays,
+                SlaEscalateAfterDays = d.SlaEscalateAfterDays,
+                EscalationEmail      = d.EscalationEmail,
             })
             .ToListAsync(ct);
     }
@@ -50,7 +62,7 @@ public class GetDivisionScoreTargetsHandler : IRequestHandler<GetDivisionScoreTa
 
 // ── Set target ─────────────────────────────────────────────────────────────────
 
-[AllowedAuthorizationRole(AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
+[AllowedAuthorizationRole(AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator, AuthorizationRole.AuditAdmin)]
 public class SetDivisionScoreTarget : IRequest<DivisionScoreTargetDto>
 {
     public int DivisionId { get; set; }
@@ -151,6 +163,58 @@ public class SetDivisionClosurePhotoRequirementHandler : IRequestHandler<SetDivi
             ScoreTarget         = division.ScoreTarget,
             AuditFrequencyDays  = division.AuditFrequencyDays,
             RequireClosurePhoto = division.RequireClosurePhoto,
+        };
+    }
+}
+
+// ── Set SLA configuration ─────────────────────────────────────────────────────
+
+[AllowedAuthorizationRole(AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
+public class SetDivisionSla : IRequest<DivisionScoreTargetDto>
+{
+    public int     DivisionId           { get; set; }
+    public int?    SlaNormalDays        { get; set; }
+    public int?    SlaUrgentDays        { get; set; }
+    public int?    SlaEscalateAfterDays { get; set; }
+    public string? EscalationEmail      { get; set; }
+}
+
+public class SetDivisionSlaHandler : IRequestHandler<SetDivisionSla, DivisionScoreTargetDto>
+{
+    private readonly AppDbContext _db;
+    public SetDivisionSlaHandler(AppDbContext db) => _db = db;
+
+    public async Task<DivisionScoreTargetDto> Handle(SetDivisionSla request, CancellationToken ct)
+    {
+        if (request.SlaNormalDays.HasValue && request.SlaNormalDays.Value <= 0)
+            throw new ArgumentException("SlaNormalDays must be a positive integer.");
+        if (request.SlaUrgentDays.HasValue && request.SlaUrgentDays.Value <= 0)
+            throw new ArgumentException("SlaUrgentDays must be a positive integer.");
+        if (request.SlaEscalateAfterDays.HasValue && request.SlaEscalateAfterDays.Value <= 0)
+            throw new ArgumentException("SlaEscalateAfterDays must be a positive integer.");
+
+        var division = await _db.Divisions.FirstOrDefaultAsync(d => d.Id == request.DivisionId, ct)
+            ?? throw new KeyNotFoundException($"Division {request.DivisionId} not found.");
+
+        division.SlaNormalDays        = request.SlaNormalDays;
+        division.SlaUrgentDays        = request.SlaUrgentDays;
+        division.SlaEscalateAfterDays = request.SlaEscalateAfterDays;
+        division.EscalationEmail      = request.EscalationEmail?.Trim();
+
+        await _db.SaveChangesAsync(ct);
+
+        return new DivisionScoreTargetDto
+        {
+            DivisionId           = division.Id,
+            DivisionCode         = division.Code,
+            DivisionName         = division.Name,
+            ScoreTarget          = division.ScoreTarget,
+            AuditFrequencyDays   = division.AuditFrequencyDays,
+            RequireClosurePhoto  = division.RequireClosurePhoto,
+            SlaNormalDays        = division.SlaNormalDays,
+            SlaUrgentDays        = division.SlaUrgentDays,
+            SlaEscalateAfterDays = division.SlaEscalateAfterDays,
+            EscalationEmail      = division.EscalationEmail,
         };
     }
 }

@@ -29,12 +29,21 @@ public class ScheduledReportService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
-            try { await RunDueReportsAsync(stoppingToken); }
-            catch (OperationCanceledException) { break; }
-            catch (Exception ex) { _logger.LogError(ex, "ScheduledReportService: error in run cycle"); }
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                await RunDueReportsAsync(stoppingToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal shutdown — host is stopping
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ScheduledReportService: error in run cycle");
         }
     }
 

@@ -8,7 +8,8 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.Auditor, AuthorizationRole.AuditAdmin)]
 public class DeleteAttachment : IRequest<Unit>
 {
     public int AuditId { get; set; }

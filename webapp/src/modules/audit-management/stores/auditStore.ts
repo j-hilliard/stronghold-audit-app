@@ -11,6 +11,7 @@ import {
     type AuditHeaderDto,
     type AuditListItemDto,
     type AuditReviewDto,
+    type DistributionRecipientDto,
     type LogicRuleDto,
     type RepeatFindingDto,
 } from '@/apiclient/auditClient';
@@ -83,7 +84,9 @@ export const useAuditStore = defineStore('audit', () => {
     const divisions = ref<DivisionDto[]>([]);
     const template = ref<TemplateDto | null>(null);
     const auditId = ref<number | null>(null);
+    const auditDivisionId = ref<number | null>(null);
     const auditStatus = ref<string>('Draft');
+    const trackingNumber = ref<string | null>(null);
 
     /** Optional section group keys enabled at audit creation. Null = audit not yet loaded. */
     const enabledOptionalGroupKeys = ref<string[]>([]);
@@ -97,6 +100,16 @@ export const useAuditStore = defineStore('audit', () => {
 
     /** questionIds that are repeat findings for the current audit's division (last 180 days). */
     const repeatFindingQuestionIds = ref<Set<number>>(new Set());
+
+    // ── Prior prefill state ────────────────────────────────────────────────────
+    /** True when a prior conforming-answer set is available to load. */
+    const priorPrefillAvailable = ref(false);
+    /** ISO date of the prior audit, for display in the banner. */
+    const priorPrefillDate = ref<string | null>(null);
+    /** Internal cache: questionId → 'Conforming' map from the API. */
+    const _priorPrefillMap = ref<Record<number, string>>({});
+    /** Set of questionIds that have been prefilled but not yet touched by the auditor. */
+    const prefillQuestionIds = ref<Set<number>>(new Set());
 
     const loading = ref(false);      // audit form loading (loadAudit)
     const listLoading = ref(false);  // dashboard list loading
@@ -282,10 +295,15 @@ export const useAuditStore = defineStore('audit', () => {
         }
     }
 
-    async function createAudit(divisionId: number, enabledKeys: string[] = []): Promise<number | null> {
+    async function createAudit(
+        divisionId: number,
+        enabledKeys: string[] = [],
+        jobPrefixId?: number | null,
+        siteCode?: string | null,
+    ): Promise<number | null> {
         saving.value = true;
         try {
-            const created = await getClient().createAudit(divisionId, enabledKeys);
+            const created = await getClient().createAudit(divisionId, enabledKeys, jobPrefixId, siteCode);
 
             // Defensive handling: API contract may return either an ID or a detail DTO.
             if (typeof created === 'number' && Number.isFinite(created) && created > 0) {
@@ -317,7 +335,9 @@ export const useAuditStore = defineStore('audit', () => {
             ]);
 
             auditId.value = audit.id;
+            auditDivisionId.value = audit.divisionId;
             auditStatus.value = audit.status;
+            trackingNumber.value = audit.trackingNumber ?? null;
             header.value = audit.header ?? {};
 
             // 2A-5: Pre-fill audit metadata on new Draft audits
@@ -400,6 +420,50 @@ export const useAuditStore = defineStore('audit', () => {
         _pendingDraft.value = null;
     }
 
+    // ── Prior prefill actions ──────────────────────────────────────────────────
+
+    /** Fetch conforming answers from the most recent completed audit for this division+template. */
+    async function loadPriorPrefill(divisionId: number, templateVersionId: number) {
+        try {
+            const result = await getClient().getPriorAuditPrefill(divisionId, templateVersionId);
+            if (result.hasPrior && Object.keys(result.responses ?? {}).length > 0) {
+                _priorPrefillMap.value = result.responses;
+                priorPrefillDate.value = result.auditDate ?? null;
+                priorPrefillAvailable.value = true;
+            }
+        } catch {
+            // Non-fatal — prefill is optional, silently skip
+        }
+    }
+
+    /** Apply the prefilled responses to the current form (only fills unanswered questions). */
+    function applyPrefill() {
+        const newPrefilled = new Set<number>();
+        for (const [qIdStr, status] of Object.entries(_priorPrefillMap.value)) {
+            const questionId = Number(qIdStr);
+            const r = responses.value.get(questionId);
+            if (r && r.status === null) {
+                r.status = status;
+                newPrefilled.add(questionId);
+            }
+        }
+        prefillQuestionIds.value = newPrefilled;
+        priorPrefillAvailable.value = false;
+        _priorPrefillMap.value = {};
+        isDirty.value = true;
+    }
+
+    /** Dismiss the prefill banner without applying. */
+    function dismissPrefill() {
+        priorPrefillAvailable.value = false;
+        _priorPrefillMap.value = {};
+    }
+
+    /** Called when the auditor actively changes a prefilled question's answer. */
+    function markPrefillTouched(questionId: number) {
+        prefillQuestionIds.value.delete(questionId);
+    }
+
     function setResponse(
         questionId: number,
         status: string | null,
@@ -442,6 +506,13 @@ export const useAuditStore = defineStore('audit', () => {
                     correctedOnSite: r.correctedOnSite,
                 })),
             });
+            // Sync trackingNumber with the saved site code
+            if (trackingNumber.value) {
+                const parts = trackingNumber.value.split('-');
+                const base = parts.slice(0, 2).join('-');
+                const site = header.value.siteCode?.trim().toUpperCase();
+                trackingNumber.value = site ? `${base}-${site}` : base;
+            }
             clearLocalDraft();
             isDirty.value = false;
             toast.add({ severity: 'success', summary: 'Saved', detail: 'Audit draft saved.', life: 2500 });
@@ -454,21 +525,21 @@ export const useAuditStore = defineStore('audit', () => {
         }
     }
 
-    async function submitAudit(): Promise<boolean> {
-        if (!auditId.value) return false;
+    async function submitAudit(): Promise<{ ok: boolean; recipients: string[]; subject: string; reviewUrl: string }> {
+        if (!auditId.value) return { ok: false, recipients: [], subject: '', reviewUrl: '' };
         // Save responses first
         const saved = await saveDraft();
-        if (!saved) return false;
+        if (!saved) return { ok: false, recipients: [], subject: '', reviewUrl: '' };
         saving.value = true;
         try {
-            await getClient().submitAudit(auditId.value);
+            const result = await getClient().submitAudit(auditId.value);
             auditStatus.value = 'Submitted';
             toast.add({ severity: 'success', summary: 'Submitted', detail: 'Audit submitted successfully.', life: 3000 });
-            return true;
+            return { ok: true, recipients: result?.recipients ?? [], subject: result?.subject ?? '', reviewUrl: result?.reviewUrl ?? '' };
         } catch (err: unknown) {
             const msg = (err as { response?: { data?: string } })?.response?.data ?? 'Failed to submit audit.';
             toast.add({ severity: 'error', summary: 'Error', detail: msg, life: 5000 });
-            return false;
+            return { ok: false, recipients: [], subject: '', reviewUrl: '' };
         } finally {
             saving.value = false;
         }
@@ -538,8 +609,48 @@ export const useAuditStore = defineStore('audit', () => {
         }
     }
 
+    // ── Review / Distribution actions ─────────────────────────────────────────
+
+    async function saveReviewSummary(auditId: number, summary: string | null): Promise<void> {
+        await getClient().saveReviewSummary(auditId, summary);
+        if (review.value && review.value.id === auditId) {
+            review.value = { ...review.value, reviewSummary: summary };
+        }
+    }
+
+    async function addDistributionRecipient(auditId: number, email: string, name?: string): Promise<DistributionRecipientDto> {
+        const result = await getClient().addDistributionRecipient(auditId, { email, name });
+        if (review.value && review.value.id === auditId) {
+            review.value = {
+                ...review.value,
+                distributionRecipients: [...(review.value.distributionRecipients ?? []), result],
+            };
+        }
+        return result;
+    }
+
+    async function removeDistributionRecipient(auditId: number, recipientId: number): Promise<void> {
+        await getClient().removeDistributionRecipient(auditId, recipientId);
+        if (review.value && review.value.id === auditId) {
+            review.value = {
+                ...review.value,
+                distributionRecipients: (review.value.distributionRecipients ?? []).filter(r => r.id !== recipientId),
+            };
+        }
+    }
+
+    async function getDistributionPreview(auditId: number, attachmentIds: number[]) {
+        return getClient().getDistributionPreview(auditId, attachmentIds);
+    }
+
+    async function sendDistributionEmail(auditId: number, attachmentIds: number[], subjectOverride?: string): Promise<void> {
+        await getClient().sendDistributionEmail(auditId, { attachmentIds, subjectOverride: subjectOverride || undefined });
+        await loadReview(auditId);
+    }
+
     function resetForm() {
         auditId.value = null;
+        auditDivisionId.value = null;
         auditStatus.value = 'Draft';
         template.value = null;
         enabledOptionalGroupKeys.value = [];
@@ -550,6 +661,10 @@ export const useAuditStore = defineStore('audit', () => {
         _pendingDraft.value = null;
         review.value = null;
         repeatFindingQuestionIds.value = new Set();
+        priorPrefillAvailable.value = false;
+        priorPrefillDate.value = null;
+        _priorPrefillMap.value = {};
+        prefillQuestionIds.value = new Set();
     }
 
     return {
@@ -557,12 +672,17 @@ export const useAuditStore = defineStore('audit', () => {
         divisions,
         template,
         auditId,
+        auditDivisionId,
         auditStatus,
+        trackingNumber,
         header,
         responses,
         audits,
         review,
         repeatFindingQuestionIds,
+        priorPrefillAvailable,
+        priorPrefillDate,
+        prefillQuestionIds,
         loading,
         listLoading,
         reviewLoading,
@@ -588,6 +708,10 @@ export const useAuditStore = defineStore('audit', () => {
         loadAudit,
         acceptPendingDraft,
         discardPendingDraft,
+        loadPriorPrefill,
+        applyPrefill,
+        dismissPrefill,
+        markPrefillTouched,
         setResponse,
         setComment,
         setCorrectedOnSite,
@@ -595,6 +719,11 @@ export const useAuditStore = defineStore('audit', () => {
         submitAudit,
         loadAuditList,
         loadReview,
+        saveReviewSummary,
+        addDistributionRecipient,
+        removeDistributionRecipient,
+        getDistributionPreview,
+        sendDistributionEmail,
         resetForm,
     };
 });

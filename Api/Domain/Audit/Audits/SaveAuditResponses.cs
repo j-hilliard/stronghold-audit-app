@@ -12,7 +12,8 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.Auditor, AuthorizationRole.AuditAdmin)]
 public class SaveAuditResponses : IRequest<Unit>
 {
     public int AuditId { get; set; }
@@ -72,6 +73,7 @@ public class SaveAuditResponsesHandler : IRequestHandler<SaveAuditResponses, Uni
                     Location = request.Header.Location,
                     AuditDate = parsedDate,
                     Auditor = request.Header.Auditor,
+                    SiteCode = request.Header.SiteCode,
                     CreatedAt = now,
                     CreatedBy = request.SavedBy
                 };
@@ -94,8 +96,20 @@ public class SaveAuditResponsesHandler : IRequestHandler<SaveAuditResponses, Uni
                 h.Location = request.Header.Location;
                 h.AuditDate = parsedDate;
                 h.Auditor = request.Header.Auditor;
+                h.SiteCode = request.Header.SiteCode;
                 h.UpdatedAt = now;
                 h.UpdatedBy = request.SavedBy;
+            }
+
+            // Keep Audit.TrackingNumber in sync with the (possibly changed) site code.
+            if (audit.TrackingNumber != null)
+            {
+                var parts = audit.TrackingNumber.Split('-');
+                var trackingBase = string.Join("-", parts.Take(2));
+                var newSite = request.Header.SiteCode?.Trim().ToUpperInvariant();
+                audit.TrackingNumber = string.IsNullOrEmpty(newSite)
+                    ? trackingBase
+                    : $"{trackingBase}-{newSite}";
             }
         }
 

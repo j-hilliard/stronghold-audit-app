@@ -9,7 +9,8 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditReviewer, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.AuditAdmin)]
 public class CloseAudit : IRequest<Unit>
 {
     public int AuditId { get; set; }
@@ -36,6 +37,17 @@ public class CloseAuditHandler : IRequestHandler<CloseAudit, Unit>
 
         if (audit.Status != "Submitted" && audit.Status != "Reopened")
             throw new InvalidOperationException($"Audit {request.AuditId} cannot be closed from status '{audit.Status}'.");
+
+        // Block closure if any non-terminal CAs remain
+        var openCaCount = await _context.CorrectiveActions
+            .CountAsync(ca => !ca.IsDeleted
+                && (ca.AuditId == audit.Id || (ca.Finding != null && ca.Finding.AuditId == audit.Id))
+                && ca.Status != "Closed"
+                && ca.Status != "Voided", cancellationToken);
+
+        if (openCaCount > 0)
+            throw new InvalidOperationException(
+                $"Cannot close audit: {openCaCount} corrective action(s) are still open.");
 
         var now = DateTime.UtcNow;
         audit.Status = "Closed";

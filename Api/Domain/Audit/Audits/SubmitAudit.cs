@@ -11,14 +11,24 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
-public class SubmitAudit : IRequest<Unit>
+    AuthorizationRole.Administrator,
+    AuthorizationRole.Auditor, AuthorizationRole.AuditAdmin)]
+public class SubmitAudit : IRequest<SubmitAuditResult>
 {
     public int AuditId { get; set; }
     public string SubmittedBy { get; set; } = null!;
 }
 
-public class SubmitAuditHandler : IRequestHandler<SubmitAudit, Unit>
+public class SubmitAuditResult
+{
+    public List<string> Recipients { get; set; } = [];
+    public string Subject { get; set; } = string.Empty;
+    public string ReviewUrl { get; set; } = string.Empty;
+    public string Score { get; set; } = string.Empty;
+    public int NcCount { get; set; }
+}
+
+public class SubmitAuditHandler : IRequestHandler<SubmitAudit, SubmitAuditResult>
 {
     private readonly AppDbContext _context;
     private readonly IProcessLogService _log;
@@ -40,7 +50,7 @@ public class SubmitAuditHandler : IRequestHandler<SubmitAudit, Unit>
         _config   = config;
     }
 
-    public async Task<Unit> Handle(SubmitAudit request, CancellationToken cancellationToken)
+    public async Task<SubmitAuditResult> Handle(SubmitAudit request, CancellationToken cancellationToken)
     {
         var audit = await _context.Audits
             .Include(a => a.Responses)
@@ -210,9 +220,9 @@ public class SubmitAuditHandler : IRequestHandler<SubmitAudit, Unit>
             relatedObject: audit.Id.ToString());
 
         // ── Send submission notification email ────────────────────────────────
-        await SendSubmissionEmailAsync(audit, nonConforming.Count, now, defaultDueDate, aiSummaryText, cancellationToken);
+        var emailResult = await SendSubmissionEmailAsync(audit, nonConforming.Count, now, defaultDueDate, aiSummaryText, cancellationToken);
 
-        return Unit.Value;
+        return emailResult;
     }
 
     /// <summary>
@@ -281,7 +291,7 @@ public class SubmitAuditHandler : IRequestHandler<SubmitAudit, Unit>
         }
     }
 
-    private async Task SendSubmissionEmailAsync(
+    private async Task<SubmitAuditResult> SendSubmissionEmailAsync(
         Data.Models.Audit.Audit audit,
         int ncCount,
         DateTime submittedAt,
@@ -289,6 +299,19 @@ public class SubmitAuditHandler : IRequestHandler<SubmitAudit, Unit>
         string? aiSummaryText,
         CancellationToken cancellationToken)
     {
+        // Score calculation (needed for both email and result)
+        var responses  = audit.Responses.Where(r => r.Status != null).ToList();
+        var conforming = responses.Count(r => r.Status == "Conforming");
+        var denom      = responses.Count(r => r.Status is "Conforming" or "NonConforming" or "Warning");
+        var scoreText  = denom > 0 ? $"{Math.Round((double)conforming / denom * 100, 1)}%" : "N/A";
+
+        var header    = audit.Header;
+        var auditDate = header?.AuditDate?.ToString("MM/dd/yyyy") ?? submittedAt.ToString("MM/dd/yyyy");
+        var divCode   = audit.Division?.Code ?? "—";
+        var appBaseUrl = _config.GetValue<string>("App:BaseUrl") ?? "http://localhost:5221";
+        var reviewLink = $"{appBaseUrl}/audit-management/audits/{audit.Id}/review";
+        var subject    = $"{divCode} Compliance Audit — {scoreText} — {ncCount} Non-Conforming Finding{(ncCount != 1 ? "s" : "")} — {auditDate}";
+
         try
         {
             // Collect recipients: division routing list + active review group members
@@ -302,27 +325,31 @@ public class SubmitAuditHandler : IRequestHandler<SubmitAudit, Unit>
                 .Select(m => m.Email)
                 .ToListAsync(cancellationToken);
 
-            var allRecipients = divisionRecipients.Union(reviewGroupRecipients).Distinct().ToList();
-            if (allRecipients.Count == 0) return;
+            var auditAdminEmails = await _context.Users
+                .Where(u => u.Active && u.UserRoles.Any(ur => ur.Role.Name == AuthorizationRoles.AuditAdmin))
+                .Select(u => u.Email)
+                .ToListAsync(cancellationToken);
 
-            // Score calculation
-            var responses  = audit.Responses.Where(r => r.Status != null).ToList();
-            var conforming = responses.Count(r => r.Status == "Conforming");
-            var denom      = responses.Count(r => r.Status is "Conforming" or "NonConforming" or "Warning");
-            var scoreText  = denom > 0 ? $"{Math.Round((double)conforming / denom * 100, 1)}%" : "N/A";
+            var allRecipients = divisionRecipients
+                .Union(reviewGroupRecipients)
+                .Union(auditAdminEmails.Where(e => !string.IsNullOrEmpty(e))!)
+                .Distinct()
+                .ToList();
 
-            var header     = audit.Header;
-            var jobNumber  = header?.JobNumber ?? "—";
-            var location   = header?.Location  ?? "—";
-            var auditor    = header?.Auditor    ?? "—";
-            var auditDate  = header?.AuditDate?.ToString("MM/dd/yyyy") ?? submittedAt.ToString("MM/dd/yyyy");
-            var divCode    = audit.Division?.Code ?? "—";
+            var result = new SubmitAuditResult
+            {
+                Recipients = allRecipients,
+                Subject    = subject,
+                ReviewUrl  = reviewLink,
+                Score      = scoreText,
+                NcCount    = ncCount,
+            };
 
-            var appBaseUrl  = _config.GetValue<string>("App:BaseUrl") ?? "http://localhost:7220";
-            var reviewLink  = $"{appBaseUrl}/audits/{audit.Id}/review";
+            if (allRecipients.Count == 0) return result;
 
-            // Subject: Division | Score | NC count | Date  (matches plan spec)
-            var subject = $"{divCode} Compliance Audit — {scoreText} — {ncCount} Non-Conforming Finding{(ncCount != 1 ? "s" : "")} — {auditDate}";
+            var jobNumber = header?.JobNumber ?? "—";
+            var location  = header?.Location  ?? "—";
+            var auditor   = header?.Auditor    ?? "—";
 
             // AI summary block (only when generated)
             var aiSummaryBlock = !string.IsNullOrWhiteSpace(aiSummaryText)
@@ -345,6 +372,8 @@ public class SubmitAuditHandler : IRequestHandler<SubmitAudit, Unit>
                       <tr><td style="padding:6px 0;color:#666;">Job Number</td><td style="padding:6px 0;">{jobNumber}</td></tr>
                       <tr><td style="padding:6px 0;color:#666;">Location</td><td style="padding:6px 0;">{location}</td></tr>
                       <tr><td style="padding:6px 0;color:#666;">Auditor</td><td style="padding:6px 0;">{auditor}</td></tr>
+                      {(header?.PM       != null ? $"<tr><td style=\"padding:6px 0;color:#666;\">Project Manager</td><td style=\"padding:6px 0;\">{System.Net.WebUtility.HtmlEncode(header.PM)}</td></tr>" : "")}
+                      {(header?.Client   != null ? $"<tr><td style=\"padding:6px 0;color:#666;\">Client</td><td style=\"padding:6px 0;\">{System.Net.WebUtility.HtmlEncode(header.Client)}</td></tr>" : "")}
                       <tr><td style="padding:6px 0;color:#666;">Audit Date</td><td style="padding:6px 0;">{auditDate}</td></tr>
                       <tr><td style="padding:6px 0;color:#666;">Conformance Score</td><td style="padding:6px 0;font-weight:bold;color:{(ncCount == 0 ? "#16a34a" : "#dc2626")};">{scoreText}</td></tr>
                       <tr><td style="padding:6px 0;color:#666;">Non-Conformances</td><td style="padding:6px 0;">{ncCount}</td></tr>
@@ -364,6 +393,7 @@ public class SubmitAuditHandler : IRequestHandler<SubmitAudit, Unit>
                 """;
 
             await _email.SendAsync(subject, body, allRecipients, cancellationToken);
+            return result;
         }
         catch (Exception ex)
         {
@@ -371,6 +401,14 @@ public class SubmitAuditHandler : IRequestHandler<SubmitAudit, Unit>
             await _log.LogAsync("SubmitAudit", "Email", "Warning",
                 $"Submission email failed for audit {audit.Id}: {ex.Message}",
                 relatedObject: audit.Id.ToString());
+            return new SubmitAuditResult
+            {
+                Recipients = [],
+                Subject    = subject,
+                ReviewUrl  = reviewLink,
+                Score      = scoreText,
+                NcCount    = ncCount,
+            };
         }
     }
 }

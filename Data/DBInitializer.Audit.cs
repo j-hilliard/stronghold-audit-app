@@ -21,29 +21,32 @@ public static class AuditDbInitializer
         SeedResponseTypes(dbContext);
 
         // IgnoreQueryFilters so soft-deleted rows still count — prevents duplicate seeding
-        if (dbContext.Divisions.IgnoreQueryFilters().Any())
-            return;
-
-        var now = DateTime.UtcNow;
-
-        // Use execution strategy to support SqlServerRetryingExecutionStrategy with transactions.
-        var strategy = dbContext.Database.CreateExecutionStrategy();
-        strategy.Execute(() =>
+        if (!dbContext.Divisions.IgnoreQueryFilters().Any())
         {
-            using var tx = dbContext.Database.BeginTransaction();
-            try
-            {
-                foreach (var divSeed in GetDivisionSeeds())
-                    SeedDivision(dbContext, divSeed, now);
+            var now = DateTime.UtcNow;
 
-                tx.Commit();
-            }
-            catch
+            // Use execution strategy to support SqlServerRetryingExecutionStrategy with transactions.
+            var strategy = dbContext.Database.CreateExecutionStrategy();
+            strategy.Execute(() =>
             {
-                tx.Rollback();
-                throw;
-            }
-        });
+                using var tx = dbContext.Database.BeginTransaction();
+                try
+                {
+                    foreach (var divSeed in GetDivisionSeeds())
+                        SeedDivision(dbContext, divSeed, now);
+
+                    tx.Commit();
+                }
+                catch
+                {
+                    tx.Rollback();
+                    throw;
+                }
+            });
+        }
+
+        // Runs after divisions exist — idempotent, seeds missing prefix rows every startup
+        SeedDivisionJobPrefixes(dbContext);
     }
 
     private static void SeedReportingCategories(AppDbContext dbContext)
@@ -285,54 +288,45 @@ public static class AuditDbInitializer
                 includeServiceReceipts: true,
                 includeCultureAttitudes: true,
                 otherQuestions: StandardOtherQuestions()),
-            DivisionEmails(
-                "joseph.hilliard@thestrongholdcompanies.com")),
+            DivisionEmails()),
 
         new DivisionSeed("STS", "STS", "JobSite",
             StandardJobSiteSections(
                 includeServiceReceipts: true,
                 includeCultureAttitudes: true,
                 otherQuestions: StandardOtherQuestions()),
-            DivisionEmails(
-                "joseph.hilliard@thestrongholdcompanies.com")),
+            DivisionEmails()),
 
         new DivisionSeed("SHI", "SHI", "JobSite",
             StandardJobSiteSections(
                 includeServiceReceipts: true,
                 includeCultureAttitudes: true,
                 otherQuestions: StandardOtherQuestions()),
-            DivisionEmails(
-                "joseph.hilliard@thestrongholdcompanies.com")),
+            DivisionEmails()),
 
         new DivisionSeed("SHI_RT", "SHI (RT)", "JobSite",
             ShiRtSections(),
-            DivisionEmails(
-                "joseph.hilliard@thestrongholdcompanies.com")),
+            DivisionEmails()),
 
         new DivisionSeed("SHI_RA", "SHI (RA)", "JobSite",
             ShiRaSections(),
-            DivisionEmails(
-                "joseph.hilliard@thestrongholdcompanies.com")),
+            DivisionEmails()),
 
         new DivisionSeed("STG", "STG", "JobSite",
             StgEtsSections(includeExtraOtherQuestions: true),
-            DivisionEmails(
-                "joseph.hilliard@thestrongholdcompanies.com")),
+            DivisionEmails()),
 
         new DivisionSeed("ETS", "ETS", "JobSite",
             StgEtsSections(includeExtraOtherQuestions: false),
-            DivisionEmails(
-                "joseph.hilliard@thestrongholdcompanies.com")),
+            DivisionEmails()),
 
         new DivisionSeed("CSL", "CSL", "JobSite",
             CslSections(),
-            DivisionEmails(
-                "joseph.hilliard@thestrongholdcompanies.com")),
+            DivisionEmails()),
 
         new DivisionSeed("FACILITY", "FACILITY", "Facility",
             FacilitySections(),
-            DivisionEmails(
-                "joseph.hilliard@thestrongholdcompanies.com")),
+            DivisionEmails()),
     };
 
     // ── Standard job-site section builder ─────────────────────────────────────
@@ -697,6 +691,60 @@ public static class AuditDbInitializer
         }),
         ("Other", StandardOtherQuestions()),
     };
+
+    // ── Division job-prefix seed ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Idempotent: seeds DivisionJobPrefix rows for all known divisions.
+    /// Safe to run on every startup — adds missing rows, never removes or duplicates.
+    /// </summary>
+    private static void SeedDivisionJobPrefixes(AppDbContext dbContext)
+    {
+        // Map: divisionCode → list of (prefix, label, isDefault, sortOrder)
+        var prefixMap = new Dictionary<string, (string Prefix, string Label, bool IsDefault, int Sort)[]>
+        {
+            ["TKIE"]     = new[] { ("T", "Main", true, 0) },
+            ["STS"]      = new[] { ("S", "Main", true, 0) },
+            ["SHI"]      = new[] { ("I", "Main", true, 0) },
+            ["SHI_RT"]   = new[] { ("I", "Main", true, 0) },
+            ["SHI_RA"]   = new[] { ("I", "Main", true, 0) },
+            ["STG"]      = new[] { ("G", "Main", true, 0) },
+            ["ETS"]      = new[] { ("H", "Main", true, 0), ("B", "Fab Shop Work", false, 1) },
+            ["CSL"]      = new[] { ("",  "Main", true, 0) },
+            // Additional divisions (may be seeded later or already exist in production)
+            ["BTI"]      = new[] { ("X", "Main", true, 0) },
+            ["CCT"]      = new[] { ("J", "Main", true, 0) },
+            ["CCI"]      = new[] { ("N", "Main", true, 0) },
+            ["EVG"]      = new[] { ("V", "Main", true, 0) },
+            ["GEM"]      = new[] { ("M", "Main", true, 0) },
+            ["NIS"]      = new[] { ("A", "Main", true, 0) },
+            ["TKA"]      = new[] { ("T", "Main", true, 0) },
+        };
+
+        foreach (var (code, prefixes) in prefixMap)
+        {
+            var division = dbContext.Divisions.IgnoreQueryFilters().FirstOrDefault(d => d.Code == code);
+            if (division == null) continue;
+
+            foreach (var (prefix, label, isDefault, sort) in prefixes)
+            {
+                var exists = dbContext.DivisionJobPrefixes
+                    .Any(p => p.DivisionId == division.Id && p.Prefix == prefix);
+                if (!exists)
+                {
+                    dbContext.DivisionJobPrefixes.Add(new DivisionJobPrefix
+                    {
+                        DivisionId = division.Id,
+                        Prefix     = prefix,
+                        Label      = label,
+                        IsDefault  = isDefault,
+                        SortOrder  = sort,
+                    });
+                }
+            }
+        }
+        dbContext.SaveChanges();
+    }
 
     // ── Record types ──────────────────────────────────────────────────────────
 

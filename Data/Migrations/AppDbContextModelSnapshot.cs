@@ -17,86 +17,10 @@ namespace Stronghold.AppDashboard.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "7.0.20")
+                .HasAnnotation("ProductVersion", "10.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.Entity("SeveritiesActual", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("code");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("created_at");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit")
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("name");
-
-                    b.Property<int>("Rank")
-                        .HasColumnType("int")
-                        .HasColumnName("rank");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("ref_severity_actual", "safety");
-                });
-
-            modelBuilder.Entity("SeveritiesPotential", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("code");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("created_at");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit")
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("name");
-
-                    b.Property<int>("Rank")
-                        .HasColumnType("int")
-                        .HasColumnName("rank");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("ref_severity_potential", "safety");
-                });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.Audit", b =>
                 {
@@ -135,6 +59,18 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
+                    b.Property<int?>("JobPrefixId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ReviewSummary")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReviewedBy")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -145,6 +81,10 @@ namespace Stronghold.AppDashboard.Data.Migrations
 
                     b.Property<int>("TemplateVersionId")
                         .HasColumnType("int");
+
+                    b.Property<string>("TrackingNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -159,15 +99,85 @@ namespace Stronghold.AppDashboard.Data.Migrations
 
                     b.HasIndex("DivisionId");
 
+                    b.HasIndex("JobPrefixId");
+
                     b.HasIndex("Status");
 
                     b.HasIndex("TemplateVersionId");
+
+                    b.HasIndex("TrackingNumber")
+                        .IsUnique()
+                        .HasFilter("[TrackingNumber] IS NOT NULL");
 
                     b.ToTable("Audit", "audit", t =>
                         {
                             t.HasCheckConstraint("CK_Audit_AuditType", "[AuditType] IN ('JobSite', 'Facility')");
 
                             t.HasCheckConstraint("CK_Audit_Status", "[Status] IN ('Draft', 'Submitted', 'Reopened', 'Closed')");
+                        });
+                });
+
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditActionLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("EntityId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("PerformedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("RequestPath")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Info");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PerformedBy");
+
+                    b.HasIndex("Timestamp");
+
+                    b.HasIndex("EntityType", "EntityId");
+
+                    b.ToTable("AuditActionLog", "audit", t =>
+                        {
+                            t.HasCheckConstraint("CK_AuditActionLog_Severity", "[Severity] IN ('Info', 'Warning', 'Error')");
                         });
                 });
 
@@ -232,6 +242,41 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.HasIndex("AuditId");
 
                     b.ToTable("AuditAttachment", "audit");
+                });
+
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditDistributionRecipient", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("AddedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("AuditId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EmailAddress")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuditId");
+
+                    b.ToTable("AuditDistributionRecipient", "audit");
                 });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditEnabledSection", b =>
@@ -392,6 +437,10 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
+                    b.Property<string>("SiteCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
                     b.Property<string>("Time")
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
@@ -419,6 +468,31 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.ToTable("AuditHeader", "audit");
                 });
 
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditNumberSequence", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("DivisionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("LastSequence")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DivisionId", "Year")
+                        .IsUnique();
+
+                    b.ToTable("AuditNumberSequence", "audit");
+                });
+
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditQuestion", b =>
                 {
                     b.Property<int>("Id")
@@ -433,6 +507,9 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Property<string>("ArchivedBy")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("AutoCreateCa")
+                        .HasColumnType("bit");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -462,12 +539,6 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Property<bool>("IsLifeCritical")
                         .HasColumnType("bit");
 
-                    b.Property<bool>("RequirePhotoOnNc")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("AutoCreateCa")
-                        .HasColumnType("bit");
-
                     b.Property<bool>("IsRequired")
                         .HasColumnType("bit");
 
@@ -483,6 +554,9 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         .HasColumnType("bit");
 
                     b.Property<bool>("RequireCorrectiveAction")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("RequirePhotoOnNc")
                         .HasColumnType("bit");
 
                     b.Property<int?>("ResponseTypeId")
@@ -815,6 +889,64 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditTrailLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("ChangedColumns")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("NewValues")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OldValues")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserEmail")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Timestamp");
+
+                    b.HasIndex("UserEmail");
+
+                    b.HasIndex("EntityType", "EntityId");
+
+                    b.ToTable("AuditTrailLog", "audit", t =>
+                        {
+                            t.HasCheckConstraint("CK_AuditTrailLog_Action", "[Action] IN ('Insert', 'Update', 'Delete')");
+                        });
+                });
+
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditVersionQuestion", b =>
                 {
                     b.Property<int>("Id")
@@ -977,17 +1109,29 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Property<int?>("FindingId")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Normal");
+
                     b.Property<int?>("QuestionId")
                         .HasColumnType("int");
 
+                    b.Property<string>("RootCause")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
                     b.Property<string>("Source")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)")
                         .HasDefaultValue("Manual");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1003,12 +1147,93 @@ namespace Stronghold.AppDashboard.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AssignedToUserId");
+
+                    b.HasIndex("AuditId");
+
+                    b.HasIndex("AuditResponseId");
+
+                    b.HasIndex("DueDate");
+
                     b.HasIndex("FindingId");
+
+                    b.HasIndex("QuestionId");
+
+                    b.HasIndex("Status");
 
                     b.ToTable("CorrectiveAction", "audit", t =>
                         {
-                            t.HasCheckConstraint("CK_CorrectiveAction_Status", "[Status] IN ('Open', 'InProgress', 'Closed', 'Voided', 'Overdue')");
+                            t.HasCheckConstraint("CK_CorrectiveAction_Priority", "[Priority] IN ('Normal', 'Urgent')");
+
+                            t.HasCheckConstraint("CK_CorrectiveAction_Source", "[Source]   IN ('Manual', 'AutoGenerated')");
+
+                            t.HasCheckConstraint("CK_CorrectiveAction_Status", "[Status]   IN ('Open', 'InProgress', 'Closed', 'Voided', 'Overdue')");
                         });
+                });
+
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.CorrectiveActionPhoto", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Caption")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("CorrectiveActionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UploadedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CorrectiveActionId");
+
+                    b.ToTable("CorrectiveActionPhoto", "audit");
                 });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.Division", b =>
@@ -1018,6 +1243,9 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AuditFrequencyDays")
+                        .HasColumnType("int");
 
                     b.Property<string>("AuditType")
                         .IsRequired()
@@ -1044,6 +1272,9 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<string>("EscalationEmail")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -1055,14 +1286,24 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<decimal?>("ScoreTarget")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int?>("AuditFrequencyDays")
-                        .HasColumnType("int");
+                    b.Property<string>("OPUNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<bool>("RequireClosurePhoto")
                         .HasColumnType("bit");
+
+                    b.Property<decimal?>("ScoreTarget")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("SlaEscalateAfterDays")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SlaNormalDays")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SlaUrgentDays")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -1077,6 +1318,40 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Division", "audit");
+                });
+
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.DivisionJobPrefix", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("DivisionId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Prefix")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("nvarchar(5)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DivisionId", "SortOrder");
+
+                    b.ToTable("DivisionJobPrefix", "audit");
                 });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.EmailRoutingRule", b =>
@@ -1202,71 +1477,6 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.HasIndex("AuditId", "QuestionId");
 
                     b.ToTable("FindingPhoto", "audit");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.CorrectiveActionPhoto", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Caption")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<int>("CorrectiveActionId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CreatedBy")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("DeletedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("FilePath")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<long>("FileSizeBytes")
-                        .HasColumnType("bigint");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime>("UploadedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("UploadedBy")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CorrectiveActionId");
-
-                    b.ToTable("CorrectiveActionPhoto", "audit");
                 });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.NewsletterTemplate", b =>
@@ -1853,562 +2063,6 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.ToTable("Roles");
                 });
 
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.IncidentAction", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id");
-
-                    b.Property<string>("ActionDescription")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("action_description");
-
-                    b.Property<string>("ActionType")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("action_type");
-
-                    b.Property<string>("AssignedTo")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("assigned_to");
-
-                    b.Property<DateTime?>("ClosedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("closed_at");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DueDate")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("due_date");
-
-                    b.Property<Guid>("IncidentReportId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("incident_report_id");
-
-                    b.Property<string>("Status")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("status");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IncidentReportId");
-
-                    b.ToTable("incident_action", "safety");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.IncidentEmployeeInvolved", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("EmployeeIdentifier")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("employee_identifier");
-
-                    b.Property<string>("EmployeeName")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("employee_name");
-
-                    b.Property<decimal?>("HoursWorked")
-                        .HasColumnType("decimal(18,2)")
-                        .HasColumnName("hours_worked");
-
-                    b.Property<Guid>("IncidentReportId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("incident_report_id");
-
-                    b.Property<string>("InjuryTypeCode")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("injury_type_code");
-
-                    b.Property<bool?>("Recordable")
-                        .HasColumnType("bit")
-                        .HasColumnName("recordable");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IncidentReportId");
-
-                    b.ToTable("incident_employee_involved", "safety");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.IncidentReport", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id");
-
-                    b.Property<string>("BodyPartsInjured")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ClientCode")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("client_code");
-
-                    b.Property<Guid?>("CompanyId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("company_id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("created_at");
-
-                    b.Property<bool>("FormalInvestigationRequired")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("FullCauseMapRequired")
-                        .HasColumnType("bit");
-
-                    b.Property<Guid?>("HealthSafetyLeaderId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("health_safety_leader_id");
-
-                    b.Property<string>("IncidentClass")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("incident_class");
-
-                    b.Property<DateTime>("IncidentDate")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("incident_date");
-
-                    b.Property<string>("IncidentNumber")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("incident_number");
-
-                    b.Property<string>("IncidentSummary")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("incident_summary");
-
-                    b.Property<string>("InvestigationDetails")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("JobNumber")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("job_number");
-
-                    b.Property<string>("NatureOfInjury")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PlantCode")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("plant_code");
-
-                    b.Property<Guid?>("RegionId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("region_id");
-
-                    b.Property<Guid?>("SeniorOpsLeaderId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("senior_ops_leader_id");
-
-                    b.Property<string>("SeverityActualCode")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("severity_actual_code");
-
-                    b.Property<string>("SeverityPotentialCode")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("severity_potential_code");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("status");
-
-                    b.Property<string>("TypeOfEquipment")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("UnitNumbers")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at");
-
-                    b.Property<string>("Visibility")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("WorkDescription")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("work_description");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("RegionId");
-
-                    b.ToTable("incident_report", "safety");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.IncidentReportReference", b =>
-                {
-                    b.Property<Guid>("IncidentReportId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("incident_report_id");
-
-                    b.Property<Guid>("ReferenceId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("reference_id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("created_at");
-
-                    b.HasKey("IncidentReportId", "ReferenceId");
-
-                    b.HasIndex("ReferenceId");
-
-                    b.ToTable("incident_report_reference", "safety");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.ProcessLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id");
-
-                    b.Property<Guid?>("IncidentReportId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("incident_report_id");
-
-                    b.Property<string>("LogType")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("log_type");
-
-                    b.Property<DateTime>("LoggedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("logged_at");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("message");
-
-                    b.Property<string>("MessageDetail")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("message_detail");
-
-                    b.Property<string>("ProcessName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("process_name");
-
-                    b.Property<string>("ProcessType")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("process_type");
-
-                    b.Property<string>("RelatedObject")
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("related_object");
-
-                    b.Property<string>("RunId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("run_id");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("process_log", "safety");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.RefCompany", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("code");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("created_at");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit")
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("name");
-
-                    b.Property<int>("NextIncidentNumber")
-                        .HasColumnType("int")
-                        .HasColumnName("next_incident_number");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("ref_company", "safety");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.RefDocType", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("code");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("created_at");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit")
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("name");
-
-                    b.Property<Guid>("ReferenceTypeId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("reference_type_id");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ReferenceTypeId");
-
-                    b.ToTable("ref_doc_type", "safety");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.RefIncidentReportReference", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("code");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("created_at");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit")
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("name");
-
-                    b.Property<Guid>("ReferenceTypeId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("reference_type_id");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ReferenceTypeId");
-
-                    b.ToTable("ref_incident_report_reference", "safety");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.RefInvestigationReference", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("code");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("created_at");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit")
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("name");
-
-                    b.Property<Guid>("ReferenceTypeId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("reference_type_id");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ReferenceTypeId");
-
-                    b.ToTable("ref_investigation_reference", "safety");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.RefReferenceType", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id");
-
-                    b.Property<string>("AppliesTo")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("applies_to");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("code");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("created_at");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit")
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("name");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("ref_reference_type", "safety");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.RefRegion", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("code");
-
-                    b.Property<Guid?>("CompanyId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("company_id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("created_at");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit")
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("name");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.ToTable("ref_region", "safety");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.RefWorkflowState", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("code");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Domain")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("domain");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit")
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)")
-                        .HasColumnName("name");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("ref_workflow_state", "safety");
-                });
-
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Settings", b =>
                 {
                     b.Property<int>("SettingsId")
@@ -2626,6 +2280,11 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.DivisionJobPrefix", "JobPrefix")
+                        .WithMany()
+                        .HasForeignKey("JobPrefixId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.AuditTemplateVersion", "TemplateVersion")
                         .WithMany()
                         .HasForeignKey("TemplateVersionId")
@@ -2633,6 +2292,8 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Division");
+
+                    b.Navigation("JobPrefix");
 
                     b.Navigation("TemplateVersion");
                 });
@@ -2643,6 +2304,17 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         .WithMany("Attachments")
                         .HasForeignKey("AuditId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Audit");
+                });
+
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditDistributionRecipient", b =>
+                {
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.Audit", "Audit")
+                        .WithMany()
+                        .HasForeignKey("AuditId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Audit");
@@ -2687,6 +2359,17 @@ namespace Stronghold.AppDashboard.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Audit");
+                });
+
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditNumberSequence", b =>
+                {
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.Division", "Division")
+                        .WithMany()
+                        .HasForeignKey("DivisionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Division");
                 });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditQuestion", b =>
@@ -2798,13 +2481,48 @@ namespace Stronghold.AppDashboard.Data.Migrations
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.CorrectiveAction", b =>
                 {
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.Audit", "Audit")
+                        .WithMany()
+                        .HasForeignKey("AuditId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.AuditFinding", "Finding")
                         .WithMany("CorrectiveActions")
                         .HasForeignKey("FindingId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.AuditQuestion", "Question")
+                        .WithMany()
+                        .HasForeignKey("QuestionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Audit");
 
                     b.Navigation("Finding");
+
+                    b.Navigation("Question");
+                });
+
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.CorrectiveActionPhoto", b =>
+                {
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.CorrectiveAction", "CorrectiveAction")
+                        .WithMany()
+                        .HasForeignKey("CorrectiveActionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CorrectiveAction");
+                });
+
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.DivisionJobPrefix", b =>
+                {
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.Division", "Division")
+                        .WithMany()
+                        .HasForeignKey("DivisionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Division");
                 });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.EmailRoutingRule", b =>
@@ -2835,17 +2553,6 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Navigation("Audit");
 
                     b.Navigation("Question");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.CorrectiveActionPhoto", b =>
-                {
-                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.CorrectiveAction", "CorrectiveAction")
-                        .WithMany()
-                        .HasForeignKey("CorrectiveActionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CorrectiveAction");
                 });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.NewsletterTemplate", b =>
@@ -2947,107 +2654,6 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.IncidentAction", b =>
-                {
-                    b.HasOne("Stronghold.AppDashboard.Data.Models.Safety.IncidentReport", "IncidentReport")
-                        .WithMany("Actions")
-                        .HasForeignKey("IncidentReportId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("IncidentReport");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.IncidentEmployeeInvolved", b =>
-                {
-                    b.HasOne("Stronghold.AppDashboard.Data.Models.Safety.IncidentReport", "IncidentReport")
-                        .WithMany("EmployeesInvolved")
-                        .HasForeignKey("IncidentReportId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("IncidentReport");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.IncidentReport", b =>
-                {
-                    b.HasOne("Stronghold.AppDashboard.Data.Models.Safety.RefCompany", "Company")
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Stronghold.AppDashboard.Data.Models.Safety.RefRegion", "Region")
-                        .WithMany()
-                        .HasForeignKey("RegionId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Company");
-
-                    b.Navigation("Region");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.IncidentReportReference", b =>
-                {
-                    b.HasOne("Stronghold.AppDashboard.Data.Models.Safety.IncidentReport", "IncidentReport")
-                        .WithMany("References")
-                        .HasForeignKey("IncidentReportId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Stronghold.AppDashboard.Data.Models.Safety.RefIncidentReportReference", "Reference")
-                        .WithMany()
-                        .HasForeignKey("ReferenceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("IncidentReport");
-
-                    b.Navigation("Reference");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.RefDocType", b =>
-                {
-                    b.HasOne("Stronghold.AppDashboard.Data.Models.Safety.RefReferenceType", "ReferenceType")
-                        .WithMany()
-                        .HasForeignKey("ReferenceTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ReferenceType");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.RefIncidentReportReference", b =>
-                {
-                    b.HasOne("Stronghold.AppDashboard.Data.Models.Safety.RefReferenceType", "ReferenceType")
-                        .WithMany("IncidentReportReferences")
-                        .HasForeignKey("ReferenceTypeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ReferenceType");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.RefInvestigationReference", b =>
-                {
-                    b.HasOne("Stronghold.AppDashboard.Data.Models.Safety.RefReferenceType", "ReferenceType")
-                        .WithMany()
-                        .HasForeignKey("ReferenceTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ReferenceType");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.RefRegion", b =>
-                {
-                    b.HasOne("Stronghold.AppDashboard.Data.Models.Safety.RefCompany", "Company")
-                        .WithMany("Regions")
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Company");
-                });
-
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.User", b =>
                 {
                     b.HasOne("Stronghold.AppDashboard.Data.Models.User", null)
@@ -3141,25 +2747,6 @@ namespace Stronghold.AppDashboard.Data.Migrations
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Role", b =>
                 {
                     b.Navigation("UserRoles");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.IncidentReport", b =>
-                {
-                    b.Navigation("Actions");
-
-                    b.Navigation("EmployeesInvolved");
-
-                    b.Navigation("References");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.RefCompany", b =>
-                {
-                    b.Navigation("Regions");
-                });
-
-            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Safety.RefReferenceType", b =>
-                {
-                    b.Navigation("IncidentReportReferences");
                 });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.User", b =>

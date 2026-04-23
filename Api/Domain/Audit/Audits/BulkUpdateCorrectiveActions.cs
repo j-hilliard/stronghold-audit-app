@@ -9,7 +9,8 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
-    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
+    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator,
+    AuthorizationRole.Auditor, AuthorizationRole.AuditAdmin)]
 public class BulkUpdateCorrectiveActions : IRequest<BulkUpdateCorrectiveActionsResult>
 {
     public List<int> CorrectiveActionIds { get; set; } = new();

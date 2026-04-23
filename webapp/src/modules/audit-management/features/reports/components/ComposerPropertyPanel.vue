@@ -121,7 +121,7 @@
                     <label class="flex items-center gap-2 cursor-pointer mt-1 px-2 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 border border-slate-600 transition-colors">
                         <i class="pi pi-upload text-xs" /> Upload from PC
                         <input type="file" accept="image/*" class="hidden"
-                            @change="onImageUpload($event, (url) => updateContent({ ...block.content, backgroundImageUrl: url }))" />
+                            @change="onImageUpload($event, (url) => updateContent({ ...block!.content, backgroundImageUrl: url }))" />
                     </label>
                     <p v-if="block.content.backgroundImageUrl" class="text-xs text-slate-500 truncate">{{ block.content.backgroundImageUrl.slice(0, 40) }}…</p>
                 </div>
@@ -461,7 +461,7 @@
                     <label class="flex items-center gap-2 cursor-pointer mt-1 px-2 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 border border-slate-600 transition-colors">
                         <i class="pi pi-upload text-xs" /> Upload from PC
                         <input type="file" accept="image/*" class="hidden"
-                            @change="onImageUpload($event, (url) => updateContent({ ...block.content, backgroundImageUrl: url }))" />
+                            @change="onImageUpload($event, (url) => updateContent({ ...block!.content, backgroundImageUrl: url }))" />
                     </label>
                 </div>
                 <div v-if="block.content.backgroundImageUrl" class="space-y-1">
@@ -610,7 +610,7 @@
                     <label class="flex items-center gap-2 cursor-pointer mt-1 px-2 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-300 border border-slate-600 transition-colors">
                         <i class="pi pi-upload text-xs" /> Upload from PC
                         <input type="file" accept="image/*" class="hidden"
-                            @change="onImageUpload($event, (url) => updateContent({ ...block.content, url }))" />
+                            @change="onImageUpload($event, (url) => updateContent({ ...block!.content, url }))" />
                     </label>
                 </div>
                 <div class="space-y-1">

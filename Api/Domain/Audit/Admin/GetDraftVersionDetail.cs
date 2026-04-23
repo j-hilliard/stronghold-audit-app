@@ -9,7 +9,8 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Admin;
 
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.AuditAdmin)]
 public class GetDraftVersionDetail : IRequest<DraftVersionDetailDto?>
 {
     public int DraftVersionId { get; set; }

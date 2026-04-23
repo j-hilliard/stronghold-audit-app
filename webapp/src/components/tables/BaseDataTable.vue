@@ -1,12 +1,12 @@
 <template>
-  <Card class="mt-6">
+  <Card class="mt-4">
     <template #content>
       <!-- Top loading bar -->
       <div class="base-table-loadbar" :class="{ 'base-table-loadbar--active': loading }">
         <div class="base-table-loadbar-fill" />
       </div>
 
-      <div v-if="$slots.filters" class="flex flex-col md:flex-row md:items-center gap-4 mb-4">
+      <div v-if="$slots.filters" class="flex flex-wrap items-end gap-2 mb-4 pb-3 border-b border-slate-700/40">
         <slot name="filters" />
       </div>
       <DataTable

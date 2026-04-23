@@ -64,6 +64,12 @@ export const useApiStore = defineStore('api', () => {
 
     function setApiRequestInterceptor() {
         api.value.interceptors.request.use(async config => {
+            // Inject dev role override header when switcher is active
+            if (import.meta.env.DEV) {
+                const role = localStorage.getItem('stronghold-audit-dev-role');
+                if (role) config.headers['X-Dev-Role-Override'] = role;
+            }
+
             const authorization = String(config.headers.getAuthorization());
 
             if (authorization?.startsWith('Bearer ')) {

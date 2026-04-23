@@ -9,7 +9,8 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.ReportDrafts;
 
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
-    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
+    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator,
+    AuthorizationRole.AuditAdmin)]
 public class UpdateReportDraft : IRequest
 {
     public int DraftId { get; set; }

@@ -12,7 +12,8 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Export;
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
     AuthorizationRole.ExecutiveViewer, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.AuditAdmin, AuthorizationRole.Executive)]
 public class ExportQuarterlySummary : IRequest<byte[]>
 {
     public int? DivisionId { get; set; }

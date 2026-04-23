@@ -8,7 +8,8 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Reports;
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager,
     AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.AuditAdmin)]
 public class DeleteScheduledReport : IRequest
 {
     public int Id { get; set; }

@@ -19,6 +19,7 @@ public record CloseAuditRequest(string? Notes);
 public record SetScoreTargetRequest(decimal? ScoreTarget);
 public record SetAuditFrequencyRequest(int? AuditFrequencyDays);
 public record SetRequireClosurePhotoRequest(bool RequireClosurePhoto);
+public record SetDivisionSlaRequest(int? SlaNormalDays, int? SlaUrgentDays, int? SlaEscalateAfterDays, string? EscalationEmail);
 
 [Route(Constants.Routes.ApiTemplate)]
 public class AuditController : V1ControllerBase
@@ -40,6 +41,37 @@ public class AuditController : V1ControllerBase
                 return Ok(await Mediator.Send(new GetDivisions()));
             },
             ex => Error<List<DivisionDto>>(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("divisions/{id:int}/job-prefixes")]
+    [ProducesResponseType(typeof(List<DivisionJobPrefixDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<DivisionJobPrefixDto>>> GetDivisionJobPrefixes([FromRoute] int id)
+    {
+        return await TryExecuteAsync<ActionResult<List<DivisionJobPrefixDto>>>(
+            async () =>
+            {
+                await GetUser();
+                return Ok(await Mediator.Send(new GetDivisionJobPrefixes { DivisionId = id }));
+            },
+            ex => Error<List<DivisionJobPrefixDto>>(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPut("admin/divisions/{id:int}/job-prefixes")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> SaveDivisionJobPrefixes([FromRoute] int id, [FromBody] SaveDivisionJobPrefixesRequest body)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                await Mediator.Send(new SaveDivisionJobPrefixes { DivisionId = id, Prefixes = body.Prefixes });
+                return NoContent();
+            },
+            ex => Error(ex)
         );
     }
 
@@ -172,7 +204,9 @@ public class AuditController : V1ControllerBase
                 {
                     DivisionId = body.DivisionId,
                     CreatedBy = user.Email!,
-                    EnabledOptionalGroupKeys = body.EnabledOptionalGroupKeys
+                    EnabledOptionalGroupKeys = body.EnabledOptionalGroupKeys,
+                    JobPrefixId = body.JobPrefixId,
+                    SiteCode = body.SiteCode
                 });
                 return CreatedAtAction(nameof(GetAudit), new { id = auditId }, auditId);
             },
@@ -217,8 +251,8 @@ public class AuditController : V1ControllerBase
             async () =>
             {
                 var user = await GetUser();
-                await Mediator.Send(new SubmitAudit { AuditId = id, SubmittedBy = user.Email! });
-                return NoContent();
+                var result = await Mediator.Send(new SubmitAudit { AuditId = id, SubmittedBy = user.Email! });
+                return Ok(result);
             },
             ex => ex is InvalidOperationException
                 ? Task.FromResult<IActionResult>(BadRequest(ex.Message))
@@ -285,6 +319,114 @@ public class AuditController : V1ControllerBase
     }
 
     [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPut("audits/{id:int}/review-summary")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SaveReviewSummary([FromRoute] int id, [FromBody] SaveReviewSummaryRequest body)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                await Mediator.Send(new SaveReviewSummary { AuditId = id, Summary = body.Summary });
+                return NoContent();
+            },
+            ex => ex is KeyNotFoundException
+                ? Task.FromResult<IActionResult>(NotFound(ex.Message))
+                : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPost("audits/{id:int}/distribution-recipients")]
+    [ProducesResponseType(typeof(DistributionRecipientDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> AddDistributionRecipient([FromRoute] int id, [FromBody] AddDistributionRecipientRequest body)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                var user = await GetUser();
+                if (string.IsNullOrWhiteSpace(body.Email))
+                    return BadRequest("Email is required.");
+                var result = await Mediator.Send(new AddDistributionRecipient
+                {
+                    AuditId = id,
+                    Email = body.Email,
+                    Name = body.Name,
+                    AddedBy = user.Email!,
+                });
+                return Created(string.Empty, result);
+            },
+            ex => Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpDelete("audits/{id:int}/distribution-recipients/{recipientId:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveDistributionRecipient([FromRoute] int id, [FromRoute] int recipientId)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                await Mediator.Send(new RemoveDistributionRecipient { AuditId = id, RecipientId = recipientId });
+                return NoContent();
+            },
+            ex => ex is KeyNotFoundException
+                ? Task.FromResult<IActionResult>(NotFound(ex.Message))
+                : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("audits/{id:int}/distribution-preview")]
+    [ProducesResponseType(typeof(DistributionPreviewDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<DistributionPreviewDto>> GetDistributionPreview([FromRoute] int id, [FromQuery] string? attachmentIds)
+    {
+        return await TryExecuteAsync<ActionResult<DistributionPreviewDto>>(
+            async () =>
+            {
+                await GetUser();
+                var ids = attachmentIds?.Split(',').Select(s => int.TryParse(s, out var n) ? n : 0).Where(n => n > 0).ToList() ?? new List<int>();
+                var result = await Mediator.Send(new GetDistributionPreview { AuditId = id, AttachmentIds = ids });
+                return Ok(result);
+            },
+            ex => ex is KeyNotFoundException
+                ? Task.FromResult<ActionResult<DistributionPreviewDto>>(NotFound(ex.Message))
+                : Error<DistributionPreviewDto>(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPost("audits/{id:int}/send-distribution")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> SendDistributionEmail([FromRoute] int id, [FromBody] SendDistributionEmailRequest body)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                var user = await GetUser();
+                await Mediator.Send(new SendDistributionEmail
+                {
+                    AuditId         = id,
+                    AttachmentIds   = body.AttachmentIds,
+                    SubjectOverride = body.SubjectOverride,
+                    SentBy          = user.Email!,
+                });
+                return NoContent();
+            },
+            ex => ex is KeyNotFoundException
+                ? Task.FromResult<IActionResult>(NotFound(ex.Message))
+                : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
     [HttpGet("audits/{id:int}/review")]
     [ProducesResponseType(typeof(AuditReviewDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -305,16 +447,19 @@ public class AuditController : V1ControllerBase
 
     [MapToApiVersion(Constants.ApiVersions.V1)]
     [HttpGet("audits/corrective-actions")]
-    [ProducesResponseType(typeof(List<CorrectiveActionListItemDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<CorrectiveActionListItemDto>>> GetCorrectiveActions(
+    [ProducesResponseType(typeof(PagedCorrectiveActionsResult), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PagedCorrectiveActionsResult>> GetCorrectiveActions(
         [FromQuery] int?    divisionId,
         [FromQuery] string? status,
         [FromQuery] string? searchText,
         [FromQuery] string? assignedTo,
         [FromQuery] string? source,
-        [FromQuery] bool    overdueOnly = false)
+        [FromQuery] string? priority,
+        [FromQuery] bool    overdueOnly  = false,
+        [FromQuery] int     pageNumber   = 1,
+        [FromQuery] int     pageSize     = 25)
     {
-        return await TryExecuteAsync<ActionResult<List<CorrectiveActionListItemDto>>>(
+        return await TryExecuteAsync<ActionResult<PagedCorrectiveActionsResult>>(
             async () =>
             {
                 await GetUser();
@@ -325,10 +470,13 @@ public class AuditController : V1ControllerBase
                     SearchText  = searchText,
                     AssignedTo  = assignedTo,
                     Source      = source,
+                    Priority    = priority,
                     OverdueOnly = overdueOnly,
+                    PageNumber  = pageNumber,
+                    PageSize    = pageSize,
                 }));
             },
-            ex => Error<List<CorrectiveActionListItemDto>>(ex)
+            ex => Error<PagedCorrectiveActionsResult>(ex)
         );
     }
 
@@ -350,6 +498,7 @@ public class AuditController : V1ControllerBase
                     AssignedTo         = body.AssignedTo,
                     AssignedToUserId   = body.AssignedToUserId,
                     DueDate            = body.DueDate,
+                    RootCause          = body.RootCause,
                     UpdatedBy          = user.Email!,
                 });
                 return NoContent();
@@ -1454,7 +1603,12 @@ public class AuditController : V1ControllerBase
     public async Task<IActionResult> ExportCorrectiveActions(
         [FromQuery] int? divisionId,
         [FromQuery] DateTime? dateFrom,
-        [FromQuery] DateTime? dateTo)
+        [FromQuery] DateTime? dateTo,
+        [FromQuery] string? status,
+        [FromQuery] string? source,
+        [FromQuery] string? priority,
+        [FromQuery] bool overdueOnly = false,
+        [FromQuery] string? searchText = null)
     {
         return await TryExecuteAsync<IActionResult>(
             async () =>
@@ -1462,9 +1616,14 @@ public class AuditController : V1ControllerBase
                 await GetUser();
                 var bytes = await Mediator.Send(new ExportCorrectiveActions
                 {
-                    DivisionId = divisionId,
-                    DateFrom   = dateFrom,
-                    DateTo     = dateTo,
+                    DivisionId  = divisionId,
+                    DateFrom    = dateFrom,
+                    DateTo      = dateTo,
+                    Status      = status,
+                    Source      = source,
+                    Priority    = priority,
+                    OverdueOnly = overdueOnly,
+                    SearchText  = searchText,
                 });
                 var fileName = $"corrective-actions-{DateTime.UtcNow:yyyy-MM}.xlsx";
                 return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
@@ -1588,8 +1747,8 @@ public class AuditController : V1ControllerBase
         return await TryExecuteAsync<IActionResult>(
             async () =>
             {
-                await GetUser();
-                await Mediator.Send(new DeleteFindingPhoto { AuditId = id, QuestionId = qid, PhotoId = pid });
+                var user = await GetUser();
+                await Mediator.Send(new DeleteFindingPhoto { AuditId = id, QuestionId = qid, PhotoId = pid, DeletedBy = user.Email });
                 return NoContent();
             },
             ex => ex is KeyNotFoundException
@@ -1610,6 +1769,54 @@ public class AuditController : V1ControllerBase
             {
                 await GetUser();
                 return Ok(await Mediator.Send(new GetRepeatFindings { AuditId = id }));
+            },
+            ex => Error(ex)
+        );
+    }
+
+    // ── Question History ──────────────────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("audits/question-history")]
+    [ProducesResponseType(typeof(List<QuestionHistoryItemDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetQuestionHistory(
+        [FromQuery] int questionId,
+        [FromQuery] int divisionId,
+        [FromQuery] int limit = 3)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                return Ok(await Mediator.Send(new GetQuestionHistory
+                {
+                    QuestionId = questionId,
+                    DivisionId = divisionId,
+                    Limit      = limit,
+                }));
+            },
+            ex => Error(ex)
+        );
+    }
+
+    // ── Prior Audit Prefill ───────────────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("audits/prior-prefill")]
+    [ProducesResponseType(typeof(PriorAuditPrefillDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPriorAuditPrefill(
+        [FromQuery] int divisionId,
+        [FromQuery] int templateVersionId)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                return Ok(await Mediator.Send(new GetPriorAuditPrefill
+                {
+                    DivisionId        = divisionId,
+                    TemplateVersionId = templateVersionId,
+                }));
             },
             ex => Error(ex)
         );
@@ -1701,6 +1908,34 @@ public class AuditController : V1ControllerBase
     }
 
     [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPut("admin/divisions/{id:int}/sla")]
+    [ProducesResponseType(typeof(DivisionScoreTargetDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetDivisionSla([FromRoute] int id, [FromBody] SetDivisionSlaRequest body)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                return Ok(await Mediator.Send(new SetDivisionSla
+                {
+                    DivisionId           = id,
+                    SlaNormalDays        = body.SlaNormalDays,
+                    SlaUrgentDays        = body.SlaUrgentDays,
+                    SlaEscalateAfterDays = body.SlaEscalateAfterDays,
+                    EscalationEmail      = body.EscalationEmail,
+                }));
+            },
+            ex => ex is ArgumentException
+                ? Task.FromResult<IActionResult>(BadRequest(ex.Message))
+                : ex is KeyNotFoundException
+                    ? Task.FromResult<IActionResult>(NotFound(ex.Message))
+                    : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
     [HttpGet("divisions/{id:int}/benchmark")]
     [ProducesResponseType(typeof(DivisionBenchmarkDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDivisionBenchmark([FromRoute] int id)
@@ -1710,6 +1945,41 @@ public class AuditController : V1ControllerBase
             {
                 await GetUser();
                 return Ok(await Mediator.Send(new GetDivisionBenchmark { DivisionId = id }));
+            },
+            ex => Error(ex)
+        );
+    }
+
+    // ── Audit logs ────────────────────────────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpGet("admin/audit-logs")]
+    [ProducesResponseType(typeof(AuditLogsResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAuditLogs(
+        [FromQuery] DateTime? dateFrom,
+        [FromQuery] DateTime? dateTo,
+        [FromQuery] string? userEmail,
+        [FromQuery] string? entityType,
+        [FromQuery] string? action,
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                return Ok(await Mediator.Send(new GetAuditLogs
+                {
+                    DateFrom   = dateFrom,
+                    DateTo     = dateTo,
+                    UserEmail  = userEmail,
+                    EntityType = entityType,
+                    Action     = action,
+                    Search     = search,
+                    Page       = page,
+                    PageSize   = pageSize,
+                }));
             },
             ex => Error(ex)
         );

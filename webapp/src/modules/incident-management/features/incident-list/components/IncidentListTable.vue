@@ -53,7 +53,7 @@
         </Column>
     </BaseDataTable>
 
-    <ConfirmDialog />
+
 </template>
 
 <script setup lang="ts">
@@ -66,7 +66,6 @@ import BaseDataTable from '@/components/tables/BaseDataTable.vue';
 import BaseButtonIconEdit from '@/components/buttons/BaseButtonIconEdit.vue';
 import BaseButtonIconDelete from '@/components/buttons/BaseButtonIconDelete.vue';
 import type { IncidentReportListItem } from '@/apiclient/client';
-import ConfirmDialog from 'primevue/confirmdialog';
 
 const router = useRouter();
 const store = useIncidentStore();

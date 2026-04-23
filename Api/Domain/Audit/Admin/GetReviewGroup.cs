@@ -14,7 +14,7 @@ public class ReviewGroupMemberDto
     public bool IsActive { get; set; }
 }
 
-[AllowedAuthorizationRole(AuthorizationRole.Administrator, AuthorizationRole.TemplateAdmin)]
+[AllowedAuthorizationRole(AuthorizationRole.Administrator, AuthorizationRole.TemplateAdmin, AuthorizationRole.AuditAdmin)]
 public class GetReviewGroup : IRequest<List<ReviewGroupMemberDto>> { }
 
 public class GetReviewGroupHandler : IRequestHandler<GetReviewGroup, List<ReviewGroupMemberDto>>

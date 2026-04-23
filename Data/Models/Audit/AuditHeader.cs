@@ -30,6 +30,12 @@ public class AuditHeader : AuditableEntity
     public DateOnly? AuditDate { get; set; }
     public string? Auditor { get; set; }
 
+    /// <summary>
+    /// Short site/location code entered by the auditor at creation (e.g. "IPT" = INEOS Pasadena TX).
+    /// Forms the last segment of the tracking number: H26-012-IPT.
+    /// </summary>
+    public string? SiteCode { get; set; }
+
     // Navigation
     public Audit Audit { get; set; } = null!;
 }

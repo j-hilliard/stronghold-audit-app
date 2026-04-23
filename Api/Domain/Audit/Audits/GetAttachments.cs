@@ -20,7 +20,8 @@ public class AuditAttachmentDto
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
     AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.ReadOnlyViewer,
     AuthorizationRole.ExecutiveViewer, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.Auditor, AuthorizationRole.AuditAdmin, AuthorizationRole.Executive)]
 public class GetAttachments : IRequest<List<AuditAttachmentDto>>
 {
     public int AuditId { get; set; }
