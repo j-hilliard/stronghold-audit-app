@@ -12,6 +12,8 @@ public static class AuditDemoDataSeeder
 
     public static void SeedDemoAudits(AppDbContext db)
     {
+        BackfillMissingTrackingNumbers(db);
+
         if (db.Audits.Any(a => a.Status == "Submitted" || a.Status == "Closed"))
             return;
 
@@ -988,6 +990,92 @@ public static class AuditDemoDataSeeder
             CreatedBy = System,
         };
         return (audit, header, responses);
+    }
+
+    private static void BackfillMissingTrackingNumbers(AppDbContext db)
+    {
+        var blanks = db.Audits
+            .Where(a => a.TrackingNumber == null || a.TrackingNumber == "")
+            .OrderBy(a => a.DivisionId).ThenBy(a => a.CreatedAt).ThenBy(a => a.Id)
+            .ToList();
+
+        if (blanks.Count == 0) return;
+
+        // Client name → 3-char site code used in the tracking number
+        var clientCodes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Valero Port Arthur"]               = "VCC",
+            ["Valero Texas City"]                = "VCC",
+            ["Chevron Phillips Cedar Bayou"]     = "P66",
+            ["Marathon Galveston Bay"]           = "BHP",
+            ["Marathon Petroleum Galveston Bay"] = "BHP",
+            ["ExxonMobil Baytown Complex"]       = "DOW",
+            ["ExxonMobil Baytown"]               = "DOW",
+            ["ExxonMobil Beaumont"]              = "XOM",
+            ["LyondellBasell"]                   = "SLL",
+            ["LyondellBasell Corpus Christi"]    = "SLL",
+            ["LyondellBasell La Porte"]          = "SLL",
+            ["Enterprise Products Partners"]     = "EPP",
+            ["Motiva Port Arthur"]               = "MPA",
+            ["Motiva Enterprises"]               = "MOT",
+            ["Gray Oak Pipeline"]                = "GOP",
+            ["Huntsman Pigments"]                = "HNT",
+            ["INEOS Phenol Pasadena"]            = "INP",
+            ["INEOS Phenol"]                     = "INP",
+            ["Kinder Morgan"]                    = "KMG",
+            ["Plains All American Pipeline"]     = "PAA",
+            ["Stronghold Companies HQ"]          = "SHC",
+        };
+
+        var auditIds = blanks.Select(a => a.Id).ToHashSet();
+        var headers = db.AuditHeaders
+            .Where(h => auditIds.Contains(h.AuditId))
+            .ToDictionary(h => h.AuditId);
+
+        var prefixes = db.DivisionJobPrefixes
+            .Where(p => p.IsDefault)
+            .ToDictionary(p => p.DivisionId, p => p.Prefix);
+
+        var seqCounters = db.AuditNumberSequences
+            .ToDictionary(s => (s.DivisionId, s.Year), s => s.LastSequence);
+
+        foreach (var audit in blanks)
+        {
+            if (!prefixes.TryGetValue(audit.DivisionId, out var prefix)) continue;
+
+            var year = audit.CreatedAt.Year;
+            var key = (audit.DivisionId, year);
+            seqCounters.TryGetValue(key, out var current);
+            seqCounters[key] = ++current;
+
+            var yy = year % 100;
+            var baseNum = string.IsNullOrEmpty(prefix)
+                ? $"{yy:D2}-{current:D3}"
+                : $"{prefix}{yy:D2}-{current:D3}";
+
+            string siteCode = "";
+            if (headers.TryGetValue(audit.Id, out var hdr))
+            {
+                if (!string.IsNullOrWhiteSpace(hdr.SiteCode))
+                    siteCode = hdr.SiteCode.Trim().ToUpperInvariant();
+                else if (!string.IsNullOrWhiteSpace(hdr.Client) &&
+                         clientCodes.TryGetValue(hdr.Client.Trim(), out var code))
+                    siteCode = code;
+            }
+
+            audit.TrackingNumber = string.IsNullOrEmpty(siteCode) ? baseNum : $"{baseNum}-{siteCode}";
+        }
+
+        foreach (var ((divId, year), lastSeq) in seqCounters)
+        {
+            var row = db.AuditNumberSequences.FirstOrDefault(s => s.DivisionId == divId && s.Year == year);
+            if (row == null)
+                db.AuditNumberSequences.Add(new AuditNumberSequence { DivisionId = divId, Year = year, LastSequence = lastSeq });
+            else if (row.LastSequence < lastSeq)
+                row.LastSequence = lastSeq;
+        }
+
+        db.SaveChanges();
     }
 
     private static ResponseSeed R(

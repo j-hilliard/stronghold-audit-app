@@ -20,7 +20,7 @@ This step is non-negotiable. You must compare the actual SQL Server database sch
 
 ```powershell
 powershell -Command "
-\$conn = New-Object System.Data.SqlClient.SqlConnection('Server=localhost,14332;Database=StrongholdAuditDb;User Id=sa;Password=Str0nghold@Audit2026!;TrustServerCertificate=True;Encrypt=False;')
+\$conn = New-Object System.Data.SqlClient.SqlConnection('Server=.\SQLEXPRESS;Database=ComplianceAudit;Trusted_Connection=True;TrustServerCertificate=True;')
 \$conn.Open()
 \$cmd = \$conn.CreateCommand()
 \$cmd.CommandText = @'
@@ -50,7 +50,7 @@ while (\$reader.Read()) {
 
 ```powershell
 powershell -Command "
-\$conn = New-Object System.Data.SqlClient.SqlConnection('Server=localhost,14332;Database=StrongholdAuditDb;User Id=sa;Password=Str0nghold@Audit2026!;TrustServerCertificate=True;Encrypt=False;')
+\$conn = New-Object System.Data.SqlClient.SqlConnection('Server=.\SQLEXPRESS;Database=ComplianceAudit;Trusted_Connection=True;TrustServerCertificate=True;')
 \$conn.Open()
 \$cmd = \$conn.CreateCommand()
 \$cmd.CommandText = 'SELECT MigrationId FROM __EFMigrationsHistory ORDER BY MigrationId'
@@ -77,7 +77,7 @@ Do NOT proceed to any other responsibility until all drift is documented. If dri
 
 ```powershell
 powershell -Command "
-\$conn = New-Object System.Data.SqlClient.SqlConnection('Server=localhost,14332;Database=StrongholdAuditDb;User Id=sa;Password=Str0nghold@Audit2026!;TrustServerCertificate=True;Encrypt=False;')
+\$conn = New-Object System.Data.SqlClient.SqlConnection('Server=.\SQLEXPRESS;Database=ComplianceAudit;Trusted_Connection=True;TrustServerCertificate=True;')
 \$conn.Open()
 \$cmd = \$conn.CreateCommand()
 # Example for a missing bit column with default false:
