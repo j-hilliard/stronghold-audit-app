@@ -7,6 +7,7 @@ using Stronghold.AppDashboard.Data;
 using Stronghold.AppDashboard.Shared.Enumerations;
 using AuditHeaderEntity = Stronghold.AppDashboard.Data.Models.Audit.AuditHeader;
 using AuditResponseEntity = Stronghold.AppDashboard.Data.Models.Audit.AuditResponse;
+using AuditSectionNaOverrideEntity = Stronghold.AppDashboard.Data.Models.Audit.AuditSectionNaOverride;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
@@ -20,6 +21,7 @@ public class SaveAuditResponses : IRequest<Unit>
     public string SavedBy { get; set; } = null!;
     public AuditHeaderDto? Header { get; set; }
     public List<AuditResponseUpsertDto> Responses { get; set; } = new();
+    public List<SectionNaOverrideDto> SectionNaOverrides { get; set; } = new();
 }
 
 public class SaveAuditResponsesHandler : IRequestHandler<SaveAuditResponses, Unit>
@@ -38,6 +40,7 @@ public class SaveAuditResponsesHandler : IRequestHandler<SaveAuditResponses, Uni
         var audit = await _context.Audits
             .Include(a => a.Header)
             .Include(a => a.Responses)
+            .Include(a => a.SectionNaOverrides)
             .FirstOrDefaultAsync(a => a.Id == request.AuditId, cancellationToken)
             ?? throw new ArgumentException($"Audit {request.AuditId} not found.");
 
@@ -165,6 +168,34 @@ public class SaveAuditResponsesHandler : IRequestHandler<SaveAuditResponses, Uni
                     IsLifeCriticalSnapshot = lc,
                     CreatedAt = now,
                     CreatedBy = request.SavedBy
+                });
+            }
+        }
+
+        // ── Section N/A overrides — full replace ─────────────────────────────
+        var existingNa = audit.SectionNaOverrides.ToDictionary(n => n.SectionId);
+        var incomingNa = request.SectionNaOverrides.ToDictionary(n => n.SectionId);
+
+        // Remove overrides no longer in the incoming set
+        foreach (var sectionId in existingNa.Keys.Except(incomingNa.Keys).ToList())
+            _context.AuditSectionNaOverrides.Remove(existingNa[sectionId]);
+
+        // Add or update
+        foreach (var dto in request.SectionNaOverrides)
+        {
+            if (existingNa.TryGetValue(dto.SectionId, out var existing))
+            {
+                existing.Reason = dto.Reason;
+            }
+            else
+            {
+                _context.AuditSectionNaOverrides.Add(new AuditSectionNaOverrideEntity
+                {
+                    AuditId   = audit.Id,
+                    SectionId = dto.SectionId,
+                    Reason    = dto.Reason,
+                    CreatedAt = now,
+                    CreatedBy = request.SavedBy,
                 });
             }
         }

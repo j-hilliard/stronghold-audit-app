@@ -14,6 +14,7 @@ import {
     type DistributionRecipientDto,
     type LogicRuleDto,
     type RepeatFindingDto,
+    type SectionNaOverrideDto,
 } from '@/apiclient/auditClient';
 
 // ── Local types ───────────────────────────────────────────────────────────────
@@ -39,6 +40,7 @@ interface LocalDraft {
     auditId: number;
     header: AuditHeaderDto;
     responses: Record<number, ResponseState>;
+    sectionNaOverrides?: Record<number, string>;
     savedAt: string;
 }
 
@@ -91,6 +93,9 @@ export const useAuditStore = defineStore('audit', () => {
     /** Optional section group keys enabled at audit creation. Null = audit not yet loaded. */
     const enabledOptionalGroupKeys = ref<string[]>([]);
 
+    /** Sections the auditor has explicitly marked N/A for this audit. Keyed by sectionId → reason. */
+    const sectionNaOverrides = ref<Map<number, string>>(new Map());
+
     const header = ref<AuditHeaderDto>({});
     // Keyed by questionId
     const responses = ref<Map<number, ResponseState>>(new Map());
@@ -129,7 +134,22 @@ export const useAuditStore = defineStore('audit', () => {
 
     // ── Computed ───────────────────────────────────────────────────────────────
 
-    const allResponses = computed(() => Array.from(responses.value.values()));
+    /** Question IDs that belong to sections the auditor has marked N/A — excluded from scoring. */
+    const naQuestionIds = computed((): Set<number> => {
+        if (!template.value || sectionNaOverrides.value.size === 0) return new Set();
+        const ids = new Set<number>();
+        for (const section of template.value.sections) {
+            if (sectionNaOverrides.value.has(section.id)) {
+                for (const q of section.questions) ids.add(q.questionId);
+            }
+        }
+        return ids;
+    });
+
+    const allResponses = computed(() => {
+        const naIds = naQuestionIds.value;
+        return Array.from(responses.value.values()).filter(r => !naIds.has(r.questionId));
+    });
 
     const score = computed(() => calculateScore(allResponses.value));
 
@@ -194,6 +214,7 @@ export const useAuditStore = defineStore('audit', () => {
             auditId: auditId.value,
             header: { ...header.value },
             responses: Object.fromEntries(responses.value),
+            sectionNaOverrides: Object.fromEntries(sectionNaOverrides.value),
             savedAt: new Date().toISOString(),
         };
         localStorage.setItem(DRAFT_KEY(auditId.value), JSON.stringify(draft));
@@ -219,6 +240,9 @@ export const useAuditStore = defineStore('audit', () => {
         for (const [qid, r] of Object.entries(draft.responses)) {
             responses.value.set(Number(qid), r);
         }
+        sectionNaOverrides.value = new Map(
+            Object.entries(draft.sectionNaOverrides ?? {}).map(([k, v]) => [Number(k), v])
+        );
         hasPendingDraft.value = false;
         isDirty.value = true;
     }
@@ -276,20 +300,7 @@ export const useAuditStore = defineStore('audit', () => {
     async function loadDivisions(force = false) {
         if (!force && divisions.value.length > 0) return;
         try {
-            const raw = await getClient().getDivisions() as unknown as Record<string, unknown>[];
-            const seen = new Set<number>();
-            divisions.value = raw
-                .map((r): DivisionDto | null => {
-                    const id = Number(r.id ?? r.Id ?? 0);
-                    if (!id) return null;
-                    return {
-                        id,
-                        code:      String(r.code      ?? r.Code      ?? ''),
-                        name:      String(r.name      ?? r.Name      ?? ''),
-                        auditType: String(r.auditType ?? r.AuditType ?? ''),
-                    };
-                })
-                .filter((d): d is DivisionDto => d !== null && !seen.has(d.id) && !!seen.add(d.id));
+            divisions.value = await getClient().getDivisions();
         } catch {
             toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load divisions.', life: 4000 });
         }
@@ -328,11 +339,8 @@ export const useAuditStore = defineStore('audit', () => {
         loading.value = true;
         resetForm();
         try {
-            const [audit, tpl] = await Promise.all([
-                getClient().getAudit(id),
-                // We need divisionId to load the template; it comes from the audit
-                getClient().getAudit(id).then(a => getClient().getActiveTemplate(a.divisionId)),
-            ]);
+            const audit = await getClient().getAudit(id);
+            const tpl = await getClient().getActiveTemplate(audit.divisionId);
 
             auditId.value = audit.id;
             auditDivisionId.value = audit.divisionId;
@@ -365,6 +373,11 @@ export const useAuditStore = defineStore('audit', () => {
 
             template.value = tpl;
             enabledOptionalGroupKeys.value = audit.enabledOptionalGroupKeys ?? [];
+
+            // Restore section N/A overrides
+            sectionNaOverrides.value = new Map(
+                (audit.sectionNaOverrides ?? []).map(n => [n.sectionId, n.reason])
+            );
 
             // Seed response map from template (visible sections only)
             initResponsesFromTemplate(tpl, enabledOptionalGroupKeys.value);
@@ -492,19 +505,38 @@ export const useAuditStore = defineStore('audit', () => {
         if (r && r.status === 'NonConforming') r.correctedOnSite = value;
     }
 
+    /**
+     * Mark a section as N/A (reason required) or remove the N/A mark (reason = null).
+     * Triggers autosave so the override is persisted locally immediately.
+     */
+    function setSectionNa(sectionId: number, reason: string | null) {
+        if (reason === null) {
+            sectionNaOverrides.value.delete(sectionId);
+        } else {
+            sectionNaOverrides.value.set(sectionId, reason);
+        }
+        // Trigger Vue reactivity on the Map
+        sectionNaOverrides.value = new Map(sectionNaOverrides.value);
+        isDirty.value = true;
+        scheduleAutosave();
+    }
+
     async function saveDraft(): Promise<boolean> {
         if (!auditId.value) return false;
         saving.value = true;
         try {
             await getClient().saveResponses(auditId.value, {
                 header: { ...header.value },
-                responses: allResponses.value.map(r => ({
+                responses: Array.from(responses.value.values()).map(r => ({
                     questionId: r.questionId,
                     questionTextSnapshot: r.questionTextSnapshot,
                     status: r.status,
                     comment: r.comment,
                     correctedOnSite: r.correctedOnSite,
                 })),
+                sectionNaOverrides: Array.from(sectionNaOverrides.value.entries()).map(
+                    ([sectionId, reason]): SectionNaOverrideDto => ({ sectionId, reason })
+                ),
             });
             // Sync trackingNumber with the saved site code
             if (trackingNumber.value) {
@@ -654,6 +686,7 @@ export const useAuditStore = defineStore('audit', () => {
         auditStatus.value = 'Draft';
         template.value = null;
         enabledOptionalGroupKeys.value = [];
+        sectionNaOverrides.value = new Map();
         header.value = {};
         responses.value = new Map();
         isDirty.value = false;
@@ -700,6 +733,7 @@ export const useAuditStore = defineStore('audit', () => {
         isSubmitted,
         visibleSections,
         enabledOptionalGroupKeys,
+        sectionNaOverrides,
         // Actions
         loadDivisions,
         createAudit,
@@ -715,6 +749,7 @@ export const useAuditStore = defineStore('audit', () => {
         setResponse,
         setComment,
         setCorrectedOnSite,
+        setSectionNa,
         saveDraft,
         submitAudit,
         loadAuditList,

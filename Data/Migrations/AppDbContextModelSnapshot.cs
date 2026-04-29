@@ -756,6 +756,45 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.ToTable("AuditSection", "audit");
                 });
 
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditSectionNaOverride", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AuditId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("SectionId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuditId");
+
+                    b.HasIndex("SectionId");
+
+                    b.HasIndex("AuditId", "SectionId")
+                        .IsUnique();
+
+                    b.ToTable("AuditSectionNaOverride", "audit");
+                });
+
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditTemplate", b =>
                 {
                     b.Property<int>("Id")
@@ -2419,6 +2458,25 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Navigation("TemplateVersion");
                 });
 
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditSectionNaOverride", b =>
+                {
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.Audit", "Audit")
+                        .WithMany("SectionNaOverrides")
+                        .HasForeignKey("AuditId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.AuditSection", "Section")
+                        .WithMany()
+                        .HasForeignKey("SectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Audit");
+
+                    b.Navigation("Section");
+                });
+
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditTemplate", b =>
                 {
                     b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.Division", "Division")
@@ -2692,6 +2750,8 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.Navigation("Header");
 
                     b.Navigation("Responses");
+
+                    b.Navigation("SectionNaOverrides");
                 });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.AuditFinding", b =>

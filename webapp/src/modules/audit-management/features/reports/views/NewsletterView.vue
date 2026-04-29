@@ -432,11 +432,12 @@ const sectionTrendOptions = {
 };
 
 const auditorRows = computed(() => {
-    const map = new Map<string, { scores: number[]; ncs: number; warnings: number }>();
+    const map = new Map<string, { total: number; scores: number[]; ncs: number; warnings: number }>();
     for (const row of report.value?.rows ?? []) {
         const key = row.auditor?.trim() || 'Unknown';
-        if (!map.has(key)) map.set(key, { scores: [], ncs: 0, warnings: 0 });
+        if (!map.has(key)) map.set(key, { total: 0, scores: [], ncs: 0, warnings: 0 });
         const entry = map.get(key)!;
+        entry.total++;
         if (row.scorePercent != null) entry.scores.push(row.scorePercent);
         entry.ncs += row.nonConformingCount;
         entry.warnings += row.warningCount;
@@ -445,14 +446,13 @@ const auditorRows = computed(() => {
     return Array.from(map.entries())
         .map(([auditor, stats]) => ({
             auditor,
-            count: stats.scores.length,
+            count: stats.total,
             avgScore: stats.scores.length
                 ? Math.round((stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length) * 10) / 10
                 : null as number | null,
             ncs: stats.ncs,
             warnings: stats.warnings,
         }))
-        .filter(x => x.count > 0)
         .sort((a, b) => (b.avgScore ?? 0) - (a.avgScore ?? 0));
 });
 
@@ -479,7 +479,7 @@ async function loadData() {
         const client = getClient();
         const [nextReport, nextTrends] = await Promise.all([
             client.getAuditReport(selectedDivisionId.value || null, null, dateFrom.value, dateTo.value),
-            client.getSectionTrends(selectedDivisionId.value || null, null, null),
+            client.getSectionTrends(selectedDivisionId.value || null, dateFrom.value, dateTo.value),
         ]);
         report.value = nextReport;
         sectionTrends.value = nextTrends;

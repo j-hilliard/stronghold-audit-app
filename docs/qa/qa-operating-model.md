@@ -5,6 +5,21 @@
 - QA agent owns testing, validation, defect reporting, evidence capture, and release-readiness decisions.
 - QA changes are limited to tests, QA scripts, and QA documentation.
 
+## Audit-Orchestrator Sweep Protocol
+- Read `LIVE_QA_TODO.md`, `QA_REGRESSION_CHECKLIST.md`, audit requirements, defect handoffs, coverage matrix, and evidence docs before starting any sweep.
+- Treat `LIVE_QA_TODO.md` as the living scoreboard. Open items require investigation, not automatic fixes.
+- Do not change application code unless Joseph explicitly approves a specific fix. Subagents are read-only auditors.
+- For full-stack audit sweeps, coordinate exactly 3 read-only subagents in this order:
+  1. UI / End-User Agent: screens, flows, layout, visual hierarchy, discoverability, empty/loading/error states, screenshots.
+  2. Logic / Workflow Agent: audit form state, scoring, skip logic, submit/reopen/close, corrective actions, reporting math, date windows, template versioning, composer drafts, print/export, route guards.
+  3. Code / Architecture Agent: maintainability, duplication, client/API contract drift, brittle state handling, frontend data masking, testability, regression risk.
+- Each subagent must read the live TODO first, report relevant item status, collect evidence, and return `OPEN`, `VERIFY`, `BLOCKED`, or `ACCEPTED AS-IS` findings. Unproven candidate issues stay `VERIFY`.
+- Every confirmed finding must include what is wrong, why it matters, user/business impact, likely root cause, likely files, recommended fix, regression test needed, and evidence path.
+- Full-stack benchmark sweeps require current web research on compliance audit / inspection / EHS / field-audit products, but competitor features are recommendations until Stronghold evidence proves a gap.
+- Every sweep must update the live TODO, regression checklist, and evidence packet. Screenshots belong under `docs/qa-evidence/<sweep-id>/`; the markdown handoff belongs under `docs/`.
+- Live screenshot sweeps must prove the API is healthy before capture. If `GET /v1/divisions` fails on the frontend-configured API base, stop and fix the environment first; do not collect or report mock screenshots as live evidence.
+- The evidence packet must record the API base URL, screenshot count, Playwright result, and any console errors captured during the sweep.
+
 ## Required Gates
 1. Pre-change baseline gate
 - `npm run qa:baseline`

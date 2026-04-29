@@ -231,7 +231,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import { useRouter, useRoute, onBeforeRouteUpdate } from 'vue-router';
 import { useConfirm } from 'primevue/useconfirm';
 import Tag from 'primevue/tag';
 import Dialog from 'primevue/dialog';
@@ -273,15 +273,23 @@ const summaryScoreClass = computed(() => {
     return 'bg-red-900/60 text-red-100';
 });
 
+async function loadAuditById(id: number) {
+    await store.loadAudit(id);
+    if (store.auditStatus === 'Draft' && store.auditDivisionId && store.template?.versionId) {
+        void store.loadPriorPrefill(store.auditDivisionId, store.template.versionId);
+    }
+}
+
 onMounted(async () => {
     const id = Number(route.params.id);
-    if (!isNaN(id)) {
-        await store.loadAudit(id);
-        // Non-blocking: load prior conforming answers for new Draft audits
-        if (store.auditStatus === 'Draft' && store.auditDivisionId && store.template?.versionId) {
-            void store.loadPriorPrefill(store.auditDivisionId, store.template.versionId);
-        }
-    }
+    if (!isNaN(id)) await loadAuditById(id);
+});
+
+// Vue Router reuses this component instance when navigating between audit IDs.
+// onMounted doesn't re-fire — this guard catches param changes and reloads.
+onBeforeRouteUpdate(async (to) => {
+    const id = Number(to.params.id);
+    if (!isNaN(id)) await loadAuditById(id);
 });
 
 function collapseAll() {

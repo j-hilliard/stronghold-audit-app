@@ -35,6 +35,7 @@ public class GetAuditHandler : IRequestHandler<GetAudit, AuditDetailDto?>
             .Include(a => a.Header)
             .Include(a => a.Responses)
             .Include(a => a.EnabledSections)
+            .Include(a => a.SectionNaOverrides)
             .FirstOrDefaultAsync(a => a.Id == request.AuditId && !a.IsDeleted, cancellationToken);
 
         if (audit == null) return null;
@@ -80,7 +81,10 @@ public class GetAuditHandler : IRequestHandler<GetAudit, AuditDetailDto?>
                 CorrectedOnSite = r.CorrectedOnSite
             }).ToList(),
             EnabledOptionalGroupKeys = audit.EnabledSections.Select(s => s.OptionalGroupKey).ToList(),
-            TrackingNumber = audit.TrackingNumber
+            TrackingNumber = audit.TrackingNumber,
+            SectionNaOverrides = audit.SectionNaOverrides
+                .Select(n => new SectionNaOverrideDto { SectionId = n.SectionId, Reason = n.Reason })
+                .ToList()
         };
     }
 }

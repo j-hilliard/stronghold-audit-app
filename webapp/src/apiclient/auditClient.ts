@@ -126,9 +126,16 @@ export interface AuditResponseUpsertDto {
     correctedOnSite: boolean;
 }
 
+export interface SectionNaOverrideDto {
+    sectionId: number;
+    reason: string;
+}
+
 export interface SaveResponsesRequest {
     header?: AuditHeaderDto;
     responses: AuditResponseUpsertDto[];
+    /** Current section N/A overrides — full replace on save */
+    sectionNaOverrides: SectionNaOverrideDto[];
 }
 
 export interface AuditDetailDto {
@@ -150,6 +157,8 @@ export interface AuditDetailDto {
     enabledOptionalGroupKeys: string[];
     /** Auto-generated audit number, e.g. "H26-003-IPT" */
     trackingNumber?: string | null;
+    /** Sections the auditor has marked N/A for this audit (mutable while Draft/Reopened). */
+    sectionNaOverrides: SectionNaOverrideDto[];
 }
 
 export interface AuditListItemDto {

@@ -39,6 +39,9 @@ public class AuditDetailDto
     /// <summary>Optional section group keys enabled at creation (immutable).</summary>
     public List<string> EnabledOptionalGroupKeys { get; set; } = new();
     public string? TrackingNumber { get; set; }
+
+    /// <summary>Sections the auditor has marked N/A for this audit (mutable while Draft/Reopened).</summary>
+    public List<SectionNaOverrideDto> SectionNaOverrides { get; set; } = new();
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
@@ -126,12 +129,23 @@ public class DivisionJobPrefixUpsertDto
     public int SortOrder { get; set; }
 }
 
+// ── Section N/A Override ──────────────────────────────────────────────────────
+
+public class SectionNaOverrideDto
+{
+    public int SectionId { get; set; }
+    public string Reason { get; set; } = null!;
+}
+
 // ── Save request ──────────────────────────────────────────────────────────────
 
 public class SaveResponsesRequest
 {
     public AuditHeaderDto? Header { get; set; }
     public List<AuditResponseUpsertDto> Responses { get; set; } = new();
+
+    /// <summary>Current set of section N/A overrides. Full replace — any omitted entry is deleted.</summary>
+    public List<SectionNaOverrideDto> SectionNaOverrides { get; set; } = new();
 }
 
 public class AuditResponseUpsertDto

@@ -758,6 +758,16 @@ async function submitEdit() {
 
 // ── Bulk actions ──────────────────────────────────────────────────────────────
 function openBulkCloseDialog() {
+    const requiresPhoto = selectedItems.value.filter(i => i.requireClosurePhoto);
+    if (requiresPhoto.length) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Bulk Close Blocked',
+            detail: `${requiresPhoto.length} selected item${requiresPhoto.length > 1 ? 's require' : ' requires'} a closure photo and cannot be bulk-closed. Remove ${requiresPhoto.length > 1 ? 'them' : 'it'} from your selection or close ${requiresPhoto.length > 1 ? 'them' : 'it'} individually.`,
+            life: 6000,
+        });
+        return;
+    }
     bulkCloseNotes.value    = '';
     showBulkCloseDialog.value = true;
 }

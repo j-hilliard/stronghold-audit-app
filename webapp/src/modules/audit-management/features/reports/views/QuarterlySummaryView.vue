@@ -307,18 +307,19 @@ const sectionRows = computed(() => {
 });
 
 const auditorRows = computed(() => {
-    const map = new Map<string, { scores: number[]; ncs: number; warnings: number }>();
+    const map = new Map<string, { total: number; scores: number[]; ncs: number; warnings: number }>();
     for (const row of report.value?.rows ?? []) {
         const key = row.auditor?.trim() || 'Unknown';
-        if (!map.has(key)) map.set(key, { scores: [], ncs: 0, warnings: 0 });
+        if (!map.has(key)) map.set(key, { total: 0, scores: [], ncs: 0, warnings: 0 });
         const e = map.get(key)!;
+        e.total++;
         if (row.scorePercent != null) e.scores.push(row.scorePercent);
         e.ncs += row.nonConformingCount;
         e.warnings += row.warningCount;
     }
     return Array.from(map.entries()).map(([auditor, s]) => ({
         auditor,
-        count: s.scores.length,
+        count: s.total,
         avgScore: s.scores.length ? Math.round(s.scores.reduce((a, b) => a + b, 0) / s.scores.length * 10) / 10 : null as number | null,
         ncs: s.ncs,
         warnings: s.warnings,

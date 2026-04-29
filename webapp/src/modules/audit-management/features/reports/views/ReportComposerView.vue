@@ -567,9 +567,11 @@ async function bulkDeleteDrafts() {
         const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
         const ids = [...selectedDraftIds.value];
         await Promise.all(ids.map(id => client.deleteReportDraft(id)));
-        // If the current draft was among deleted, clear it
+        // If the active draft was among the deleted, clear local state only —
+        // do not call draft.deleteDraft() since it was already deleted above.
         if (draft.meta.value.id !== null && ids.includes(draft.meta.value.id)) {
-            await draft.deleteDraft();
+            draft.meta.value.id = null;
+            draft.meta.value.rowVersion = null;
             selectedDraftId.value = null;
         }
         allDrafts.value = allDrafts.value.filter(d => !ids.includes(d.id));

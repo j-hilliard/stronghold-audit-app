@@ -108,16 +108,15 @@
                     <!-- Action Log tab -->
                     <TabPanel value="actions">
                         <DataTable
+                            v-if="activeTab === 'actions'"
                             :value="result?.actionLogs ?? []"
                             :loading="loading"
                             row-hover
                             striped-rows
                             size="small"
                             class="text-sm"
-                            expand-row
-                            :expanded-rows="expandedActionRows"
-                            @row-expand="onActionRowExpand"
-                            @row-collapse="onActionRowCollapse"
+                            dataKey="id"
+                            v-model:expandedRows="expandedActionRows"
                         >
                             <Column expander style="width: 3rem" />
                             <Column field="timestamp" header="Time" style="width: 170px">
@@ -170,15 +169,15 @@
                     <!-- Change Trail tab -->
                     <TabPanel value="trail">
                         <DataTable
+                            v-if="activeTab === 'trail'"
                             :value="result?.trailLogs ?? []"
                             :loading="loading"
                             row-hover
                             striped-rows
                             size="small"
                             class="text-sm"
-                            :expanded-rows="expandedTrailRows"
-                            @row-expand="onTrailRowExpand"
-                            @row-collapse="onTrailRowCollapse"
+                            dataKey="id"
+                            v-model:expandedRows="expandedTrailRows"
                         >
                             <Column expander style="width: 3rem" />
                             <Column field="timestamp" header="Time" style="width: 170px">
@@ -273,8 +272,8 @@ const pageSize  = 50;
 
 const result = ref<AuditLogsResult | null>(null);
 
-const expandedActionRows = ref<Record<number, boolean>>({});
-const expandedTrailRows  = ref<Record<number, boolean>>({});
+const expandedActionRows = ref<any[]>([]);
+const expandedTrailRows  = ref<any[]>([]);
 
 const filters = ref({
     search:     '',
@@ -351,22 +350,6 @@ function onPage(event: { page: number }) {
     loadData();
 }
 
-function onActionRowExpand(event: { data: { id: number } }) {
-    expandedActionRows.value = { ...expandedActionRows.value, [event.data.id]: true };
-}
-function onActionRowCollapse(event: { data: { id: number } }) {
-    const copy = { ...expandedActionRows.value };
-    delete copy[event.data.id];
-    expandedActionRows.value = copy;
-}
-function onTrailRowExpand(event: { data: { id: number } }) {
-    expandedTrailRows.value = { ...expandedTrailRows.value, [event.data.id]: true };
-}
-function onTrailRowCollapse(event: { data: { id: number } }) {
-    const copy = { ...expandedTrailRows.value };
-    delete copy[event.data.id];
-    expandedTrailRows.value = copy;
-}
 
 function formatTs(ts: string): string {
     const d = new Date(ts);

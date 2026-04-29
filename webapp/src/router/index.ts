@@ -71,6 +71,7 @@ router.beforeEach((to, _from, next) => {
         const userStore = useUserStore();
 
         if (userStore.isAuthenticated) {
+            const meta = to.meta as Record<string, unknown>;
             const path = to.path;
 
             const fallback = () => {
@@ -79,17 +80,17 @@ router.beforeEach((to, _from, next) => {
                 return '/audit-management/corrective-actions';
             };
 
-            if (path.includes('/admin/users') && !userStore.isITAdmin && !userStore.isAdmin) {
+            if (meta.requiresITAdmin && !userStore.isITAdmin && !userStore.isAdmin) {
                 next({ path: fallback() });
                 return;
             }
 
-            if (path.includes('/admin/') && !path.includes('/admin/users') && !userStore.canAccessAdminTemplates) {
+            if (meta.requiresAuditAdmin && !userStore.canAccessAdminTemplates) {
                 next({ path: fallback() });
                 return;
             }
 
-            if (path.includes('/audits/new') && !userStore.canCreateAudit) {
+            if (meta.requiresCreateAudit && !userStore.canCreateAudit) {
                 next({ path: fallback() });
                 return;
             }

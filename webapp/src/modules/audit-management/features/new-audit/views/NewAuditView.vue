@@ -139,13 +139,11 @@ import { useRouter } from 'vue-router';
 import ProgressSpinner from 'primevue/progressspinner';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
-import { useAdminStore } from '@/modules/audit-management/stores/adminStore';
 import { AuditClient, type DivisionDto, type DivisionJobPrefixDto } from '@/apiclient/auditClient';
 import { useApiStore } from '@/stores/apiStore';
 
 const router = useRouter();
 const store = useAuditStore();
-const adminStore = useAdminStore();
 const apiStore = useApiStore();
 
 const loading = ref(false);
@@ -186,10 +184,7 @@ onMounted(async () => {
     store.resetForm();
     loading.value = true;
     try {
-        await Promise.all([
-            store.loadDivisions(),
-            adminStore.loadTemplates(),
-        ]);
+        await store.loadDivisions();
     } finally {
         loading.value = false;
     }
@@ -204,44 +199,36 @@ watch(selectedDivisionId, async (divId) => {
     siteCode.value = '';
     if (!divId) return;
 
-    const div = store.divisions.find(d => d.id === divId);
-    if (!div) return;
-
     loadingTemplate.value = true;
     try {
         const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-        const prefixes = await client.getDivisionJobPrefixes(divId).catch(() => []);
+        const [prefixes, template] = await Promise.all([
+            client.getDivisionJobPrefixes(divId).catch(() => [] as DivisionJobPrefixDto[]),
+            client.getActiveTemplate(divId).catch(() => null),
+        ]);
         jobPrefixes.value = prefixes;
         const defaultPrefix = prefixes.find(p => p.isDefault) ?? prefixes[0] ?? null;
         selectedJobPrefixId.value = defaultPrefix?.id ?? null;
-        const versions = adminStore.templates.filter(
-            t => t.divisionCode === div.code && t.status === 'Active'
-        );
-        if (versions.length > 0) {
-            const v = versions[0];
-            await adminStore.loadDraft(v.id);
-            const detail = adminStore.draftDetail;
-            if (detail) {
-                activeTemplate.value = {
-                    versionNumber: v.versionNumber,
-                    questionCount: v.questionCount,
-                    sectionCount: detail.sections.length,
-                };
 
-                const groupMap = new Map<string, string[]>();
-                for (const s of detail.sections) {
-                    if (s.isOptional && s.optionalGroupKey) {
-                        const existing = groupMap.get(s.optionalGroupKey) ?? [];
-                        existing.push(s.name);
-                        groupMap.set(s.optionalGroupKey, existing);
-                    }
+        if (template) {
+            activeTemplate.value = {
+                versionNumber: template.versionNumber,
+                questionCount: template.sections.reduce((sum, s) => sum + s.questions.length, 0),
+                sectionCount: template.sections.length,
+            };
+            const groupMap = new Map<string, string[]>();
+            for (const s of template.sections) {
+                if (s.isOptional && s.optionalGroupKey) {
+                    const existing = groupMap.get(s.optionalGroupKey) ?? [];
+                    existing.push(s.name);
+                    groupMap.set(s.optionalGroupKey, existing);
                 }
-                optionalGroups.value = Array.from(groupMap.entries()).map(([key, names]) => ({
-                    key,
-                    label: key.replace(/_/g, ' '),
-                    sectionNames: names,
-                }));
             }
+            optionalGroups.value = Array.from(groupMap.entries()).map(([key, names]) => ({
+                key,
+                label: key.replace(/_/g, ' '),
+                sectionNames: names,
+            }));
         }
     } finally {
         loadingTemplate.value = false;

@@ -32,14 +32,22 @@ public class GetAuditReviewHandler : IRequestHandler<GetAuditReview, AuditReview
             .Include(a => a.Responses)
             .Include(a => a.Findings).ThenInclude(f => f.CorrectiveActions)
             .Include(a => a.Attachments)
+            .Include(a => a.SectionNaOverrides).ThenInclude(n => n.Section)
             .FirstOrDefaultAsync(a => a.Id == request.AuditId, cancellationToken);
 
         if (audit == null) return null;
 
+        // ── Exclude responses from sections the auditor explicitly marked N/A ─
+        var naSectionNames = audit.SectionNaOverrides
+            .Select(n => n.Section.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         // ── Score calculation (two-level weighted) ────────────────────────────
         // Level 1: within each section → sectionScore = Σ(conforming × qWeight) / Σ(scored × qWeight)
         // Level 2: overall → Σ(sectionScore × sWeight) / Σ(sWeight with answered questions) × 100
-        var responses = audit.Responses.ToList();
+        var responses = audit.Responses
+            .Where(r => !naSectionNames.Contains(r.SectionNameSnapshot ?? ""))
+            .ToList();
         int conforming = responses.Count(r => r.Status == "Conforming");
         int nonConforming = responses.Count(r => r.Status == "NonConforming");
         int warning = responses.Count(r => r.Status == "Warning");

@@ -6,13 +6,12 @@
             subtitle="View and manage all compliance audits"
         >
             <Button
-                v-if="selectedAudits.length > 0"
-                :label="deleteSelection.length > 0 ? `Delete ${deleteSelection.length} Audit${deleteSelection.length !== 1 ? 's' : ''}` : 'Cannot Delete'"
+                v-if="deleteSelection.length > 0"
+                :label="`Delete ${deleteSelection.length} Audit${deleteSelection.length !== 1 ? 's' : ''}`"
                 icon="pi pi-trash"
                 severity="danger"
                 outlined
                 size="small"
-                :disabled="deleteSelection.length === 0"
                 @click="onBulkDelete"
             />
             <Button
@@ -167,13 +166,18 @@
                     class="w-full"
                 />
             </div>
+            <div v-if="printError" class="flex items-center gap-2 text-sm text-red-400 bg-red-950/40 border border-red-800/50 rounded px-3 py-2">
+                <i class="pi pi-exclamation-triangle shrink-0" />
+                {{ printError }}
+            </div>
         </div>
         <template #footer>
             <Button label="Cancel" severity="secondary" text @click="showPrintDialog = false" />
             <Button
                 label="Print"
                 icon="pi pi-print"
-                :disabled="!printDivisionId"
+                :loading="printLoading"
+                :disabled="!printDivisionId || printLoading"
                 @click="doPrint"
             />
         </template>

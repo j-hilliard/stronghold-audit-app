@@ -219,6 +219,15 @@ async function installCaMocks(page: Page): Promise<MockState> {
         route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }, body: Buffer.alloc(0) }),
     );
 
+
+    // Users with audit roles — needed by AutoComplete in Reassign dialogs
+    await page.route(/\/v1\/admin\/users\/audit-roles(\?.*)?$/i, (route) =>
+        replyJson(route, [
+            { userId: 10, email: 'dave.smith@example.com', firstName: 'Dave', lastName: 'Smith', roleName: 'Auditor' },
+            { userId: 11, email: 'alice.jones@example.com', firstName: 'Alice', lastName: 'Jones', roleName: 'Reviewer' },
+        ]),
+    );
+
     return state;
 }
 
@@ -429,7 +438,7 @@ test.describe('Corrective Actions Dashboard — row action buttons', () => {
         await expect(closeActionBtn).toBeDisabled();
 
         // After entering notes — enabled
-        await dialog.locator('textarea').fill('All corrected on site.');
+        await dialog.getByPlaceholder('Describe what was done to resolve this action', { exact: false }).fill('All corrected on site.');
         await expect(closeActionBtn).toBeEnabled();
 
         expectNoRuntimeErrors(runtimeErrors);
@@ -445,7 +454,7 @@ test.describe('Corrective Actions Dashboard — row action buttons', () => {
         await firstRow.locator('button:has(.pi-check)').click();
 
         const dialog = page.getByRole('dialog', { name: 'Close Corrective Action' });
-        await dialog.locator('textarea').fill('Fixed and verified.');
+        await dialog.getByPlaceholder('Describe what was done to resolve this action', { exact: false }).fill('Fixed and verified.');
         await dialog.locator('button', { hasText: 'Close Action' }).click();
 
         await expect(dialog).toBeHidden({ timeout: 5000 });
@@ -500,7 +509,7 @@ test.describe('Corrective Actions Dashboard — closure photo requirement (2B-3)
         await expect(dialog.locator('.pi-camera')).toBeVisible();
 
         // Close Action button disabled even with notes — no photo yet
-        await dialog.locator('textarea').fill('Replaced all hard hats.');
+        await dialog.getByPlaceholder('Describe what was done to resolve this action', { exact: false }).fill('Replaced all hard hats.');
         const closeActionBtn = dialog.locator('button', { hasText: 'Close Action' });
         await expect(closeActionBtn).toBeDisabled();
 
@@ -516,7 +525,7 @@ test.describe('Corrective Actions Dashboard — closure photo requirement (2B-3)
         await targetRow.locator('button:has(.pi-check)').click();
 
         const dialog = page.getByRole('dialog', { name: 'Close Corrective Action' });
-        await dialog.locator('textarea').fill('All hard hats replaced and verified.');
+        await dialog.getByPlaceholder('Describe what was done to resolve this action', { exact: false }).fill('All hard hats replaced and verified.');
 
         // Simulate file input selection
         const fileInput = dialog.locator('input[type="file"]');
@@ -648,7 +657,15 @@ test.describe('Corrective Actions Dashboard — bulk actions', () => {
 
         await page.locator('.bg-blue-900\\/40').locator('button', { hasText: 'Reassign' }).click();
         const dialog = page.getByRole('dialog', { name: /Reassign .* Corrective Actions/ });
-        await dialog.locator('input[type="text"], input:not([type])').fill('Dave Smith');
+
+        // AutoComplete requires selecting from suggestions (force-selection=true).
+        // Type to trigger @complete, wait for suggestion panel, click the suggestion.
+        const autocompleteInput = dialog.locator('.p-autocomplete input');
+        await autocompleteInput.fill('Dave');
+        const suggestionItem = page.locator('.p-autocomplete-item', { hasText: 'Dave Smith' });
+        await expect(suggestionItem).toBeVisible({ timeout: 5000 });
+        await suggestionItem.click();
+
         await dialog.locator('button', { hasText: 'Reassign All' }).click();
 
         await page.waitForTimeout(500);

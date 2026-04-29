@@ -45,6 +45,7 @@ public class GetAuditReportHandler : IRequestHandler<GetAuditReport, AuditReport
             .Include(a => a.Header)
             .Include(a => a.Responses)
             .Include(a => a.Findings)
+            .Include(a => a.SectionNaOverrides).ThenInclude(n => n.Section)
             .AsQueryable();
 
         // Division scope: scoped users only see their assigned divisions
@@ -75,10 +76,18 @@ public class GetAuditReportHandler : IRequestHandler<GetAuditReport, AuditReport
         // Calculate per-audit weighted scores (two-level: question weight within section → section weight to total)
         var rows = audits.Select(a =>
         {
-            double? score = ComputeTwoLevelScore(a.Responses);
+            // Exclude responses from sections the auditor explicitly marked N/A
+            var naSectionNames = a.SectionNaOverrides
+                .Select(n => n.Section.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var scorableResponses = naSectionNames.Count > 0
+                ? a.Responses.Where(r => !naSectionNames.Contains(r.SectionNameSnapshot ?? "")).ToList()
+                : a.Responses;
 
-            var nc = a.Responses.Count(r => r.Status == "NonConforming");
-            var warn = a.Responses.Count(r => r.Status == "Warning");
+            double? score = ComputeTwoLevelScore(scorableResponses);
+
+            var nc = scorableResponses.Count(r => r.Status == "NonConforming");
+            var warn = scorableResponses.Count(r => r.Status == "Warning");
 
             return new AuditReportRowDto
             {
@@ -127,8 +136,16 @@ public class GetAuditReportHandler : IRequestHandler<GetAuditReport, AuditReport
             })
             .ToList();
 
-        // Section-level NC breakdown across all filtered audits
-        var allResponses = audits.SelectMany(a => a.Responses).ToList();
+        // Section-level NC breakdown — exclude responses from N/A sections
+        var allResponses = audits.SelectMany(a =>
+        {
+            var naSectionNames = a.SectionNaOverrides
+                .Select(n => n.Section.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return naSectionNames.Count > 0
+                ? a.Responses.Where(r => !naSectionNames.Contains(r.SectionNameSnapshot ?? ""))
+                : a.Responses;
+        }).ToList();
         var sectionBreakdown = allResponses
             .Where(r => r.Status == "NonConforming" && !string.IsNullOrWhiteSpace(r.SectionNameSnapshot))
             .GroupBy(r => r.SectionNameSnapshot!)

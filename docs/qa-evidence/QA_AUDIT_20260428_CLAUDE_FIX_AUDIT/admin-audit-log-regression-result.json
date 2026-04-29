@@ -1,0 +1,8 @@
+{
+  "url": "http://127.0.0.1:7220/audit-management/admin/audit-log",
+  "actionTableVisible": true,
+  "beforeVisibleOnInitialActionTab": false,
+  "afterVisibleOnInitialActionTab": false,
+  "expanderCount": 1,
+  "errors": []
+}

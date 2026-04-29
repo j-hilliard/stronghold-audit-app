@@ -230,7 +230,8 @@ public class AuditController : V1ControllerBase
                     AuditId = id,
                     SavedBy = user.Email!,
                     Header = body.Header,
-                    Responses = body.Responses
+                    Responses = body.Responses,
+                    SectionNaOverrides = body.SectionNaOverrides
                 });
                 return NoContent();
             },

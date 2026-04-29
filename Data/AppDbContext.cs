@@ -40,6 +40,7 @@ public class AppDbContext : DbContext
     public DbSet<ReviewGroupMember> ReviewGroupMembers { get; set; } = null!;
     public DbSet<CaNotificationLog> CaNotificationLogs { get; set; } = null!;
     public DbSet<AuditEnabledSection> AuditEnabledSections { get; set; } = null!;
+    public DbSet<AuditSectionNaOverride> AuditSectionNaOverrides { get; set; } = null!;
     public DbSet<ScheduledReport> ScheduledReports { get; set; } = null!;
     public DbSet<QuestionLogicRule> QuestionLogicRules { get; set; } = null!;
     public DbSet<FindingPhoto> FindingPhotos { get; set; } = null!;
@@ -507,6 +508,19 @@ public class AppDbContext : DbContext
             b.HasIndex(e => e.AuditId);
             // One entry per group key per audit
             b.HasIndex(e => new { e.AuditId, e.OptionalGroupKey }).IsUnique();
+        });
+
+        modelBuilder.Entity<AuditSectionNaOverride>(b =>
+        {
+            b.ToTable("AuditSectionNaOverride", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Reason).IsRequired().HasMaxLength(500);
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.HasOne(e => e.Audit).WithMany(a => a.SectionNaOverrides).HasForeignKey(e => e.AuditId).OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(e => e.Section).WithMany().HasForeignKey(e => e.SectionId).OnDelete(DeleteBehavior.Cascade);
+            b.HasIndex(e => e.AuditId);
+            // One N/A override per section per audit
+            b.HasIndex(e => new { e.AuditId, e.SectionId }).IsUnique();
         });
 
         modelBuilder.Entity<ScheduledReport>(b =>

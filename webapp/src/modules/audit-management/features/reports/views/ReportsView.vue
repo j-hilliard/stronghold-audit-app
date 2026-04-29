@@ -1435,17 +1435,18 @@ const quarterlyChartOptions = computed(() => ({
 
 // ── Auditor performance ───────────────────────────────────────────────────────
 const auditorStats = computed(() => {
-    const map = new Map<string, { scores: number[]; ncs: number; warnings: number }>();
+    const map = new Map<string, { scores: number[]; ncs: number; warnings: number; count: number }>();
     for (const row of report.value?.rows ?? []) {
         const key = row.auditor?.trim() || 'Unknown';
-        if (!map.has(key)) map.set(key, { scores: [], ncs: 0, warnings: 0 });
+        if (!map.has(key)) map.set(key, { scores: [], ncs: 0, warnings: 0, count: 0 });
         const entry = map.get(key)!;
+        entry.count++;
         if (row.scorePercent != null) entry.scores.push(row.scorePercent);
         entry.ncs += row.nonConformingCount;
         entry.warnings += row.warningCount;
     }
     return Array.from(map.entries()).map(([auditor, s]) => ({
-        auditor, auditCount: s.scores.length,
+        auditor, auditCount: s.count,
         avgScore: s.scores.length > 0 ? Math.round(s.scores.reduce((a, b) => a + b, 0) / s.scores.length * 10) / 10 : null as number | null,
         totalNcs: s.ncs, totalWarnings: s.warnings,
     })).filter(r => r.auditCount > 0).sort((a, b) => (b.avgScore ?? 0) - (a.avgScore ?? 0));

@@ -33,6 +33,9 @@ public class Audit : AuditableEntity
     /// <summary>Optional section groups enabled at audit creation (immutable after create).</summary>
     public ICollection<AuditEnabledSection> EnabledSections { get; set; } = new List<AuditEnabledSection>();
 
+    /// <summary>Sections the auditor has explicitly marked N/A during this audit (mutable while Draft/Reopened).</summary>
+    public ICollection<AuditSectionNaOverride> SectionNaOverrides { get; set; } = new List<AuditSectionNaOverride>();
+
     /// <summary>AI-generated plain-language summary generated at submission time. Null when AI is disabled or unavailable.</summary>
     public string? AiSummary { get; set; }
 
