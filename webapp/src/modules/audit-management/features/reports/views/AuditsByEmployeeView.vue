@@ -93,19 +93,13 @@
                     :sort-field="sortField"
                     :sort-order="sortOrder"
                     removable-sort
-                    class="employee-table"
-                    :pt="{
-                        table: { class: 'w-full text-sm' },
-                        thead: { class: 'sticky top-0 z-10' },
-                    }"
+                    class="stronghold-table"
                     @sort="(e: any) => onSort(e)"
                 >
                     <Column field="auditor" header="Auditor" sortable>
                         <template #body="{ data }">
-                            <div class="font-medium text-white">{{ data.auditor }}</div>
-                            <div v-if="data.lastDivisionCode" class="text-xs text-slate-500 mt-0.5">
-                                Last: {{ data.lastDivisionCode }}
-                            </div>
+                            <span class="font-medium text-white">{{ data.auditor }}</span>
+                            <span v-if="data.lastDivisionCode" class="text-xs text-slate-500 ml-1.5">({{ data.lastDivisionCode }})</span>
                         </template>
                     </Column>
                     <Column field="auditCount" header="Audits" sortable class="text-center" />
@@ -221,21 +215,3 @@ onMounted(async () => {
 });
 </script>
 
-<style scoped>
-:deep(.employee-table .p-datatable-thead th) {
-    background: rgb(30, 41, 59);
-    color: #94a3b8;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-bottom: 1px solid rgb(51, 65, 85);
-}
-:deep(.employee-table .p-datatable-tbody td) {
-    border-bottom: 1px solid rgb(51, 65, 85);
-    padding: 10px 12px;
-}
-:deep(.employee-table .p-datatable-tbody tr:hover td) {
-    background: rgba(99, 179, 237, 0.04);
-}
-</style>

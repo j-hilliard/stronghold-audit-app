@@ -158,6 +158,10 @@ body {
     padding: 0.65rem 1rem !important;
     border-color: rgba(51, 65, 85, 0.35) !important;
     font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 0;
 }
 .stronghold-table .p-datatable-emptymessage td {
     text-align: center !important;
@@ -165,7 +169,7 @@ body {
     padding: 3rem 1rem !important;
 }
 .stronghold-table .p-datatable-tbody > tr > td .p-button {
-    padding-block: 0.25rem !important;
+    padding-block: 0.15rem !important;
 }
 
 /* ── CA row state — global, full PrimeVue chain for correct specificity ──────────
