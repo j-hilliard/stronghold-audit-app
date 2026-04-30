@@ -1551,6 +1551,46 @@ export class AuditClient {
             .post(`${this.baseUrl}${endpoint}`, data, { responseType: 'blob', cancelToken })
             .then(r => r.data as Blob);
     }
+
+    // ── CA Public Tokens (authenticated admin operations) ─────────────────────
+
+    createCaPublicToken(
+        caId: number,
+        payload: CreateCaTokenRequest,
+        cancelToken?: CancelToken,
+    ): Promise<CreateCaPublicTokenResult> {
+        return this.instance
+            .post<CreateCaPublicTokenResult>(`${this.baseUrl}/v1/corrective-actions/${caId}/tokens`, payload, { cancelToken })
+            .then(r => r.data);
+    }
+}
+
+// ── CA Public Token DTOs ──────────────────────────────────────────────────────
+
+export interface CreateCaTokenRequest {
+    sentToName?:  string | null;
+    sentToEmail?: string | null;
+    expiresAt?:   string | null;
+}
+
+export interface CreateCaPublicTokenResult {
+    id:    number;
+    token: string;
+}
+
+export interface CaPublicAccessDto {
+    tokenId:            number;
+    correctiveActionId: number;
+    description:        string;
+    rootCause?:         string | null;
+    status:             string;
+    priority:           string;
+    dueDate?:           string | null;
+    auditTitle?:        string | null;
+    assignedTo?:        string | null;
+    sentToName?:        string | null;
+    createdAt:          string;
+    expiresAt?:         string | null;
 }
 
 // ── Scheduled Reports ─────────────────────────────────────────────────────────

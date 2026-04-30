@@ -50,6 +50,7 @@ public class AppDbContext : DbContext
     public DbSet<AuditNumberSequence> AuditNumberSequences { get; set; } = null!;
     public DbSet<AuditActionLog> AuditActionLogs { get; set; } = null!;
     public DbSet<AuditTrailLog> AuditTrailLogs { get; set; } = null!;
+    public DbSet<CaPublicToken> CaPublicTokens { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -642,6 +643,22 @@ public class AppDbContext : DbContext
             b.HasIndex(e => new { e.EntityType, e.EntityId });
             b.ToTable("AuditTrailLog", "audit", t =>
                 t.HasCheckConstraint("CK_AuditTrailLog_Action", "[Action] IN ('Insert', 'Update', 'Delete')"));
+        });
+
+        modelBuilder.Entity<CaPublicToken>(b =>
+        {
+            b.ToTable("CaPublicToken", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Token).IsRequired().HasMaxLength(64);
+            b.Property(e => e.CreatedBy).IsRequired().HasMaxLength(200);
+            b.Property(e => e.SentToName).HasMaxLength(200);
+            b.Property(e => e.SentToEmail).HasMaxLength(200);
+            b.HasIndex(e => e.Token).IsUnique();
+            b.HasIndex(e => e.CorrectiveActionId);
+            b.HasOne(e => e.CorrectiveAction)
+             .WithMany()
+             .HasForeignKey(e => e.CorrectiveActionId)
+             .OnDelete(DeleteBehavior.Cascade);
         });
     }
 

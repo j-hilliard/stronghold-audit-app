@@ -39,6 +39,12 @@ const routes = [
         component: () => import('@/modules/audit-management/features/audit-review/views/PrintableAuditReviewView.vue'),
     },
     {
+        // External CA access — no auth required, token is in the URL
+        path: '/ca/:token',
+        name: 'external-ca',
+        component: () => import('@/modules/audit-management/features/corrective-actions/views/ExternalCaView.vue'),
+    },
+    {
         path: '/authentication/login-callback',
         name: 'authentication-login-callback',
         component: () => import('@/views/auth/AuthRedirectView.vue'),

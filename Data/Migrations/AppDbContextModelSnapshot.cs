@@ -1089,6 +1089,54 @@ namespace Stronghold.AppDashboard.Data.Migrations
                     b.ToTable("CaNotificationLog", "audit");
                 });
 
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.CaPublicToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CorrectiveActionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("SentToName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("SentToEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsRevoked")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CorrectiveActionId");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.ToTable("CaPublicToken", "audit");
+                });
+
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.CorrectiveAction", b =>
                 {
                     b.Property<int>("Id")
@@ -2562,6 +2610,17 @@ namespace Stronghold.AppDashboard.Data.Migrations
                 });
 
             modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.CorrectiveActionPhoto", b =>
+                {
+                    b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.CorrectiveAction", "CorrectiveAction")
+                        .WithMany()
+                        .HasForeignKey("CorrectiveActionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CorrectiveAction");
+                });
+
+            modelBuilder.Entity("Stronghold.AppDashboard.Data.Models.Audit.CaPublicToken", b =>
                 {
                     b.HasOne("Stronghold.AppDashboard.Data.Models.Audit.CorrectiveAction", "CorrectiveAction")
                         .WithMany()
