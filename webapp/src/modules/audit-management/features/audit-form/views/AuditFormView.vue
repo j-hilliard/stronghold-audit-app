@@ -37,7 +37,7 @@
                 @click="store.saveDraft()"
             />
             <Button
-                v-if="!store.isSubmitted && (userStore.isAuditor || userStore.isAuditAdmin || userStore.isAdmin)"
+                v-if="!store.isSubmitted && hasPermission('audit.submit')"
                 label="Submit for Review"
                 icon="pi pi-send"
                 :loading="store.saving"
@@ -156,7 +156,7 @@
             v-if="store.template"
             :visible="!store.isSubmitted"
             :saving="store.saving"
-            :can-submit="userStore.isAuditor || userStore.isAuditAdmin || userStore.isAdmin"
+            :can-submit="hasPermission('audit.submit')"
             :status-label="store.auditStatus ? `Status: ${store.auditStatus}` : 'Editing draft'"
             @save="store.saveDraft()"
             @submit="onSubmit"
@@ -251,7 +251,7 @@ import ProgressSpinner from 'primevue/progressspinner';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import BaseButtonSave from '@/components/buttons/BaseButtonSave.vue';
 import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
-import { useUserStore } from '@/stores/userStore';
+import { usePermissions } from '@/modules/audit-management/composables/usePermissions';
 import AuditHeader from '../components/AuditHeader.vue';
 import AuditSection from '../components/AuditSection.vue';
 import ScoreSummaryBar from '../components/ScoreSummaryBar.vue';
@@ -266,7 +266,7 @@ interface SectionRef {
 const router = useRouter();
 const route = useRoute();
 const store = useAuditStore();
-const userStore = useUserStore();
+const { hasPermission } = usePermissions();
 const confirm = useConfirm();
 const sectionRefs = ref<Map<number, SectionRef>>(new Map());
 const showSummary = ref(false);

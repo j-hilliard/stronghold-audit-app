@@ -114,7 +114,7 @@
                             row-hover
                             striped-rows
                             size="small"
-                            class="text-sm"
+                            class="stronghold-table text-sm"
                             dataKey="id"
                             v-model:expandedRows="expandedActionRows"
                         >
@@ -175,7 +175,7 @@
                             row-hover
                             striped-rows
                             size="small"
-                            class="text-sm"
+                            class="stronghold-table text-sm"
                             dataKey="id"
                             v-model:expandedRows="expandedTrailRows"
                         >

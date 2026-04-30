@@ -85,7 +85,7 @@
             :loading="loading"
             sort-field="lastName"
             :sort-order="1"
-            class="text-sm"
+            class="stronghold-table text-sm"
             data-key="userId"
             scrollable
             scroll-height="flex"
@@ -366,17 +366,13 @@
 import { ref, computed, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { useConfirm } from 'primevue/useconfirm';
-import { UserClient, RoleClient, UserRoleClient, type User, type Role, type UserRole } from '@/apiclient/client';
-import { useApiStore } from '@/stores/apiStore';
+import { type User, type Role, type UserRole } from '@/apiclient/client';
+import { useUserService } from '@/modules/audit-management/services/useUserService';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 
 const toast    = useToast();
 const confirm  = useConfirm();
-const apiStore = useApiStore();
-
-function getUserClient()     { return new UserClient(apiStore.api.defaults.baseURL, apiStore.api); }
-function getRoleClient()     { return new RoleClient(apiStore.api.defaults.baseURL, apiStore.api); }
-function getUserRoleClient() { return new UserRoleClient(apiStore.api.defaults.baseURL, apiStore.api); }
+const { getUserClient, getRoleClient, getUserRoleClient } = useUserService();
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const loading    = ref(false);

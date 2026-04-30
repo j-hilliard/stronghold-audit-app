@@ -632,7 +632,7 @@
                     </template>
                     <template #content>
                         <div v-show="!collapsed.openCAs">
-                        <DataTable :value="report.openCorrectiveActions" :rows="10" paginator sortField="dueDate" :sortOrder="1" class="text-sm">
+                        <DataTable :value="report.openCorrectiveActions" :rows="10" paginator sortField="dueDate" :sortOrder="1" class="stronghold-table text-sm">
                             <Column field="id" header="CA #" style="width:60px" sortable />
                             <Column field="auditId" header="Audit #" style="width:80px" sortable />
                             <Column field="description" header="Description">
@@ -687,7 +687,7 @@
                     </template>
                     <template #content>
                         <div v-show="!collapsed.auditorPerf">
-                        <DataTable :value="auditorStats" sortField="avgScore" :sortOrder="-1" class="text-sm">
+                        <DataTable :value="auditorStats" sortField="avgScore" :sortOrder="-1" class="stronghold-table text-sm">
                             <Column field="auditor" header="Auditor" sortable>
                                 <template #body="{ data }">
                                     <button class="auditor-link" @click="drillByAuditor(data.auditor)" :title="`Show ${data.auditor}'s audits`">{{ data.auditor }}</button>
@@ -748,7 +748,7 @@
                     </template>
                     <template #content>
                         <div v-show="!collapsed.auditDetail">
-                        <DataTable :value="filteredAuditRows" :rows="20" paginator sortField="id" :sortOrder="-1" class="text-sm">
+                        <DataTable :value="filteredAuditRows" :rows="20" paginator sortField="id" :sortOrder="-1" class="stronghold-table text-sm">
                             <Column field="id" header="#" style="width:60px" sortable>
                                 <template #body="{ data }"><span data-testid="report-grid-row">{{ data.id }}</span></template>
                             </Column>

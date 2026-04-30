@@ -200,12 +200,14 @@ import BaseButtonIconView from '@/components/buttons/BaseButtonIconView.vue';
 import BaseDataTable from '@/components/tables/BaseDataTable.vue';
 import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
 import { useUserStore } from '@/stores/userStore';
+import { usePermissions } from '@/modules/audit-management/composables/usePermissions';
 import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 import type { AuditListItemDto } from '@/apiclient/auditClient';
 
 const router = useRouter();
 const store = useAuditStore();
 const userStore = useUserStore();
+const { hasPermission } = usePermissions();
 const confirm = useConfirm();
 const loading = ref(false);
 const selectedAudits = ref<AuditListItemDto[]>([]);
@@ -240,7 +242,7 @@ async function doPrint() {
 }
 
 const deleteSelection = computed(() =>
-    userStore.isAuditAdmin
+    hasPermission('admin.access')
         ? selectedAudits.value
         : selectedAudits.value.filter(a => a.status === 'Draft')
 );

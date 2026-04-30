@@ -235,7 +235,6 @@ import { useReportEngine } from '../composables/useReportEngine';
 import { useReportDraft } from '../composables/useReportDraft';
 import type { ReportBlock } from '../types/report-block';
 import type { NewsletterTemplateDto } from '@/apiclient/auditClient';
-import { REPORT_THEMES } from '../composables/useReportThemes';
 
 const service = useAuditService();
 const userStore = useUserStore();
