@@ -1,5 +1,3 @@
-using AutoMapper;
-
 namespace Stronghold.AppDashboard.Api.Models;
 
 public class RefCompanyDto
@@ -51,16 +49,3 @@ public class RefReferenceTypeDto
     public string AppliesTo { get; set; } = null!;
 }
 
-public class ReferenceDataProfile : Profile
-{
-    public ReferenceDataProfile()
-    {
-        CreateMap<Data.Models.Safety.RefCompany, RefCompanyDto>();
-        CreateMap<Data.Models.Safety.RefRegion, RefRegionDto>();
-        CreateMap<Data.Models.Safety.RefSeverity, RefSeverityDto>();
-        CreateMap<Data.Models.Safety.RefWorkflowState, RefWorkflowStateDto>();
-        CreateMap<Data.Models.Safety.RefReferenceType, RefReferenceTypeDto>();
-        CreateMap<Data.Models.Safety.RefIncidentReportReference, RefOptionDto>()
-            .ForMember(d => d.ReferenceTypeCode, opt => opt.MapFrom(s => s.ReferenceType != null ? s.ReferenceType.Code : null));
-    }
-}

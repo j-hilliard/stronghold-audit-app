@@ -211,11 +211,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { useApiStore } from '@/stores/apiStore';
-import { AuditClient, type AuditReportDto, type DivisionDto } from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
+import type { AuditReportDto, DivisionDto } from '@/apiclient/auditClient';
 
 const route = useRoute();
-const apiStore = useApiStore();
+const service = useAuditService();
 const pageEl = ref<HTMLElement | null>(null);
 
 const loading = ref(false);
@@ -244,15 +244,12 @@ function quarterDateRange(year: number, q: number) {
     };
 }
 
-function getClient() {
-    return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-}
 
 async function loadData() {
     loading.value = true;
     try {
         const { from, to } = quarterDateRange(selectedYear.value, selectedQuarter.value);
-        report.value = await getClient().getAuditReport(
+        report.value = await service.getAuditReport(
             selectedDivisionId.value || null,
             null,
             from,
@@ -264,7 +261,7 @@ async function loadData() {
 }
 
 onMounted(async () => {
-    divisions.value = await getClient().getDivisions();
+    divisions.value = await service.getDivisions();
     await loadData();
 });
 
@@ -307,18 +304,19 @@ const sectionRows = computed(() => {
 });
 
 const auditorRows = computed(() => {
-    const map = new Map<string, { scores: number[]; ncs: number; warnings: number }>();
+    const map = new Map<string, { total: number; scores: number[]; ncs: number; warnings: number }>();
     for (const row of report.value?.rows ?? []) {
         const key = row.auditor?.trim() || 'Unknown';
-        if (!map.has(key)) map.set(key, { scores: [], ncs: 0, warnings: 0 });
+        if (!map.has(key)) map.set(key, { total: 0, scores: [], ncs: 0, warnings: 0 });
         const e = map.get(key)!;
+        e.total++;
         if (row.scorePercent != null) e.scores.push(row.scorePercent);
         e.ncs += row.nonConformingCount;
         e.warnings += row.warningCount;
     }
     return Array.from(map.entries()).map(([auditor, s]) => ({
         auditor,
-        count: s.scores.length,
+        count: s.total,
         avgScore: s.scores.length ? Math.round(s.scores.reduce((a, b) => a + b, 0) / s.scores.length * 10) / 10 : null as number | null,
         ncs: s.ncs,
         warnings: s.warnings,

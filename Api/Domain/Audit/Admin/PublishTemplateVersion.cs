@@ -8,7 +8,8 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Admin;
 
 [AllowedAuthorizationRole(
-    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
+    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator,
+    AuthorizationRole.AuditAdmin)]
 public class PublishTemplateVersion : IRequest<Unit>
 {
     public int DraftVersionId { get; set; }

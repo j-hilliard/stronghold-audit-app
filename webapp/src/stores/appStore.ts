@@ -9,21 +9,17 @@ export const useAppStore = defineStore('app', () => {
     const userStore = useUserStore();
 
     const currentApp = computed(() => {
-        for (const app in apps) {
-            if (apps[app].baseSlug && route.fullPath.startsWith(`/${apps[app].baseSlug}`)) {
-                return apps[app];
-            }
-        }
-
-        return apps.strongholdBizAppsSuite;
+        return apps.auditManagement;
     });
 
     const menu = computed(() => {
         const routes = [{ label: currentApp.value.name, items: currentApp.value.menu.user }];
 
-        // Show admin section for system Administrators AND TemplateAdmins in the audit module
+        // Show admin section for system Administrators, TemplateAdmins, AuditAdmins,
+        // AND ITAdmins (who need access to the Users link inside the admin block).
         const showAdmin = userStore.isAdmin ||
-            (currentApp.value.name === 'Compliance Audit' && userStore.canAccessAdminTemplates);
+            (currentApp.value.name === 'Compliance Audit' &&
+                (userStore.canAccessAdminTemplates || userStore.isITAdmin));
 
         if (showAdmin && currentApp.value.menu.admin.length) {
             routes.push({ label: 'Administration', items: currentApp.value.menu.admin });

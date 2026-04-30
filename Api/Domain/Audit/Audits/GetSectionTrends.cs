@@ -11,7 +11,8 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
     AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.ReadOnlyViewer,
     AuthorizationRole.ExecutiveViewer, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.Auditor, AuthorizationRole.AuditAdmin, AuthorizationRole.Executive)]
 public class GetSectionTrends : IRequest<SectionTrendsReportDto>
 {
     public int? DivisionId { get; set; }

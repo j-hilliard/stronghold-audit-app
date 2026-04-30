@@ -26,7 +26,8 @@ public class GenerateReportRequest
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
     AuthorizationRole.ReadOnlyViewer, AuthorizationRole.ExecutiveViewer,
-    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
+    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator,
+    AuthorizationRole.AuditAdmin, AuthorizationRole.Executive)]
 public class GenerateReport : IRequest<byte[]>
 {
     public GenerateReportRequest Payload { get; set; } = null!;

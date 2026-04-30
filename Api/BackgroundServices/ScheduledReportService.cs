@@ -29,12 +29,21 @@ public class ScheduledReportService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
-            try { await RunDueReportsAsync(stoppingToken); }
-            catch (OperationCanceledException) { break; }
-            catch (Exception ex) { _logger.LogError(ex, "ScheduledReportService: error in run cycle"); }
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                await RunDueReportsAsync(stoppingToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal shutdown — host is stopping
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ScheduledReportService: error in run cycle");
         }
     }
 
@@ -75,16 +84,28 @@ public class ScheduledReportService : BackgroundService
                 if (recipients.Count > 0)
                 {
                     var body = $@"<p>Your scheduled report <strong>{System.Net.WebUtility.HtmlEncode(report.Title)}</strong>
-has been generated ({sizeKb} KB). Please log in to download it from the Reports section.</p>
+has been generated ({sizeKb} KB) and is attached to this email.</p>
 <p><em>Generated: {DateTime.UtcNow:MMMM d, yyyy 'at' HH:mm} UTC</em></p>";
 
-                    await email.SendAsync(
-                        subject: $"{report.Title} — {DateTime.UtcNow:MMMM d, yyyy}",
-                        htmlBody: body,
-                        recipients: recipients,
-                        ct: ct
-                    );
-                    _logger.LogInformation("ScheduledReportService: sent notification for {Title} to {Count} recipient(s)", report.Title, recipients.Count);
+                    var tempPath = Path.GetTempFileName() + ".pdf";
+                    try
+                    {
+                        await File.WriteAllBytesAsync(tempPath, pdfBytes, ct);
+                        var fileName = $"{SanitizeFileName(report.Title)}-{DateTime.UtcNow:yyyy-MM-dd}.pdf";
+
+                        await email.SendAsync(
+                            subject: $"{report.Title} — {DateTime.UtcNow:MMMM d, yyyy}",
+                            htmlBody: body,
+                            recipients: recipients,
+                            attachments: new[] { (fileName, tempPath) },
+                            ct: ct
+                        );
+                    }
+                    finally
+                    {
+                        if (File.Exists(tempPath)) File.Delete(tempPath);
+                    }
+                    _logger.LogInformation("ScheduledReportService: sent PDF for {Title} to {Count} recipient(s)", report.Title, recipients.Count);
                 }
                 else
                 {

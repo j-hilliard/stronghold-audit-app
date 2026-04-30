@@ -21,6 +21,17 @@
             <!-- Question text -->
             <p class="flex-1 text-sm text-slate-100 leading-snug pt-1">{{ response.questionTextSnapshot }}</p>
 
+            <!-- History icon button -->
+            <button
+                ref="historyAnchor"
+                type="button"
+                class="shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-slate-700 transition-colors self-start mt-0.5"
+                title="View response history for this question"
+                @click.stop="toggleHistory"
+            >
+                <i class="pi pi-history text-slate-500 hover:text-slate-300 text-xs" />
+            </button>
+
             <!-- Repeat finding badge -->
             <span
                 v-if="isRepeatFinding"
@@ -28,6 +39,15 @@
                 title="NonConforming in 2+ recent audits for this division"
             >
                 &#9888; Repeat
+            </span>
+
+            <!-- Prefilled badge -->
+            <span
+                v-if="isPrefilled"
+                class="shrink-0 text-[10px] font-semibold bg-blue-900/50 border border-blue-700/50 text-blue-300 rounded px-1.5 py-0.5 self-start mt-1 whitespace-nowrap"
+                title="Answer prefilled from prior audit — change to confirm"
+            >
+                &#x21A9; prefilled
             </span>
 
             <!-- Camera icon button + hidden file input -->
@@ -147,6 +167,57 @@
             </div>
         </Teleport>
 
+        <!-- Question history popover -->
+        <Teleport to="body">
+            <Transition name="history-pop">
+                <div
+                    v-if="historyOpen"
+                    :style="historyPopoverStyle"
+                    class="fixed z-50 w-72 bg-slate-800 border border-slate-600 rounded-lg shadow-2xl p-3"
+                    @click.stop
+                >
+                    <!-- Header -->
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-semibold text-slate-300 uppercase tracking-wide">Last 3 Responses</span>
+                        <button type="button" class="text-slate-500 hover:text-slate-300" @click="historyOpen = false">
+                            <i class="pi pi-times text-xs" />
+                        </button>
+                    </div>
+
+                    <!-- Loading -->
+                    <div v-if="historyLoading" class="py-2 text-center text-slate-500 text-xs">
+                        <i class="pi pi-spin pi-spinner" /> Loading...
+                    </div>
+
+                    <!-- Empty -->
+                    <div v-else-if="historyItems.length === 0" class="py-2 text-center text-slate-500 text-xs italic">
+                        No prior responses for this division.
+                    </div>
+
+                    <!-- Items -->
+                    <div v-else class="space-y-2">
+                        <div
+                            v-for="item in historyItems"
+                            :key="item.auditId"
+                            class="rounded bg-slate-750 border border-slate-700 p-2 text-xs"
+                        >
+                            <div class="flex items-center justify-between gap-2 mb-1">
+                                <span :class="historyStatusClass(item.status)" class="font-semibold px-1.5 py-0.5 rounded text-[10px]">
+                                    {{ item.status ?? 'Unanswered' }}
+                                </span>
+                                <span class="text-slate-400 truncate">{{ item.auditor ?? '—' }}</span>
+                                <span class="text-slate-500 whitespace-nowrap">{{ item.auditDate ?? '—' }}</span>
+                            </div>
+                            <p v-if="item.comment" class="text-slate-300 italic line-clamp-2 text-[10px]">
+                                "{{ item.comment }}"
+                            </p>
+                            <p v-if="item.jobNumber" class="text-slate-500 text-[10px] mt-0.5">Job: {{ item.jobNumber }}</p>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
+
         <!-- Conforming: optional note (collapsed until clicked or note already exists) -->
         <Transition name="nc-expand">
             <div v-if="response.status === 'Conforming'" class="px-4 pb-3 border-t border-slate-700/50">
@@ -263,13 +334,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onBeforeUnmount } from 'vue';
+import { computed, ref, watch, onBeforeUnmount, onMounted } from 'vue';
 import Textarea from 'primevue/textarea';
 import { useToast } from 'primevue/usetoast';
 import StatusButtons from './StatusButtons.vue';
 import { useAuditStore, type ResponseState } from '@/modules/audit-management/stores/auditStore';
-import { useApiStore } from '@/stores/apiStore';
-import { AuditClient, type FindingPhotoDto } from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
+import type { FindingPhotoDto, QuestionHistoryItemDto } from '@/apiclient/auditClient';
 
 const props = defineProps<{
     response: ResponseState;
@@ -279,12 +350,8 @@ const props = defineProps<{
 }>();
 
 const store = useAuditStore();
-const apiStore = useApiStore();
 const toast = useToast();
-
-function getClient() {
-    return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-}
+const service = useAuditService();
 
 // ── Photo state ────────────────────────────────────────────────────────────────
 
@@ -299,7 +366,7 @@ async function loadPhotos() {
     if (photosLoaded.value || !store.auditId) return;
     photosLoaded.value = true;
     try {
-        photos.value = await getClient().getFindingPhotos(store.auditId, props.response.questionId);
+        photos.value = await service.getFindingPhotos(store.auditId, props.response.questionId);
         for (const photo of photos.value) {
             loadBlobUrl(photo);
         }
@@ -310,7 +377,7 @@ async function loadPhotos() {
 
 function loadBlobUrl(photo: FindingPhotoDto) {
     if (photo.id in blobUrls.value || !store.auditId) return;
-    getClient()
+    service
         .downloadFindingPhoto(store.auditId, photo.questionId, photo.id)
         .then(blob => {
             blobUrls.value = { ...blobUrls.value, [photo.id]: URL.createObjectURL(blob) };
@@ -339,14 +406,14 @@ async function onFileChange(e: Event) {
         if (!photosLoaded.value) {
             photosLoaded.value = true;
             try {
-                photos.value = await getClient().getFindingPhotos(store.auditId, props.response.questionId);
+                photos.value = await service.getFindingPhotos(store.auditId, props.response.questionId);
                 for (const photo of photos.value) {
                     loadBlobUrl(photo);
                 }
             } catch { /* non-fatal */ }
         }
 
-        const dto = await getClient().uploadFindingPhoto(store.auditId, props.response.questionId, file);
+        const dto = await service.uploadFindingPhoto(store.auditId, props.response.questionId, file);
         photos.value.push(dto);
         loadBlobUrl(dto);
         toast.add({ severity: 'success', summary: 'Photo attached', life: 2000 });
@@ -360,7 +427,7 @@ async function onFileChange(e: Event) {
 async function deletePhoto(photo: FindingPhotoDto) {
     if (!store.auditId) return;
     try {
-        await getClient().deleteFindingPhoto(store.auditId, photo.questionId, photo.id);
+        await service.deleteFindingPhoto(store.auditId, photo.questionId, photo.id);
         const url = blobUrls.value[photo.id];
         if (url) {
             URL.revokeObjectURL(url);
@@ -392,6 +459,71 @@ onBeforeUnmount(() => {
         URL.revokeObjectURL(url);
     }
 });
+
+// ── Question History Popover ───────────────────────────────────────────────────
+
+const historyAnchor   = ref<HTMLButtonElement | null>(null);
+const historyOpen     = ref(false);
+const historyLoading  = ref(false);
+const historyItems    = ref<QuestionHistoryItemDto[]>([]);
+const historyLoaded   = ref(false);
+const historyPopoverStyle = ref<Record<string, string>>({});
+
+function updatePopoverPosition() {
+    const el = historyAnchor.value;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const top = spaceBelow > 220
+        ? `${rect.bottom + 6}px`
+        : `${rect.top - 220}px`;
+    const left = Math.min(rect.left, window.innerWidth - 296);
+    historyPopoverStyle.value = { top, left: `${Math.max(8, left)}px` };
+}
+
+async function toggleHistory() {
+    if (historyOpen.value) {
+        historyOpen.value = false;
+        return;
+    }
+    updatePopoverPosition();
+    historyOpen.value = true;
+
+    if (!historyLoaded.value && store.auditDivisionId) {
+        historyLoading.value = true;
+        try {
+            historyItems.value = await service.getQuestionHistory(
+                props.response.questionId,
+                store.auditDivisionId,
+                3,
+            );
+            historyLoaded.value = true;
+        } catch {
+            historyItems.value = [];
+        } finally {
+            historyLoading.value = false;
+        }
+    }
+}
+
+function historyStatusClass(status?: string | null) {
+    switch (status) {
+        case 'Conforming':    return 'bg-emerald-800 text-emerald-300';
+        case 'NonConforming': return 'bg-red-900 text-red-300';
+        case 'Warning':       return 'bg-amber-900 text-amber-300';
+        case 'NA':            return 'bg-slate-700 text-slate-400';
+        default:              return 'bg-slate-700 text-slate-400';
+    }
+}
+
+function closeHistoryOnOutsideClick(e: MouseEvent) {
+    if (historyOpen.value && historyAnchor.value && !historyAnchor.value.contains(e.target as Node)) {
+        historyOpen.value = false;
+    }
+}
+
+onMounted(() => document.addEventListener('click', closeHistoryOnOutsideClick, true));
+onBeforeUnmount(() => document.removeEventListener('click', closeHistoryOnOutsideClick, true));
 
 // ── Conforming note ────────────────────────────────────────────────────────────
 
@@ -430,7 +562,12 @@ const commentPlaceholder = computed(() => {
     return 'Describe the observed condition...';
 });
 
+const isPrefilled = computed(() =>
+    store.prefillQuestionIds.has(props.response.questionId),
+);
+
 function onStatusChange(newStatus: string | null) {
+    store.markPrefillTouched(props.response.questionId);
     store.setResponse(props.response.questionId, newStatus);
 }
 </script>
@@ -450,6 +587,27 @@ function onStatusChange(newStatus: string | null) {
 .nc-expand-leave-from {
     opacity: 1;
     max-height: 300px;
+}
+
+.history-pop-enter-active,
+.history-pop-leave-active {
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.history-pop-enter-from,
+.history-pop-leave-to {
+    opacity: 0;
+    transform: translateY(-4px);
+}
+
+.bg-slate-750 {
+    background-color: rgb(37 47 63);
+}
+
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .question-row {

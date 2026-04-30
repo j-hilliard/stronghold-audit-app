@@ -48,7 +48,8 @@ public class SaveScheduledReportRequest
 
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
-    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
+    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator,
+    AuthorizationRole.AuditAdmin, AuthorizationRole.Executive)]
 public class GetScheduledReports : IRequest<List<ScheduledReportDto>>
 {
     public int? DivisionId { get; set; }

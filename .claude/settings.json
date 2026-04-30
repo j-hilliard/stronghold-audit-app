@@ -1,0 +1,18 @@
+﻿{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const cp=require('child_process');let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const j=JSON.parse(d);const p=(j.tool_input&&(j.tool_input.file_path||j.tool_input.path))||'';if(/\\.(cs|vue|ts|tsx|csproj)$/.test(p)){console.log('[AUTO-TRIGGER] Source file changed: '+p);const r=cp.spawnSync('powershell',['-NoProfile','-ExecutionPolicy','Bypass','-File','Scripts/qa/Invoke-CodexAgentCycle.ps1','-ChangedFiles',p,'-Reason','post-tooluse','-Strict','$true'],{stdio:'inherit'});if((r.status??0)!==0){process.exit(r.status||1);}}}catch(e){console.error('[AUTO-TRIGGER] Hook failure:',e.message);process.exit(1);}})\""
+          }
+        ]
+      }
+    ]
+  }
+}

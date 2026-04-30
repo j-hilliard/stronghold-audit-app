@@ -1,38 +1,16 @@
-import { apps } from '@/apps.ts';
-import { useAppStore } from '@/stores/appStore.ts';
 import { useUserStore } from '@/stores/userStore.ts';
-import { createRouter, createWebHistory } from 'vue-router';
-import { billingPacketRoutes } from '@/modules/billing-packet-request-system/router';
-import { strongholdBizAppsSuiteRoutes } from '@/modules/stronghold-biz-apps-suite/router';
-import { projectManagementSystemRoutes } from '@/modules/project-management-system/router';
-import { incidentManagementRoutes } from '@/modules/incident-management/router';
 import { auditManagementRoutes } from '@/modules/audit-management/router';
+import { createRouter, createWebHistory } from 'vue-router';
 import NProgress from 'nprogress';
 import 'nprogress/nprogress.css';
 
 const routes = [
     {
-        path: `/${apps.billingPacketRequestSystem.baseSlug}`,
-        component: () => import('@/layout/AppLayout.vue'),
-        children: billingPacketRoutes,
+        path: '/',
+        redirect: '/audit-management',
     },
     {
-        path: `/${apps.strongholdBizAppsSuite.baseSlug}`,
-        component: () => import('@/layout/AppLayout.vue'),
-        children: strongholdBizAppsSuiteRoutes,
-    },
-    {
-        path: `/${apps.projectManagementSystem.baseSlug}`,
-        component: () => import('@/layout/AppLayout.vue'),
-        children: projectManagementSystemRoutes,
-    },
-    {
-        path: `/${apps.incidentManagement.baseSlug}`,
-        component: () => import('@/layout/AppLayout.vue'),
-        children: incidentManagementRoutes,
-    },
-    {
-        path: `/${apps.auditManagement.baseSlug}`,
+        path: '/audit-management',
         component: () => import('@/layout/AppLayout.vue'),
         children: auditManagementRoutes,
     },
@@ -55,9 +33,25 @@ const routes = [
         component: () => import('@/modules/audit-management/features/audit-form/views/PrintableAuditFormView.vue'),
     },
     {
+        // Audit review print view — standalone, no AppLayout, professional PDF output
+        path: '/audit-management/print-review/:auditId',
+        name: 'audit-management-print-review',
+        component: () => import('@/modules/audit-management/features/audit-review/views/PrintableAuditReviewView.vue'),
+    },
+    {
+        // External CA access — no auth required, token is in the URL
+        path: '/ca/:token',
+        name: 'external-ca',
+        component: () => import('@/modules/audit-management/features/corrective-actions/views/ExternalCaView.vue'),
+    },
+    {
         path: '/authentication/login-callback',
         name: 'authentication-login-callback',
         component: () => import('@/views/auth/AuthRedirectView.vue'),
+    },
+    {
+        path: '/:pathMatch(.*)*',
+        redirect: '/audit-management',
     },
 ];
 
@@ -69,7 +63,7 @@ const router = createRouter({
     },
 });
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
     NProgress.start();
 
     // Trim trailing slashes
@@ -82,17 +76,45 @@ router.beforeEach((to, from, next) => {
     if (to.path.startsWith('/audit-management')) {
         const userStore = useUserStore();
 
-        // Only check if user data is loaded (skip during initial auth hydration)
         if (userStore.isAuthenticated) {
-            const isAdminRoute = to.path.includes('/admin/');
+            const meta         = to.meta as Record<string, unknown>;
+            const path         = to.path;
+            const unauthorized = '/audit-management/unauthorized';
 
-            if (isAdminRoute && !userStore.canAccessAdminTemplates) {
-                next({ path: '/audit-management/audits' });
+            if (meta.requiresITAdmin && !userStore.isITAdmin && !userStore.isAdmin) {
+                next({ path: unauthorized });
                 return;
             }
 
-            if (to.path.includes('/audits/new') && !userStore.canCreateAudit) {
-                next({ path: '/audit-management/audits' });
+            if (meta.requiresAuditAdmin && !userStore.canAccessAdminTemplates && !userStore.isITAdmin && !userStore.isAdmin) {
+                next({ path: unauthorized });
+                return;
+            }
+
+            if (meta.requiresCreateAudit && !userStore.canCreateAudit) {
+                next({ path: unauthorized });
+                return;
+            }
+
+            const isReviewRoute = /^\/audit-management\/audits\/[^/]+\/review(\/|$)/.test(path);
+            if (isReviewRoute && !userStore.isAuditReviewer && !userStore.isAuditAdmin) {
+                next({ path: unauthorized });
+                return;
+            }
+
+            const isAuditRoute = /^\/audit-management\/audits(\/|$)/.test(path);
+            if (isAuditRoute && !userStore.canViewAudits) {
+                next({ path: unauthorized });
+                return;
+            }
+
+            if (path.includes('/reports') && !userStore.canViewReports) {
+                next({ path: unauthorized });
+                return;
+            }
+
+            if (path.includes('/corrective-actions') && !userStore.canManageCas) {
+                next({ path: unauthorized });
                 return;
             }
         }
@@ -103,10 +125,7 @@ router.beforeEach((to, from, next) => {
 
 router.afterEach((to) => {
     NProgress.done();
-    const appStore = useAppStore();
-    const routeTitle = to.meta.title ? `${to.meta.title} - ` : '';
-    const appName = appStore.currentApp.name || 'The Stronghold Companies';
-    document.title = routeTitle + appName;
+    document.title = to.meta.title ? `${to.meta.title} - Compliance Audit` : 'Compliance Audit';
 });
 
 router.onError(() => {

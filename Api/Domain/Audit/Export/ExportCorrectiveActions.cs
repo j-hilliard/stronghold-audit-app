@@ -10,12 +10,18 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Export;
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
     AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.ExecutiveViewer,
-    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
+    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator,
+    AuthorizationRole.Auditor, AuthorizationRole.AuditAdmin, AuthorizationRole.Executive, AuthorizationRole.NormalUser)]
 public class ExportCorrectiveActions : IRequest<byte[]>
 {
-    public int? DivisionId { get; set; }
-    public DateTime? DateFrom { get; set; }
-    public DateTime? DateTo { get; set; }
+    public int?    DivisionId  { get; set; }
+    public DateTime? DateFrom  { get; set; }
+    public DateTime? DateTo    { get; set; }
+    public string? Status      { get; set; }
+    public string? Source      { get; set; }
+    public string? Priority    { get; set; }
+    public bool    OverdueOnly { get; set; }
+    public string? SearchText  { get; set; }
 }
 
 public class ExportCorrectiveActionsHandler : IRequestHandler<ExportCorrectiveActions, byte[]>
@@ -36,6 +42,8 @@ public class ExportCorrectiveActionsHandler : IRequestHandler<ExportCorrectiveAc
             .Include(ca => ca.Finding).ThenInclude(f => f.Audit).ThenInclude(a => a.Header)
             .AsQueryable();
 
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
         // Division scope
         if (!_userContext.IsGlobal && _userContext.AllowedDivisionIds is { Count: > 0 } allowed)
             caQuery = caQuery.Where(ca => allowed.Contains(ca.Finding.Audit.DivisionId));
@@ -45,10 +53,25 @@ public class ExportCorrectiveActionsHandler : IRequestHandler<ExportCorrectiveAc
             caQuery = caQuery.Where(ca => ca.CreatedAt >= request.DateFrom.Value);
         if (request.DateTo.HasValue)
             caQuery = caQuery.Where(ca => ca.CreatedAt <= request.DateTo.Value);
+        if (!string.IsNullOrEmpty(request.Status))
+            caQuery = caQuery.Where(ca => ca.Status == request.Status);
+        if (!string.IsNullOrEmpty(request.Source))
+            caQuery = caQuery.Where(ca => ca.Source == request.Source);
+        if (!string.IsNullOrEmpty(request.Priority))
+            caQuery = caQuery.Where(ca => ca.Priority == request.Priority);
+        if (request.OverdueOnly)
+            caQuery = caQuery.Where(ca => ca.Status != "Closed" && ca.Status != "Voided" && ca.DueDate.HasValue && ca.DueDate.Value < today);
+        if (!string.IsNullOrEmpty(request.SearchText))
+        {
+            var q = request.SearchText.ToLower();
+            caQuery = caQuery.Where(ca =>
+                ca.Description.ToLower().Contains(q) ||
+                (ca.AssignedTo != null && ca.AssignedTo.ToLower().Contains(q)) ||
+                (ca.Finding != null && ca.Finding.QuestionTextSnapshot.ToLower().Contains(q)));
+        }
 
         var allCas = await caQuery.OrderBy(ca => ca.DueDate).ToListAsync(ct);
 
-        var today   = DateOnly.FromDateTime(DateTime.UtcNow);
         var nowUtc  = DateTime.UtcNow;
 
         using var wb = new XLWorkbook();

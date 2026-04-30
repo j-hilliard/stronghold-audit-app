@@ -7,7 +7,7 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.UserRoles;
 
-[AllowedAuthorizationRole(AuthorizationRole.Administrator)]
+[AllowedAuthorizationRole(AuthorizationRole.Administrator, AuthorizationRole.ITAdmin, AuthorizationRole.AuditAdmin)]
 public class RemoveUserFromRole : IRequest<bool?>
 {
     public int UserId { get; set; }

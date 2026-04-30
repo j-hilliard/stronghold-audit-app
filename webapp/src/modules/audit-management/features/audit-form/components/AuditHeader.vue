@@ -1,7 +1,15 @@
 <template>
     <Card class="mb-4">
         <template #title>
-            <span class="text-base font-semibold text-white">Audit Information</span>
+            <div class="flex items-center justify-between gap-4 w-full">
+                <span class="text-base font-semibold text-white">Audit Information</span>
+                <div v-if="displayAuditNumber" class="flex items-center gap-2">
+                    <span class="text-xs text-slate-400 uppercase tracking-wide">Audit #</span>
+                    <span class="font-mono text-sm font-bold text-blue-300 bg-blue-950/50 border border-blue-800/40 px-2 py-0.5 rounded">
+                        {{ displayAuditNumber }}
+                    </span>
+                </div>
+            </div>
         </template>
         <template #content>
 
@@ -46,8 +54,8 @@
                         <InputText v-model="header.auditor" class="w-full" :disabled="disabled" />
                     </BaseFormField>
                 </div>
-                <div class="mt-4">
-                    <BaseFormField label="Work Description">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <BaseFormField label="Work Description" class="md:col-span-2">
                         <Textarea
                             v-model="header.workDescription"
                             rows="2"
@@ -55,6 +63,17 @@
                             :disabled="disabled"
                             autoResize
                         />
+                    </BaseFormField>
+                    <BaseFormField label="Customer Code">
+                        <InputText
+                            v-model="header.siteCode"
+                            class="w-full font-mono uppercase"
+                            :disabled="disabled"
+                            maxlength="10"
+                            placeholder="e.g. IPT"
+                            @input="header.siteCode = (($event.target as HTMLInputElement).value ?? '').toUpperCase()"
+                        />
+                        <small class="text-slate-500">3-char site code appended to Audit #</small>
                     </BaseFormField>
                 </div>
             </template>
@@ -87,6 +106,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import InputText from 'primevue/inputtext';
 import Dropdown from 'primevue/dropdown';
 import Textarea from 'primevue/textarea';
@@ -94,12 +114,23 @@ import Card from 'primevue/card';
 import BaseFormField from '@/components/forms/BaseFormField.vue';
 import type { AuditHeaderDto } from '@/apiclient/auditClient';
 
-defineProps<{
+const props = defineProps<{
     header: AuditHeaderDto;
     /** "JobSite" | "Facility" */
     auditType: string;
     disabled?: boolean;
+    trackingNumber?: string | null;
 }>();
 
 const SHIFTS = ['Day', 'Evening', 'Night'];
+
+// Live-computed display: base (auto-generated part) + current customer code
+const displayAuditNumber = computed(() => {
+    if (!props.trackingNumber) return null;
+    // Extract base = first two dash-segments, e.g. "H26" + "003" → "H26-003"
+    const parts = props.trackingNumber.split('-');
+    const base = parts.slice(0, 2).join('-');
+    const site = props.header.siteCode?.trim().toUpperCase();
+    return site ? `${base}-${site}` : base;
+});
 </script>

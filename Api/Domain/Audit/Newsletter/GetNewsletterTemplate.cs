@@ -10,7 +10,8 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Newsletter;
 
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
-    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
+    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator,
+    AuthorizationRole.AuditAdmin)]
 public class GetNewsletterTemplate : IRequest<NewsletterTemplateDto?>
 {
     public int DivisionId { get; set; }

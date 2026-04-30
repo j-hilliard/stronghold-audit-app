@@ -6,10 +6,52 @@
 
 :root {
     line-height: 1.5;
+    /* Legacy aliases — keep for existing usages */
     --navy-800: #1e293b;
     --navy-900: #0f172a;
-    font-synthesis: none;
     --content-alt-bg-color: #4E565F;
+
+    /* ── Design system CSS custom properties ─────────────────────────────────
+       These mirror tokens.ts exactly. Use in scoped styles instead of hex.
+    ──────────────────────────────────────────────────────────────────────── */
+
+    /* Surfaces */
+    --surface-1: #0f172a;
+    --surface-2: #1e293b;
+    --surface-3: #273549;
+
+    /* Borders */
+    --border-subtle: rgba(148,163,184,0.12);
+    --border:        rgba(148,163,184,0.20);
+    --border-strong: rgba(148,163,184,0.30);
+
+    /* Text */
+    --text-primary:   #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted:     #475569;
+
+    /* Status */
+    --color-success: #10b981;
+    --color-warning: #f59e0b;
+    --color-danger:  #ef4444;
+    --color-info:    #3b82f6;
+
+    /* Chart grid/axis */
+    --chart-grid: rgba(148,163,184,0.10);
+    --chart-axis: #94a3b8;
+
+    /* Radius */
+    --radius-sm:   0.375rem;
+    --radius-md:   0.5rem;
+    --radius-card: 0.625rem;
+    --radius-xl:   0.75rem;
+
+    /* Transitions */
+    --transition-fast: 100ms cubic-bezier(0.4,0,0.2,1);
+    --transition-base: 150ms cubic-bezier(0.4,0,0.2,1);
+    --transition-slow: 200ms cubic-bezier(0.4,0,0.2,1);
+
+    font-synthesis: none;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
@@ -46,6 +88,43 @@ body {
 }
 .page-leave-to {
     opacity: 0;
+}
+
+/* ── Report composer — section cards and shared headings ────────────────────── */
+/* These are used by ReportSection*.vue children across the composer view.
+   Kept global (not scoped) so child components can use them without :deep(). */
+
+.report-section-card {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(51, 65, 85, 0.6);
+    border-radius: var(--radius-xl);
+    padding: 1.25rem;
+}
+
+.section-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.875rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+@media print {
+    .section-heading {
+        color: #334155;
+        border-bottom-color: #e2e8f0;
+    }
+    .report-section-card {
+        background: white;
+        border-color: #e2e8f0;
+        break-inside: avoid;
+    }
 }
 
 /* ── Overdue pulse ring ───────────────────────────────────────────────────────── */
@@ -317,6 +396,18 @@ html.theme-light .menu-wrapper .layout-menu-container .layout-menu li > a.active
 html.theme-light .layout-menuitem-root-text { color: #94a3b8 !important; }
 html.theme-light .p-button.p-button-text { color: #334155 !important; }
 html.theme-light .p-tag { border: 1px solid currentColor; }
+/* Light theme — kpi cards and filter bars */
+html.theme-light .kpi-card {
+    background: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    color: #1e293b !important;
+}
+html.theme-light .kpi-card:hover {
+    box-shadow: 0 0 0 1px rgba(59,130,246,0.3), 0 8px 24px rgba(0,0,0,0.1) !important;
+    border-color: rgba(59,130,246,0.4) !important;
+}
+html.theme-light .kpi-card .text-white { color: #1e293b !important; }
+html.theme-light .kpi-card .text-slate-400 { color: #64748b !important; }
 
 /* ── Views that lock the layout to viewport height (only inner panel scrolls) ── */
 /* Screen-only: must NOT apply during print or it clips the print content. */
@@ -343,6 +434,11 @@ html.theme-light .p-tag { border: 1px solid currentColor; }
     .layout-wrapper:has(.template-manager-view) .layout-content > * {
         flex: 1 1 0;
         min-height: 0;
+    }
+
+    /* print-only elements are hidden on screen */
+    .print-only {
+        display: none !important;
     }
 }
 
@@ -435,10 +531,27 @@ html.theme-light .p-tag { border: 1px solid currentColor; }
        These rules apply when #print-root is NOT present (e.g. printing other pages).
     ─────────────────────────────────────────────────────────────────────────── */
 
+    /* Override PrimeVue's global `body * { visibility: hidden }` print rule
+       when NOT using the #print-root composer approach */
+    body:not(:has(#print-root)) * {
+        visibility: visible !important;
+    }
+
     /* Unwind SPA viewport-height layout so content flows to full print length */
     html, body {
         height: auto !important;
         overflow: visible !important;
+    }
+
+    /* Unwind overflow/height constraints used for SPA scroll areas */
+    body:not(:has(#print-root)) .flex-1,
+    body:not(:has(#print-root)) .overflow-y-auto,
+    body:not(:has(#print-root)) .overflow-hidden,
+    body:not(:has(#print-root)) .min-h-0 {
+        overflow: visible !important;
+        height: auto !important;
+        max-height: none !important;
+        min-height: 0 !important;
     }
 
     /* Hide all SPA chrome */
@@ -557,4 +670,58 @@ html.theme-light .p-tag { border: 1px solid currentColor; }
 
     /* Progress bar */
     .bg-slate-700.rounded-full { background: #e2e8f0 !important; }
+
+    /* ── Audit Review print fixes ───────────────────────────────────────────── */
+
+    /* Hide the DEV role switcher pill */
+    .dev-pill, .dev-panel {
+        display: none !important;
+    }
+
+    /* Utility: hide/show print-only elements */
+    .no-print {
+        display: none !important;
+    }
+    .print-only {
+        display: block !important;
+    }
+
+    /* Audit review page: clean white background, readable text */
+    .audit-review-content .p-card {
+        break-inside: avoid;
+        margin-bottom: 12px !important;
+        border: 1px solid #ccc !important;
+        box-shadow: none !important;
+        background: #fff !important;
+    }
+
+    /* NC finding cards: light red border instead of dark */
+    .finding-card {
+        border-color: #fca5a5 !important;
+        background: #fff5f5 !important;
+        break-inside: avoid;
+    }
+
+    /* Warning cards: light amber */
+    .warning-card {
+        border-color: #fcd34d !important;
+        background: #fffbeb !important;
+        break-inside: avoid;
+    }
+
+    /* Score ring SVG: keep colors */
+    .audit-review-content svg circle {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    /* Remove per-audit remove (×) buttons on recipients */
+    .audit-review-content .p-button[severity="danger"] {
+        display: none !important;
+    }
+
+    /* Distribution recipients section: hide in print */
+    .audit-review-content .distribution-section {
+        display: none !important;
+    }
 }

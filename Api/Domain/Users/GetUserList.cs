@@ -8,7 +8,7 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Users;
 
-[AllowedAuthorizationRole(AuthorizationRole.Administrator)]
+[AllowedAuthorizationRole(AuthorizationRole.Administrator, AuthorizationRole.ITAdmin)]
 public class GetUserList : IRequest<List<User>> { }
 
 public class GetUserListHandler : IRequestHandler<GetUserList, List<User>>

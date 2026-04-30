@@ -8,8 +8,7 @@
  * All other consumers work with ReportBlock[] — never raw JSON strings.
  */
 import { ref, computed, watch } from 'vue';
-import { useApiStore } from '@/stores/apiStore';
-import { AuditClient } from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 import type { ReportDraftDto, CreateReportDraftRequest, UpdateReportDraftRequest } from '@/apiclient/auditClient';
 import type { ReportBlock, BlockLayout, ColumnRowBlock } from '../types/report-block';
 import { REPORT_THEMES } from './useReportThemes';
@@ -27,7 +26,7 @@ export interface DraftMeta {
 }
 
 export function useReportDraft() {
-    const apiStore = useApiStore();
+    const service = useAuditService();
     const meta = ref<DraftMeta>({
         id: null,
         divisionId: 0,
@@ -91,9 +90,6 @@ export function useReportDraft() {
     // Mark dirty when blocks change (after initial load)
     watch(blocks, () => { isDirty.value = true; }, { deep: true });
 
-    function getClient() {
-        return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-    }
 
     /**
      * Back-fill layout for any block loaded from an old draft that predates
@@ -142,7 +138,7 @@ export function useReportDraft() {
 
     /** Load an existing draft by id. Populates meta + blocks. */
     async function loadDraft(id: number): Promise<void> {
-        const client = getClient();
+        const client = service;
         const dto: ReportDraftDto = await client.getReportDraft(id);
         meta.value = {
             id: dto.id,
@@ -166,7 +162,7 @@ export function useReportDraft() {
         saving.value = true;
         saveError.value = null;
 
-        const client = getClient();
+        const client = service;
 
         try {
             const blocksJson = serialize(blocks.value);
@@ -226,7 +222,7 @@ export function useReportDraft() {
     /** Delete the current draft from the server. */
     async function deleteDraft(): Promise<void> {
         if (meta.value.id === null) return;
-        const client = getClient();
+        const client = service;
         await client.deleteReportDraft(meta.value.id);
         meta.value.id = null;
         meta.value.rowVersion = null;

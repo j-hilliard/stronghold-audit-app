@@ -1,6 +1,3 @@
-using Stronghold.AppDashboard.Data;
-using Stronghold.AppDashboard.Data.Models.Safety;
-
 namespace Stronghold.AppDashboard.Api.Services;
 
 public interface IProcessLogService
@@ -17,17 +14,16 @@ public interface IProcessLogService
 
 public class ProcessLogService : IProcessLogService
 {
-    private readonly AppDbContext _context;
+    private readonly ILogger<ProcessLogService> _logger;
     private readonly string _runId;
 
-    public ProcessLogService(AppDbContext context, IHttpContextAccessor httpContextAccessor)
+    public ProcessLogService(ILogger<ProcessLogService> logger, IHttpContextAccessor httpContextAccessor)
     {
-        _context = context;
-        // Use trace identifier per request as the run_id so all logs in one request share an ID
+        _logger = logger;
         _runId = httpContextAccessor.HttpContext?.TraceIdentifier ?? Guid.NewGuid().ToString();
     }
 
-    public async Task LogAsync(
+    public Task LogAsync(
         string processName,
         string processType,
         string logType,
@@ -36,29 +32,9 @@ public class ProcessLogService : IProcessLogService
         string? messageDetail = null,
         string? relatedObject = null)
     {
-        var entry = new ProcessLog
-        {
-            Id = Guid.NewGuid(),
-            IncidentReportId = incidentReportId,
-            ProcessName = processName,
-            ProcessType = processType,
-            LogType = logType,
-            Message = message,
-            MessageDetail = messageDetail,
-            RelatedObject = relatedObject,
-            RunId = _runId,
-            LoggedAt = DateTime.UtcNow
-        };
-
-        try
-        {
-            await _context.ProcessLogs.AddAsync(entry);
-            await _context.SaveChangesAsync();
-        }
-        catch
-        {
-            // Process log table may not exist in all database contexts — never fail the caller
-            _context.ChangeTracker.Clear();
-        }
+        _logger.LogInformation(
+            "[{RunId}] [{LogType}] {ProcessName}/{ProcessType}: {Message} | Detail={MessageDetail} | Related={RelatedObject} | IncidentId={IncidentReportId}",
+            _runId, logType, processName, processType, message, messageDetail, relatedObject, incidentReportId);
+        return Task.CompletedTask;
     }
 }

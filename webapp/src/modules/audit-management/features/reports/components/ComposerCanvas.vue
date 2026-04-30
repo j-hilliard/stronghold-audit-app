@@ -92,13 +92,13 @@
             </div>
 
             <!-- Empty state -->
-            <div
+            <EmptyState
                 v-if="!blocks.length"
-                class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 text-sm space-y-2 pointer-events-none"
-            >
-                <i class="pi pi-file-edit text-3xl" />
-                <div>Add blocks from the toolbar, or click Generate to build the report.</div>
-            </div>
+                icon="pi pi-file-edit"
+                title="Canvas is empty"
+                message="Generate a report or add blocks from the toolbar to get started."
+                class="absolute inset-0 pointer-events-none"
+            />
         </div>
 
     </div>
@@ -141,6 +141,7 @@
 <script setup lang="ts">
 import { defineAsyncComponent, ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import type { ReportBlock, BlockType, BlockLayout } from '../types/report-block';
+import EmptyState from '@/components/ui/EmptyState.vue';
 
 const props = defineProps<{
     blocks: ReportBlock[];

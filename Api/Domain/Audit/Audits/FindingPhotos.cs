@@ -29,7 +29,8 @@ public class FindingPhotoDto
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
     AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.ReadOnlyViewer,
     AuthorizationRole.ExecutiveViewer, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.Auditor, AuthorizationRole.AuditAdmin, AuthorizationRole.Executive)]
 public class GetFindingPhotos : IRequest<List<FindingPhotoDto>>
 {
     public int AuditId { get; set; }
@@ -67,7 +68,8 @@ public class GetFindingPhotosHandler : IRequestHandler<GetFindingPhotos, List<Fi
 
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.Auditor, AuthorizationRole.AuditAdmin)]
 public class UploadFindingPhoto : IRequest<FindingPhotoDto>
 {
     public int AuditId { get; set; }
@@ -161,7 +163,8 @@ public class UploadFindingPhotoHandler : IRequestHandler<UploadFindingPhoto, Fin
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
     AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.ReadOnlyViewer,
     AuthorizationRole.ExecutiveViewer, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.Auditor, AuthorizationRole.AuditAdmin, AuthorizationRole.Executive)]
 public class DownloadFindingPhoto : IRequest<DownloadFindingPhotoResult>
 {
     public int AuditId { get; set; }
@@ -217,12 +220,14 @@ public class DownloadFindingPhotoHandler : IRequestHandler<DownloadFindingPhoto,
 
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.AuditAdmin)]
 public class DeleteFindingPhoto : IRequest<Unit>
 {
     public int AuditId { get; set; }
     public int QuestionId { get; set; }
     public int PhotoId { get; set; }
+    public string DeletedBy { get; set; } = null!;
 }
 
 public class DeleteFindingPhotoHandler : IRequestHandler<DeleteFindingPhoto, Unit>
@@ -238,13 +243,12 @@ public class DeleteFindingPhotoHandler : IRequestHandler<DeleteFindingPhoto, Uni
                                    && p.QuestionId == request.QuestionId, ct)
             ?? throw new KeyNotFoundException($"Photo {request.PhotoId} not found.");
 
-        // Best-effort file deletion — don't fail if file already missing
-        if (File.Exists(photo.FilePath))
-        {
-            try { File.Delete(photo.FilePath); } catch { /* log in production */ }
-        }
+        photo.IsDeleted  = true;
+        photo.DeletedAt  = DateTime.UtcNow;
+        photo.DeletedBy  = request.DeletedBy;
+        photo.UpdatedAt  = DateTime.UtcNow;
+        photo.UpdatedBy  = request.DeletedBy;
 
-        _db.FindingPhotos.Remove(photo);
         await _db.SaveChangesAsync(ct);
         return Unit.Value;
     }

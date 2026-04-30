@@ -153,11 +153,11 @@ import Column from 'primevue/column';
 import ProgressSpinner from 'primevue/progressspinner';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
-import { useApiStore } from '@/stores/apiStore';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 
-const router   = useRouter();
-const store    = useAuditStore();
-const apiStore = useApiStore();
+const router  = useRouter();
+const store   = useAuditStore();
+const service = useAuditService();
 
 interface EmployeeRow {
     auditor: string;
@@ -184,8 +184,7 @@ async function load() {
         if (filterDivisionId.value) params.divisionId = String(filterDivisionId.value);
         if (filterDateFrom.value) params.dateFrom = filterDateFrom.value.toISOString();
         if (filterDateTo.value) params.dateTo = filterDateTo.value.toISOString();
-        const res = await apiStore.api.get('/v1/audits/by-employee', { params });
-        rows.value = res.data;
+        rows.value = await service.getAuditsByEmployee(params);
     } finally {
         loading.value = false;
     }

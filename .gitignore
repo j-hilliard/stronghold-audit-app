@@ -22,3 +22,15 @@ webapp/.eslintcache
 
 # Codex auto-agent runtime outputs
 qa-runtime/
+
+# Runtime log files
+*.err.log
+*.out.log
+api-runtime.*.log
+
+# Misc local artifacts
+webapp/capture-prototype.js
+test-results/
+.agents/
+.codex/
+.config/

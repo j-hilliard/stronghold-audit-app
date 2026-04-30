@@ -1,0 +1,14 @@
+{
+  "selectedDivision": {
+    "value": "8",
+    "text": "CSL (Job Site) ",
+    "disabled": false
+  },
+  "auditUrls": [
+    "http://localhost:7221/v1/divisions",
+    "http://localhost:7221/v1/divisions/8/job-prefixes",
+    "http://localhost:7221/v1/templates/active?divisionId=8"
+  ],
+  "adminUrls": [],
+  "errors": []
+}

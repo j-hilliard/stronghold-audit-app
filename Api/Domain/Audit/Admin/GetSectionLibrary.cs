@@ -7,7 +7,7 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Admin;
 
-[AllowedAuthorizationRole(AuthorizationRole.Administrator, AuthorizationRole.TemplateAdmin)]
+[AllowedAuthorizationRole(AuthorizationRole.Administrator, AuthorizationRole.TemplateAdmin, AuthorizationRole.AuditAdmin)]
 public class GetSectionLibrary : IRequest<List<SectionLibraryItemDto>> { }
 
 public class GetSectionLibraryHandler : IRequestHandler<GetSectionLibrary, List<SectionLibraryItemDto>>

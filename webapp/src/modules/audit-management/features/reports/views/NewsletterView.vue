@@ -201,17 +201,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useApiStore } from '@/stores/apiStore';
-import {
-    AuditClient,
-    type AuditReportDto,
-    type DivisionDto,
-    type SectionTrendsReportDto,
-} from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
+import type { AuditReportDto, DivisionDto, SectionTrendsReportDto } from '@/apiclient/auditClient';
 
 const route = useRoute();
 const router = useRouter();
-const apiStore = useApiStore();
+const service = useAuditService();
 
 const loading = ref(false);
 const report = ref<AuditReportDto | null>(null);
@@ -232,10 +227,6 @@ const yearOptions = computed(() => {
 });
 
 const todayLabel = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-
-function getClient() {
-    return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-}
 
 function quarterDateRange(year: number, quarter: number) {
     const startMonth = (quarter - 1) * 3 + 1;
@@ -432,11 +423,12 @@ const sectionTrendOptions = {
 };
 
 const auditorRows = computed(() => {
-    const map = new Map<string, { scores: number[]; ncs: number; warnings: number }>();
+    const map = new Map<string, { total: number; scores: number[]; ncs: number; warnings: number }>();
     for (const row of report.value?.rows ?? []) {
         const key = row.auditor?.trim() || 'Unknown';
-        if (!map.has(key)) map.set(key, { scores: [], ncs: 0, warnings: 0 });
+        if (!map.has(key)) map.set(key, { total: 0, scores: [], ncs: 0, warnings: 0 });
         const entry = map.get(key)!;
+        entry.total++;
         if (row.scorePercent != null) entry.scores.push(row.scorePercent);
         entry.ncs += row.nonConformingCount;
         entry.warnings += row.warningCount;
@@ -445,14 +437,13 @@ const auditorRows = computed(() => {
     return Array.from(map.entries())
         .map(([auditor, stats]) => ({
             auditor,
-            count: stats.scores.length,
+            count: stats.total,
             avgScore: stats.scores.length
                 ? Math.round((stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length) * 10) / 10
                 : null as number | null,
             ncs: stats.ncs,
             warnings: stats.warnings,
         }))
-        .filter(x => x.count > 0)
         .sort((a, b) => (b.avgScore ?? 0) - (a.avgScore ?? 0));
 });
 
@@ -476,10 +467,10 @@ function generateNarrative() {
 async function loadData() {
     loading.value = true;
     try {
-        const client = getClient();
+        const client = service;
         const [nextReport, nextTrends] = await Promise.all([
             client.getAuditReport(selectedDivisionId.value || null, null, dateFrom.value, dateTo.value),
-            client.getSectionTrends(selectedDivisionId.value || null, null, null),
+            client.getSectionTrends(selectedDivisionId.value || null, dateFrom.value, dateTo.value),
         ]);
         report.value = nextReport;
         sectionTrends.value = nextTrends;
@@ -496,7 +487,7 @@ function printPage() {
 }
 
 onMounted(async () => {
-    divisions.value = await getClient().getDivisions();
+    divisions.value = await service.getDivisions();
     await loadData();
 });
 </script>

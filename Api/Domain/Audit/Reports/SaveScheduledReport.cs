@@ -10,7 +10,8 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Reports;
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager,
     AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.AuditAdmin)]
 public class SaveScheduledReport : IRequest<ScheduledReportDto>
 {
     public SaveScheduledReportRequest Payload { get; set; } = null!;

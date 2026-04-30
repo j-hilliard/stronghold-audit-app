@@ -21,6 +21,7 @@ export const auditManagementRoutes = [
         component: () => import('@/modules/audit-management/features/new-audit/views/NewAuditView.vue'),
         meta: {
             title: 'New Audit',
+            requiresCreateAudit: true,
             breadcrumbItems: () => [
                 { label: 'Compliance Audit' },
                 { label: 'Audits', to: '/audit-management/audits' },
@@ -84,6 +85,7 @@ export const auditManagementRoutes = [
         component: () => import('@/modules/audit-management/features/template-manager/views/TemplateManagerView.vue'),
         meta: {
             title: 'Template Manager',
+            requiresAuditAdmin: true,
             breadcrumbItems: () => [
                 { label: 'Compliance Audit' },
                 { label: 'Admin' },
@@ -97,10 +99,39 @@ export const auditManagementRoutes = [
         component: () => import('@/modules/audit-management/features/admin-settings/views/AuditSettingsView.vue'),
         meta: {
             title: 'Email Routing',
+            requiresAuditAdmin: true,
             breadcrumbItems: () => [
                 { label: 'Compliance Audit' },
                 { label: 'Admin' },
                 { label: 'Email Routing' },
+            ],
+        },
+    },
+    {
+        path: 'admin/users',
+        name: 'audit-management-admin-users',
+        component: () => import('@/modules/audit-management/features/admin-users/views/AdminUsersView.vue'),
+        meta: {
+            title: 'User Management',
+            requiresITAdmin: true,
+            breadcrumbItems: () => [
+                { label: 'Compliance Audit' },
+                { label: 'Admin' },
+                { label: 'User Management' },
+            ],
+        },
+    },
+    {
+        path: 'admin/audit-log',
+        name: 'audit-management-admin-audit-log',
+        component: () => import('@/modules/audit-management/features/admin-audit-log/views/AdminAuditLogView.vue'),
+        meta: {
+            title: 'Audit Log',
+            requiresAuditAdmin: true,
+            breadcrumbItems: () => [
+                { label: 'Compliance Audit' },
+                { label: 'Admin' },
+                { label: 'Audit Log' },
             ],
         },
     },

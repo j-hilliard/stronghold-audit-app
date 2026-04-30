@@ -56,3 +56,34 @@ Do not report complete until:
 4. UI fixes require before/after Playwright screenshots.
 5. Data-write flows require DB verification — not UI-only confirmation.
 6. Never commit without explicit user instruction.
+
+## Hard QA Contract (Before and After Every Code Change)
+
+This is mandatory. No exceptions.
+
+1. Pre-Change Baseline (before first code edit in a task):
+   - API health must be 200 for:
+     - `/v1/divisions`
+     - `/v1/audits`
+     - `/v1/admin/templates`
+     - `/v1/reports/compliance-status`
+   - Capture visual baseline on audit routes (desktop/tablet/mobile, dark/light) and store artifact paths in the report.
+
+2. Post-Change Verification (after edits):
+   - Re-run API health checks above.
+   - Run:
+     - `npm --prefix webapp run qa:baseline`
+     - `npm --prefix webapp run test:e2e:audit:live-guard`
+     - `npm --prefix webapp run test:e2e:audit:visual:all`
+   - Capture post-change visuals and list diff/failure artifacts.
+
+3. Required Report Output (every change):
+   - Exact commands executed.
+   - Pass/fail counts.
+   - Before/after screenshot artifact paths.
+   - All failures with root cause and fix.
+
+4. Fail Conditions:
+   - If API health fails, stop and fix runtime first.
+   - If visuals are missing, task is not complete.
+   - If any claim is not backed by executed evidence, task is not complete.

@@ -63,7 +63,7 @@
             </template>
         </BaseDialog>
 
-        <ConfirmDialog />
+
     </div>
 </template>
 
@@ -80,7 +80,6 @@ import BaseButtonSave from '@/components/buttons/BaseButtonSave.vue';
 import BaseButtonCancel from '@/components/buttons/BaseButtonCancel.vue';
 import BaseButtonIconEdit from '@/components/buttons/BaseButtonIconEdit.vue';
 import BaseButtonIconDelete from '@/components/buttons/BaseButtonIconDelete.vue';
-import ConfirmDialog from 'primevue/confirmdialog';
 
 const store = useRefTableMaintenanceStore();
 const confirm = useConfirm();

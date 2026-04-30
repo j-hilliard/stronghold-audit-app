@@ -11,7 +11,8 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Newsletter;
 
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
-    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
+    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator,
+    AuthorizationRole.AuditAdmin)]
 public class GenerateNewsletterSummary : IRequest<NewsletterAiSummaryResult>
 {
     public string DivisionCode { get; set; } = null!;

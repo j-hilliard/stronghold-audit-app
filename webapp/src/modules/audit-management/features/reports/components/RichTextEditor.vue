@@ -168,7 +168,8 @@ watch(() => props.modelValue, (newVal) => {
     const current = editor.value.getHTML();
     const incoming = newVal || '';
     if (current !== incoming) {
-        editor.value.commands.setContent(incoming, false);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (editor.value.commands as any).setContent(incoming, false);
     }
 });
 

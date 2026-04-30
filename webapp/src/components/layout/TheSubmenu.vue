@@ -61,7 +61,8 @@ import { computed, onMounted, ref } from 'vue';
 
 const props = defineProps({
     items: {
-        type: Array,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        type: Array as () => any[],
         required: false,
     },
     menuMode: {

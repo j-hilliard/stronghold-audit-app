@@ -6,13 +6,12 @@
             subtitle="View and manage all compliance audits"
         >
             <Button
-                v-if="selectedAudits.length > 0"
-                :label="`Delete Selected (${draftSelection.length})`"
+                v-if="deleteSelection.length > 0"
+                :label="`Delete ${deleteSelection.length} Audit${deleteSelection.length !== 1 ? 's' : ''}`"
                 icon="pi pi-trash"
                 severity="danger"
                 outlined
                 size="small"
-                :disabled="draftSelection.length === 0"
                 @click="onBulkDelete"
             />
             <Button
@@ -62,23 +61,35 @@
                     @keydown.enter="store.loadAuditList()"
                     @change="store.filterAuditor = ($event.target as HTMLInputElement).value || null; store.loadAuditList()"
                 />
-                <InputText
-                    v-model="store.filterDateFrom"
-                    placeholder="From (YYYY-MM-DD)"
-                    class="w-full md:w-36"
-                    @keydown.enter="store.loadAuditList()"
-                />
-                <InputText
-                    v-model="store.filterDateTo"
-                    placeholder="To (YYYY-MM-DD)"
-                    class="w-full md:w-36"
-                    @keydown.enter="store.loadAuditList()"
-                />
+                <div class="flex flex-col gap-0.5 w-full md:w-auto">
+                    <label class="text-[10px] text-slate-500 font-medium uppercase tracking-wide px-0.5">From</label>
+                    <InputText
+                        v-model="store.filterDateFrom"
+                        type="date"
+                        class="w-full md:w-36"
+                        @change="store.loadAuditList()"
+                    />
+                </div>
+                <div class="flex flex-col gap-0.5 w-full md:w-auto">
+                    <label class="text-[10px] text-slate-500 font-medium uppercase tracking-wide px-0.5">To</label>
+                    <InputText
+                        v-model="store.filterDateTo"
+                        type="date"
+                        class="w-full md:w-36"
+                        @change="store.loadAuditList()"
+                    />
+                </div>
                 <Button icon="pi pi-search" severity="secondary" :loading="loading" @click="store.loadAuditList()" title="Apply filters" />
                 <Button icon="pi pi-times" severity="secondary" text :loading="loading" @click="clearFilters" title="Clear filters" />
             </template>
 
             <Column selection-mode="multiple" style="width: 44px;" />
+            <Column field="trackingNumber" header="Audit #" style="min-width: 120px;" sortable>
+                <template #body="{ data }">
+                    <span v-if="data.trackingNumber" class="font-mono text-xs font-semibold text-blue-300">{{ data.trackingNumber }}</span>
+                    <span v-else class="text-slate-500">—</span>
+                </template>
+            </Column>
             <Column field="id" header="#" style="width: 60px;" sortable />
             <Column field="divisionCode" header="Division" sortable />
             <Column field="auditDate" header="Date" sortable>
@@ -110,6 +121,7 @@
                 <template #body="{ data }">
                     <div class="audit-row-actions">
                         <Button
+                            v-if="data.status === 'Draft' || data.status === 'Reopened'"
                             icon="pi pi-pencil"
                             label="Edit"
                             size="small"
@@ -118,7 +130,7 @@
                             @click.stop="router.push(`/audit-management/audits/${data.id}`)"
                         />
                         <Button
-                            v-if="data.status !== 'Draft'"
+                            v-if="data.status !== 'Draft' && data.status !== 'Reopened'"
                             icon="pi pi-eye"
                             label="View"
                             size="small"
@@ -132,7 +144,7 @@
         </BaseDataTable>
     </div>
 
-    <ConfirmDialog />
+
 
     <!-- Print Blank Form dialog -->
     <Dialog
@@ -154,13 +166,18 @@
                     class="w-full"
                 />
             </div>
+            <div v-if="printError" class="flex items-center gap-2 text-sm text-red-400 bg-red-950/40 border border-red-800/50 rounded px-3 py-2">
+                <i class="pi pi-exclamation-triangle shrink-0" />
+                {{ printError }}
+            </div>
         </div>
         <template #footer>
             <Button label="Cancel" severity="secondary" text @click="showPrintDialog = false" />
             <Button
                 label="Print"
                 icon="pi pi-print"
-                :disabled="!printDivisionId"
+                :loading="printLoading"
+                :disabled="!printDivisionId || printLoading"
                 @click="doPrint"
             />
         </template>
@@ -174,7 +191,6 @@ import Tag from 'primevue/tag';
 import Dropdown from 'primevue/dropdown';
 import InputText from 'primevue/inputtext';
 import Column from 'primevue/column';
-import ConfirmDialog from 'primevue/confirmdialog';
 import Dialog from 'primevue/dialog';
 import { useConfirm } from 'primevue/useconfirm';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
@@ -183,13 +199,15 @@ import BaseButtonIconEdit from '@/components/buttons/BaseButtonIconEdit.vue';
 import BaseButtonIconView from '@/components/buttons/BaseButtonIconView.vue';
 import BaseDataTable from '@/components/tables/BaseDataTable.vue';
 import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
-import { useApiStore } from '@/stores/apiStore';
-import { AuditClient } from '@/apiclient/auditClient';
+import { useUserStore } from '@/stores/userStore';
+import { usePermissions } from '@/modules/audit-management/composables/usePermissions';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 import type { AuditListItemDto } from '@/apiclient/auditClient';
 
 const router = useRouter();
 const store = useAuditStore();
-const apiStore = useApiStore();
+const userStore = useUserStore();
+const { hasPermission } = usePermissions();
 const confirm = useConfirm();
 const loading = ref(false);
 const selectedAudits = ref<AuditListItemDto[]>([]);
@@ -212,8 +230,7 @@ async function doPrint() {
     try {
         // Fetch the template in the authenticated main-app context, then pass
         // it to the print tab via sessionStorage — the print view has no auth token.
-        const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-        const template = await client.getActiveTemplate(printDivisionId.value);
+        const template = await useAuditService().getActiveTemplate(printDivisionId.value);
         sessionStorage.setItem('print-blank-form-data', JSON.stringify(template));
         window.open(`/audit-management/print/${printDivisionId.value}`, '_blank');
         showPrintDialog.value = false;
@@ -224,7 +241,11 @@ async function doPrint() {
     }
 }
 
-const draftSelection = computed(() => selectedAudits.value.filter(a => a.status === 'Draft'));
+const deleteSelection = computed(() =>
+    hasPermission('admin.access')
+        ? selectedAudits.value
+        : selectedAudits.value.filter(a => a.status === 'Draft')
+);
 
 const STATUS_OPTIONS = [
     { label: 'Draft', value: 'Draft' },
@@ -266,7 +287,7 @@ function statusSeverity(status: string): string {
 
 function onRowDblClick(event: { data: AuditListItemDto }) {
     const d = event.data;
-    if (d.status === 'Draft') {
+    if (d.status === 'Draft' || d.status === 'Reopened') {
         router.push(`/audit-management/audits/${d.id}`);
     } else {
         router.push(`/audit-management/audits/${d.id}/review`);
@@ -274,25 +295,26 @@ function onRowDblClick(event: { data: AuditListItemDto }) {
 }
 
 function onBulkDelete() {
-    const drafts = draftSelection.value;
+    const toDelete = deleteSelection.value;
 
-    if (drafts.length === 0) return;
-    const nonDraft = selectedAudits.value.length - drafts.length;
-    const msg = nonDraft > 0
-        ? `Delete ${drafts.length} draft audit${drafts.length !== 1 ? 's' : ''}? (${nonDraft} non-draft selected will be skipped)`
-        : `Delete ${drafts.length} draft audit${drafts.length !== 1 ? 's' : ''}? This cannot be undone.`;
+    if (toDelete.length === 0) return;
+    const skipped = selectedAudits.value.length - toDelete.length;
+    const msg = skipped > 0
+        ? `Delete ${toDelete.length} draft audit${toDelete.length !== 1 ? 's' : ''}? (${skipped} non-draft selected will be skipped)`
+        : `Delete ${toDelete.length} audit${toDelete.length !== 1 ? 's' : ''}? This cannot be undone.`;
 
     confirm.require({
         message: msg,
-        header: 'Delete Drafts',
+        header: 'Delete Audits',
         icon: 'pi pi-exclamation-triangle',
         acceptLabel: 'Delete',
         rejectLabel: 'Cancel',
         acceptClass: 'p-button-danger',
-        accept: async () => {
-            const ids = drafts.map(a => a.id);
-            await store.bulkDeleteAudits(ids);
-            selectedAudits.value = [];
+        accept: () => {
+            const ids = toDelete.map(a => a.id);
+            store.bulkDeleteAudits(ids).then(() => {
+                selectedAudits.value = [];
+            });
         },
     });
 }

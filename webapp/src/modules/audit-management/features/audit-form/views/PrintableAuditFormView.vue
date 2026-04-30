@@ -1,146 +1,198 @@
 <template>
-    <div class="print-form" ref="formEl">
-        <!-- Print header -->
-        <div class="print-header">
-            <div class="print-header-top">
-                <h1>{{ template ? `${template.divisionCode} Compliance Audit` : 'Compliance Audit' }}</h1>
-                <p class="print-subtitle">{{ template?.divisionName }}</p>
-            </div>
-
-            <!-- Header fields grid -->
-            <div class="header-grid">
-                <div class="header-field"><span class="field-label">Job Number</span><div class="field-line"></div></div>
-                <div class="header-field"><span class="field-label">Date</span><div class="field-line"></div></div>
-                <div class="header-field"><span class="field-label">Client</span><div class="field-line"></div></div>
-                <div class="header-field"><span class="field-label">Location</span><div class="field-line"></div></div>
-                <div class="header-field"><span class="field-label">Unit</span><div class="field-line"></div></div>
-                <div class="header-field"><span class="field-label">Time</span><div class="field-line"></div></div>
-                <div class="header-field"><span class="field-label">Shift</span><div class="field-line"></div></div>
-                <div class="header-field"><span class="field-label">Project Manager</span><div class="field-line"></div></div>
-                <div class="header-field"><span class="field-label">Auditor</span><div class="field-line"></div></div>
-                <div class="header-field full-width"><span class="field-label">Work Description</span><div class="field-line"></div></div>
-            </div>
-        </div>
-
-        <!-- Loading -->
+    <div class="print-doc" ref="formEl">
         <div v-if="loading" class="loading-msg">Loading template…</div>
 
-        <!-- Sections -->
-        <div v-else-if="template">
-            <div v-for="section in template.sections" :key="section.id" class="section">
-                <div class="section-header">
-                    <span class="section-name">{{ section.name }}</span>
-                    <span class="section-count">{{ section.questions.length }} items</span>
-                </div>
+        <template v-else-if="template">
+            <table class="audit-table">
+                <thead>
+                    <!-- Banner row -->
+                    <tr class="hdr-row-banner">
+                        <td colspan="10" class="banner-cell">
+                            <div class="banner-inner">
+                                <img v-if="logoUrl" :src="logoUrl" alt="" class="banner-logo" />
+                                <span v-else class="banner-division-code">{{ template.divisionCode }}</span>
+                                <span class="banner-title">{{ template.divisionCode }} Compliance Audit</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <!-- Row 1: Job # | Time | Client | Location -->
+                    <tr class="hdr-row">
+                        <td class="hdr-label">Job #</td>
+                        <td class="hdr-value hdr-line" colspan="2"></td>
+                        <td class="hdr-label">Time</td>
+                        <td class="hdr-value hdr-line"></td>
+                        <td class="hdr-label">Client</td>
+                        <td class="hdr-value hdr-line" colspan="2"></td>
+                        <td class="hdr-label">Location</td>
+                        <td class="hdr-value hdr-line"></td>
+                    </tr>
+                    <!-- Row 2: Date | Unit | Shift -->
+                    <tr class="hdr-row">
+                        <td class="hdr-label">Date</td>
+                        <td class="hdr-value hdr-line" colspan="2"></td>
+                        <td class="hdr-label">Unit</td>
+                        <td class="hdr-value hdr-line" colspan="3"></td>
+                        <td class="hdr-label">Shift</td>
+                        <td class="hdr-value hdr-line" colspan="2"></td>
+                    </tr>
+                    <!-- Row 3: Work Description | PM | Auditor -->
+                    <tr class="hdr-row">
+                        <td class="hdr-label" colspan="2">Work Description</td>
+                        <td class="hdr-value hdr-line" colspan="3"></td>
+                        <td class="hdr-label" colspan="2">Project Manager</td>
+                        <td class="hdr-value hdr-line"></td>
+                        <td class="hdr-label">Auditor</td>
+                        <td class="hdr-value hdr-line"></td>
+                    </tr>
+                </thead>
 
-                <table class="question-table">
-                    <thead>
-                        <tr>
-                            <th class="col-num">#</th>
-                            <th class="col-question">Question</th>
-                            <th class="col-status">C</th>
-                            <th class="col-status">NC</th>
-                            <th class="col-status">W</th>
-                            <th class="col-status" v-if="true">N/A</th>
-                            <th class="col-comment">Comments / Corrective Action</th>
+                <tbody>
+                    <!-- Score summary row -->
+                    <tr class="score-row">
+                        <td colspan="10" class="score-td">
+                            <div class="score-block">
+                                <div class="score-circle">
+                                    <span class="score-pct"></span>
+                                    <span class="score-label">Score</span>
+                                </div>
+                                <div class="score-stats">
+                                    <div class="stat-item stat-conforming">
+                                        <span class="stat-count">&nbsp;</span>
+                                        <span class="stat-name">Conforming</span>
+                                    </div>
+                                    <div class="stat-item stat-nc">
+                                        <span class="stat-count">&nbsp;</span>
+                                        <span class="stat-name">Non-Conforming</span>
+                                    </div>
+                                    <div class="stat-item stat-warning">
+                                        <span class="stat-count">&nbsp;</span>
+                                        <span class="stat-name">Warning</span>
+                                    </div>
+                                    <div class="stat-item stat-na">
+                                        <span class="stat-count">&nbsp;</span>
+                                        <span class="stat-name">N/A</span>
+                                    </div>
+                                    <div class="stat-item stat-total">
+                                        <span class="stat-count">&nbsp;</span>
+                                        <span class="stat-name">Total Scored</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Sections -->
+                    <template v-for="section in template.sections" :key="section.id">
+                        <!-- Section header = column label row -->
+                        <tr class="section-header-row">
+                            <td class="sec-col-num">#</td>
+                            <td colspan="4" class="section-name-cell">{{ section.name }}</td>
+                            <td class="sec-col-cb">C</td>
+                            <td class="sec-col-cb">NC</td>
+                            <td class="sec-col-cb">W</td>
+                            <td class="sec-col-cb">N/A</td>
+                            <td class="sec-col-comment">Comments / Corrective Action</td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="(q, idx) in section.questions" :key="q.versionQuestionId">
-                            <td class="col-num">{{ idx + 1 }}</td>
-                            <td class="col-question">{{ q.questionText }}</td>
-                            <td class="col-status"><span class="checkbox">☐</span></td>
-                            <td class="col-status"><span class="checkbox">☐</span></td>
-                            <td class="col-status"><span class="checkbox">☐</span></td>
-                            <td class="col-status" v-if="q.allowNA"><span class="checkbox">☐</span></td>
-                            <td class="col-status" v-else></td>
-                            <td class="col-comment"><div class="comment-line"></div></td>
+                        <!-- Question rows -->
+                        <tr
+                            v-for="(q, idx) in section.questions"
+                            :key="q.versionQuestionId"
+                            class="question-row"
+                            :class="{ 'row-alt': idx % 2 === 1 }"
+                        >
+                            <td class="q-num">{{ idx + 1 }}</td>
+                            <td colspan="4" class="q-text">{{ q.questionText }}</td>
+                            <td class="q-cb"><span class="checkbox">☐</span></td>
+                            <td class="q-cb"><span class="checkbox">☐</span></td>
+                            <td class="q-cb"><span class="checkbox">☐</span></td>
+                            <td class="q-cb">
+                                <span v-if="q.allowNA" class="checkbox">☐</span>
+                            </td>
+                            <td class="q-comment"></td>
                         </tr>
-                    </tbody>
-                </table>
-            </div>
+                    </template>
 
-            <!-- Score summary box -->
-            <div class="score-box">
-                <table class="score-table">
-                    <thead><tr>
-                        <th>Conforming</th>
-                        <th>Non-Conforming</th>
-                        <th>Warning</th>
-                        <th>N/A</th>
-                        <th>Total Scored</th>
-                        <th>Score %</th>
-                    </tr></thead>
-                    <tbody><tr>
-                        <td><div class="score-cell"></div></td>
-                        <td><div class="score-cell"></div></td>
-                        <td><div class="score-cell"></div></td>
-                        <td><div class="score-cell"></div></td>
-                        <td><div class="score-cell"></div></td>
-                        <td><div class="score-cell"></div></td>
-                    </tr></tbody>
-                </table>
-            </div>
+                    <!-- Signature row -->
+                    <tr class="sig-row">
+                        <td colspan="6" class="sig-cell">
+                            <span class="sig-label">Auditor Signature</span>
+                            <div class="sig-line"></div>
+                        </td>
+                        <td colspan="4" class="sig-cell">
+                            <span class="sig-label">Date</span>
+                            <div class="sig-line"></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </template>
 
-            <!-- Signature block -->
-            <div class="signature-block">
-                <div class="sig-line"><span class="sig-label">Auditor Signature</span><div class="sig-space"></div></div>
-                <div class="sig-line"><span class="sig-label">Date</span><div class="sig-space"></div></div>
-            </div>
-        </div>
-
-        <div v-else class="loading-msg">Template not found for this division.</div>
+        <div v-else class="loading-msg">No active template found for this division.</div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { useApiStore } from '@/stores/apiStore';
-import { AuditClient, type TemplateDto } from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
+import type { TemplateDto } from '@/apiclient/auditClient';
 
 const route = useRoute();
-const apiStore = useApiStore();
+const formEl = ref<HTMLElement | null>(null);
 const loading = ref(true);
 const template = ref<TemplateDto | null>(null);
 
+const LOGO_MAP: Record<string, string> = {
+    ETS:  'https://www.thestrongholdcompanies.com/wp-content/uploads/2021/08/ETS-Logo-color-full.png',
+    STS:  'https://www.thestrongholdcompanies.com/wp-content/uploads/2021/08/STS-Logo-Full-Clr@2x-2.png',
+    STG:  'https://www.thestrongholdcompanies.com/wp-content/uploads/2021/08/STG-Logo-Full-Clr@2x-3.png',
+    SHI:  'https://www.thestrongholdcompanies.com/wp-content/uploads/2021/08/SHI-Logo-Full-color.png',
+    TKIE: 'https://www.thestrongholdcompanies.com/wp-content/uploads/2021/08/TKIE-Logo-Full-Clr@2x-2.png',
+    CSL:  'https://www.thestrongholdcompanies.com/wp-content/uploads/2021/08/CSL-Logo-Full-Clr@2x-3.png',
+    CC:   'https://www.thestrongholdcompanies.com/wp-content/uploads/2021/08/CC-Logo-Full-Clr@2x-1.png',
+};
+
+const logoUrl = computed(() => {
+    const code = template.value?.divisionCode?.toUpperCase() ?? '';
+    return LOGO_MAP[code] ?? null;
+});
+
 onMounted(async () => {
-    // Primary path: template was pre-fetched in the authenticated main app
-    // and passed via sessionStorage to avoid 401s in this new tab.
     const stored = sessionStorage.getItem('print-blank-form-data');
     if (stored) {
         sessionStorage.removeItem('print-blank-form-data');
         try {
             template.value = JSON.parse(stored) as TemplateDto;
-        } catch {
-            // malformed data — fall through to API call
-        }
+        } catch { /* fall through */ }
     }
 
-    // Fallback: direct navigation (e.g. during development)
     if (!template.value) {
         const divisionId = Number(route.params.divisionId);
         if (!isNaN(divisionId) && divisionId > 0) {
             try {
-                const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-                template.value = await client.getActiveTemplate(divisionId);
-            } catch {
-                // template stays null
-            }
+                template.value = await useAuditService().getActiveTemplate(divisionId);
+            } catch { /* template stays null */ }
         }
     }
 
     loading.value = false;
     await nextTick();
 
-    // PrimeVue's theme CSS has a global `body * { visibility: hidden }` print rule.
-    // Move the live form node into #print-root — the existing global print CSS then
-    // hides all other SPA content and forces #print-root * to be visible.
-    const formEl = document.querySelector('.print-form') as HTMLElement | null;
-    if (formEl) {
+    // Wait for logos to load before printing
+    const imgs = Array.from(document.querySelectorAll<HTMLImageElement>('img'));
+    await Promise.all(
+        imgs.map(img =>
+            img.complete
+                ? Promise.resolve()
+                : new Promise<void>(resolve => { img.onload = () => resolve(); img.onerror = () => resolve(); })
+        )
+    );
+
+    const formNode = document.querySelector('.print-doc') as HTMLElement | null;
+    if (formNode) {
         const printRoot = document.createElement('div');
         printRoot.id = 'print-root';
-        printRoot.appendChild(formEl);
+        printRoot.appendChild(formNode);
         document.body.appendChild(printRoot);
     }
     window.print();
@@ -148,227 +200,232 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.print-form {
-    font-family: Arial, sans-serif;
-    font-size: 11px;
-    color: #000;
+* {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 9pt;
+    box-sizing: border-box;
+}
+
+.print-doc {
     background: #fff;
-    padding: 12px 16px;
-    max-width: 1000px;
-    margin: 0 auto;
-}
-
-.print-header {
-    border: 2px solid #1a3a5c;
-    border-radius: 4px;
-    margin-bottom: 12px;
-    overflow: hidden;
-}
-
-.print-header-top {
-    background: #1a3a5c;
-    color: #fff;
-    padding: 8px 12px;
-}
-
-.print-header-top h1 {
-    font-size: 16px;
-    font-weight: bold;
+    color: #000;
+    padding: 0;
     margin: 0;
 }
 
-.print-subtitle {
-    font-size: 11px;
-    margin: 2px 0 0;
-    opacity: 0.85;
+.loading-msg {
+    padding: 20px;
+    font-size: 12pt;
+    color: #666;
 }
 
-.header-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    padding: 8px 12px;
+/* ── Main table ───────────────────────────────────────────────────────────── */
+.audit-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
 }
 
-.header-field {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+.audit-table td {
+    border: 1px solid #000;
+    padding: 3px 5px;
+    vertical-align: middle;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
-.header-field.full-width {
-    grid-column: 1 / -1;
+thead {
+    display: table-header-group;
 }
 
-.field-label {
-    font-size: 9px;
-    font-weight: bold;
-    text-transform: uppercase;
-    color: #555;
-    letter-spacing: 0.5px;
-}
-
-.field-line {
-    border-bottom: 1px solid #999;
-    min-height: 16px;
-}
-
-.section {
-    margin-bottom: 10px;
-    break-inside: avoid;
-}
-
-.section-header {
+/* ── Banner ───────────────────────────────────────────────────────────────── */
+.banner-cell {
     background: #1a3a5c;
-    color: #fff;
-    padding: 4px 8px;
+    padding: 6px 10px;
+    border: none;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+}
+
+.banner-inner {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    border-radius: 2px 2px 0 0;
+    justify-content: space-between;
+    gap: 12px;
 }
 
-.section-name {
+.banner-logo {
+    max-height: 44px;
+    max-width: 180px;
+    object-fit: contain;
+    filter: brightness(0) invert(1);
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+}
+
+.banner-division-code {
+    font-size: 18pt;
     font-weight: bold;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.section-count {
-    font-size: 9px;
-    opacity: 0.8;
-}
-
-.question-table {
-    width: 100%;
-    border-collapse: collapse;
-    border: 1px solid #ccc;
-}
-
-.question-table th {
-    background: #e8edf2;
-    border: 1px solid #bbb;
-    padding: 3px 4px;
-    font-size: 9px;
-    font-weight: bold;
-    text-align: center;
-}
-
-.question-table td {
-    border: 1px solid #ccc;
-    padding: 3px 4px;
-    vertical-align: top;
-}
-
-.col-num {
-    width: 24px;
-    text-align: center;
-    color: #555;
-    font-size: 10px;
-}
-
-.col-question {
-    width: auto;
-    font-size: 10px;
-    line-height: 1.4;
-}
-
-.col-status {
-    width: 28px;
-    text-align: center;
-}
-
-.checkbox {
-    font-size: 13px;
-    line-height: 1;
-}
-
-.col-comment {
-    width: 30%;
-}
-
-.comment-line {
-    border-bottom: 1px solid #bbb;
-    min-height: 28px;
-    margin-top: 12px;
-}
-
-.score-box {
-    margin-top: 10px;
-    border: 2px solid #1a3a5c;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.score-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.score-table th {
-    background: #1a3a5c;
     color: #fff;
-    border: 1px solid #1a3a5c;
-    padding: 4px;
-    text-align: center;
-    font-size: 9px;
 }
 
-.score-table td {
-    border: 1px solid #ccc;
-    padding: 2px 4px;
+.banner-title {
+    font-size: 13pt;
+    font-weight: bold;
+    color: #fff;
+    text-align: right;
+    opacity: 0.92;
 }
 
-.score-cell {
-    min-height: 22px;
-    border-bottom: 1px solid #bbb;
+/* ── Header field rows ────────────────────────────────────────────────────── */
+.hdr-label {
+    background: #f0f0f0;
+    font-weight: bold;
+    font-size: 8pt;
+    white-space: nowrap;
+    width: 8%;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
 }
 
-.signature-block {
-    margin-top: 12px;
-    display: grid;
-    grid-template-columns: 2fr 1fr;
+.hdr-value { font-weight: normal; }
+
+.hdr-line { min-height: 20px; }
+
+/* ── Score summary row ────────────────────────────────────────────────────── */
+.score-td {
+    background: #f8fafc;
+    padding: 8px 10px;
+    border-bottom: 2px solid #1a3a5c;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+}
+
+.score-block {
+    display: flex;
+    align-items: center;
     gap: 16px;
 }
 
-.sig-line {
+.score-circle {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: 3px solid #94a3b8;
+    color: #64748b;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
 }
 
+.score-pct   { font-size: 14pt; font-weight: bold; line-height: 1; min-height: 18px; }
+.score-label { font-size: 7pt; }
+
+.score-stats { display: flex; gap: 12px; }
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 56px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+}
+
+.stat-conforming { background: #dcfce7; color: #166534; }
+.stat-nc         { background: #fee2e2; color: #991b1b; }
+.stat-warning    { background: #fef9c3; color: #854d0e; }
+.stat-na         { background: #f3f4f6; color: #374151; }
+.stat-total      { background: #e0f2fe; color: #0369a1; }
+
+.stat-count { font-size: 16pt; font-weight: bold; line-height: 1; min-height: 20px; }
+.stat-name  { font-size: 7pt; text-align: center; }
+
+/* ── Section header row ───────────────────────────────────────────────────── */
+.section-header-row td {
+    background: #1a3a5c;
+    color: #fff;
+    font-weight: bold;
+    padding: 4px 5px;
+    break-after: avoid;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+}
+
+.sec-col-num     { font-size: 8pt; text-align: center; width: 3%; }
+.section-name-cell { font-size: 9pt; letter-spacing: 0.3px; }
+.sec-col-cb      { font-size: 8pt; text-align: center; width: 5%; }
+.sec-col-comment { font-size: 8pt; width: 28%; }
+
+/* ── Question rows ────────────────────────────────────────────────────────── */
+.question-row { break-inside: avoid; }
+
+.question-row.row-alt td { background: #f9fafb; }
+
+.q-num {
+    text-align: center;
+    font-weight: bold;
+    color: #6b7280;
+    font-size: 8pt;
+    width: 3%;
+}
+
+.q-text { font-size: 9pt; line-height: 1.4; }
+
+.q-cb {
+    text-align: center;
+    width: 5%;
+}
+
+.checkbox { font-size: 13pt; line-height: 1; }
+
+.q-comment { width: 28%; min-height: 28px; }
+
+/* ── Signature row ────────────────────────────────────────────────────────── */
+.sig-row { break-inside: avoid; }
+
+.sig-cell { padding: 8px 10px 12px; vertical-align: bottom; }
+
 .sig-label {
-    font-size: 9px;
+    font-size: 8pt;
     font-weight: bold;
     text-transform: uppercase;
     color: #555;
+    display: block;
+    margin-bottom: 16px;
 }
 
-.sig-space {
-    border-bottom: 1px solid #999;
-    min-height: 22px;
+.sig-line {
+    border-bottom: 1px solid #555;
+    min-height: 2px;
 }
 
-.loading-msg {
-    padding: 40px;
-    text-align: center;
-    color: #555;
-}
-
-/* Screen: show a print button and dark background */
-@media screen {
-    body { background: #334 !important; }
-    .print-form {
-        box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-        border-radius: 4px;
-        min-height: 100vh;
-    }
-}
-
+/* ── Print overrides ──────────────────────────────────────────────────────── */
 @media print {
-    body { margin: 0 !important; background: #fff !important; }
-    .print-form { padding: 6px 8px; box-shadow: none; }
-    .section { break-inside: avoid; }
+    * {
+        print-color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
+    }
+    .print-doc { width: 100%; }
+    .audit-table { page-break-inside: auto; }
+    .question-row { page-break-inside: avoid; break-inside: avoid; }
+    .section-header-row { page-break-after: avoid; break-after: avoid; }
+    .score-row { page-break-inside: avoid; break-inside: avoid; }
+    .sig-row { page-break-inside: avoid; break-inside: avoid; }
+}
+
+@media screen {
+    .print-doc {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #fff;
+        box-shadow: 0 0 20px rgba(0,0,0,0.15);
+    }
 }
 </style>

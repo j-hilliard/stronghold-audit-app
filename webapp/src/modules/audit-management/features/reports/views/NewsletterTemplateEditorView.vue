@@ -211,15 +211,18 @@
                                 <i class="pi pi-eye mr-1" /> Preview Newsletter
                             </button>
                             <button
+                                :disabled="saving"
                                 @click="saveTemplate"
-                                class="px-4 py-1.5 text-sm bg-blue-700 hover:bg-blue-600 text-white rounded"
+                                class="px-4 py-1.5 text-sm bg-blue-700 hover:bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <i class="pi pi-save mr-1" /> Save Template
+                                <i :class="saving ? 'pi pi-spin pi-spinner' : 'pi pi-save'" class="mr-1" />
+                                {{ saving ? 'Saving…' : 'Save Template' }}
                             </button>
                         </div>
                     </div>
 
                     <div v-if="saveMessage" class="text-sm text-emerald-400 text-right">{{ saveMessage }}</div>
+                    <div v-if="saveError" class="text-sm text-red-400 text-right">{{ saveError }}</div>
                 </div>
             </div>
         </div>
@@ -230,11 +233,11 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
-import { useApiStore } from '@/stores/apiStore';
-import { AuditClient, type DivisionDto } from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
+import type { DivisionDto } from '@/apiclient/auditClient';
 
 const router = useRouter();
-const apiStore = useApiStore();
+const service = useAuditService();
 
 const divisions = ref<DivisionDto[]>([]);
 const selectedDivisionId = ref<number | null>(null);
@@ -278,34 +281,39 @@ function defaultTemplate(divisionId: number): NewsletterTemplate {
     };
 }
 
-const STORAGE_KEY = 'audit-newsletter-templates';
-
-function loadAllTemplates(): Record<number, NewsletterTemplate> {
-    try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
-    } catch {
-        return {};
-    }
-}
-
-function saveAllTemplates(templates: Record<number, NewsletterTemplate>) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
-}
-
 const current = ref<NewsletterTemplate>(defaultTemplate(0));
 const saveMessage = ref('');
+const saveError = ref('');
+const saving = ref(false);
+const divisionsWithTemplates = ref(new Set<number>());
 
 function hasTemplate(divisionId: number): boolean {
-    const all = loadAllTemplates();
-    return !!all[divisionId]?.name;
+    return divisionsWithTemplates.value.has(divisionId);
 }
 
-function selectDivision(d: DivisionDto) {
+async function selectDivision(d: DivisionDto) {
     selectedDivisionId.value = d.id;
-    const all = loadAllTemplates();
-    current.value = all[d.id] ?? defaultTemplate(d.id);
-    current.value.divisionId = d.id;
     saveMessage.value = '';
+    saveError.value = '';
+    try {
+        const template = await service.getNewsletterTemplate(d.id);
+        if (template) {
+            current.value = {
+                divisionId: template.divisionId,
+                name: template.name,
+                primaryColor: template.primaryColor,
+                accentColor: template.accentColor,
+                coverImageUrl: template.coverImageUrl ?? '',
+                enabledSections: template.visibleSections ?? [...NEWSLETTER_SECTIONS],
+                isDefault: template.isDefault,
+            };
+            divisionsWithTemplates.value.add(d.id);
+        } else {
+            current.value = defaultTemplate(d.id);
+        }
+    } catch {
+        current.value = defaultTemplate(d.id);
+    }
 }
 
 function toggleSection(section: string) {
@@ -338,13 +346,28 @@ function resetToDefaults() {
     current.value = defaultTemplate(selectedDivisionId.value);
 }
 
-function saveTemplate() {
+async function saveTemplate() {
     if (!selectedDivisionId.value) return;
-    const all = loadAllTemplates();
-    all[selectedDivisionId.value] = { ...current.value };
-    saveAllTemplates(all);
-    saveMessage.value = 'Template saved!';
-    setTimeout(() => saveMessage.value = '', 3000);
+    saving.value = true;
+    saveError.value = '';
+    try {
+        await service.saveNewsletterTemplate({
+            divisionId: current.value.divisionId,
+            name: current.value.name,
+            primaryColor: current.value.primaryColor,
+            accentColor: current.value.accentColor,
+            coverImageUrl: current.value.coverImageUrl || null,
+            visibleSections: current.value.enabledSections,
+            isDefault: current.value.isDefault,
+        });
+        divisionsWithTemplates.value.add(current.value.divisionId);
+        saveMessage.value = 'Template saved!';
+        setTimeout(() => saveMessage.value = '', 3000);
+    } catch {
+        saveError.value = 'Failed to save template. Please try again.';
+    } finally {
+        saving.value = false;
+    }
 }
 
 function openNewsletter() {
@@ -355,8 +378,7 @@ function openNewsletter() {
 }
 
 onMounted(async () => {
-    const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-    divisions.value = await client.getDivisions();
+    divisions.value = await service.getDivisions();
     if (divisions.value.length > 0) {
         selectDivision(divisions.value[0]);
     }

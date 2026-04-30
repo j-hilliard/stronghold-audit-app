@@ -23,6 +23,9 @@ internal static class GlobalAuditRoles
         AuthorizationRoles.TemplateAdmin,
         AuthorizationRoles.AuditManager,
         AuthorizationRoles.ExecutiveViewer,
+        // Official roles — these bypass division filter
+        AuthorizationRoles.AuditAdmin,
+        AuthorizationRoles.Executive,
     };
 }
 
@@ -67,7 +70,28 @@ public class AuthorizationBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
     {
         if (_env.EnvironmentName == "Local")
         {
-            return await next();
+            var httpCtx = _httpContextAccessor.HttpContext;
+            var devRoleHeader = httpCtx?.Request.Headers["X-Dev-Role-Override"].ToString();
+
+            if (string.IsNullOrWhiteSpace(devRoleHeader))
+                return await next(); // No override — bypass all checks (default Local behavior)
+
+            // Role override active: enforce the AllowedAuthorizationRole attribute
+            var overrideRoles = new List<string> { devRoleHeader.Trim(), AuthorizationRoles.User };
+
+            var localUser = await _appDbContext.Users.FirstOrDefaultAsync(
+                u => u.AzureAdObjectId == Guid.Empty, cancellationToken);
+            var localIsGlobal = overrideRoles.Any(r => GlobalAuditRoles.Names.Contains(r));
+            _auditUserContext.Initialize(localUser?.UserId ?? 0, localIsGlobal, []);
+
+            var devAttribute = Attribute.GetCustomAttribute(request.GetType(), typeof(AllowedAuthorizationRole))
+                as AllowedAuthorizationRole;
+
+            if (devAttribute == null || devAttribute.IsAllowed(overrideRoles))
+                return await next();
+
+            throw new UnauthorizedAccessException(
+                $"[DevRoleOverride] Roles [{string.Join(", ", overrideRoles)}] cannot perform '{typeof(TRequest).Name}'");
         }
 
         var httpContext = _httpContextAccessor.HttpContext;

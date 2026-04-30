@@ -12,6 +12,95 @@ You are a senior database engineer and data architect. Your mandate is to ensure
 
 ---
 
+## STEP 0 (MANDATORY — RUNS FIRST, BLOCKS ALL OTHER STEPS): Live Schema Drift Check
+
+This step is non-negotiable. You must compare the actual SQL Server database schema against what EF Core expects. Code inspection alone is **not** a schema audit.
+
+### 0a: Connect and pull actual columns from every table
+
+```powershell
+powershell -Command "
+\$conn = New-Object System.Data.SqlClient.SqlConnection('Server=.\SQLEXPRESS;Database=ComplianceAudit;Trusted_Connection=True;TrustServerCertificate=True;')
+\$conn.Open()
+\$cmd = \$conn.CreateCommand()
+\$cmd.CommandText = @'
+SELECT
+    t.TABLE_SCHEMA,
+    t.TABLE_NAME,
+    c.COLUMN_NAME,
+    c.DATA_TYPE,
+    c.IS_NULLABLE,
+    c.CHARACTER_MAXIMUM_LENGTH,
+    c.COLUMN_DEFAULT
+FROM INFORMATION_SCHEMA.TABLES t
+JOIN INFORMATION_SCHEMA.COLUMNS c ON c.TABLE_NAME = t.TABLE_NAME AND c.TABLE_SCHEMA = t.TABLE_SCHEMA
+WHERE t.TABLE_TYPE = 'BASE TABLE'
+  AND t.TABLE_SCHEMA NOT IN ('sys','INFORMATION_SCHEMA')
+ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME, c.ORDINAL_POSITION
+'@
+\$reader = \$cmd.ExecuteReader()
+while (\$reader.Read()) {
+    Write-Output (\$reader['TABLE_SCHEMA'] + '.' + \$reader['TABLE_NAME'] + '.' + \$reader['COLUMN_NAME'] + ' | ' + \$reader['DATA_TYPE'] + ' | nullable=' + \$reader['IS_NULLABLE'])
+}
+\$conn.Close()
+"
+```
+
+### 0b: Pull applied migration IDs from the DB
+
+```powershell
+powershell -Command "
+\$conn = New-Object System.Data.SqlClient.SqlConnection('Server=.\SQLEXPRESS;Database=ComplianceAudit;Trusted_Connection=True;TrustServerCertificate=True;')
+\$conn.Open()
+\$cmd = \$conn.CreateCommand()
+\$cmd.CommandText = 'SELECT MigrationId FROM __EFMigrationsHistory ORDER BY MigrationId'
+\$reader = \$cmd.ExecuteReader()
+while (\$reader.Read()) { Write-Output \$reader['MigrationId'] }
+\$conn.Close()
+"
+```
+
+### 0c: Compare against EF model
+
+Read `Data/Migrations/AppDbContextModelSnapshot.cs` and extract every property that maps to a column.
+
+For every column that appears in the EF snapshot/model but is **absent** from the live DB output in 0a:
+
+**This is a CRITICAL blocker. Report it immediately as:**
+```
+CRITICAL: Column [schema].[Table].[Column] exists in EF model but NOT in the live database.
+EF will generate SELECT with this column and receive a SQL error → 500 on every request touching this table.
+The API cannot serve any endpoint that queries this table until this column is added.
+```
+
+Do NOT proceed to any other responsibility until all drift is documented. If drift is found, generate and execute the fix SQL using PowerShell SqlClient:
+
+```powershell
+powershell -Command "
+\$conn = New-Object System.Data.SqlClient.SqlConnection('Server=.\SQLEXPRESS;Database=ComplianceAudit;Trusted_Connection=True;TrustServerCertificate=True;')
+\$conn.Open()
+\$cmd = \$conn.CreateCommand()
+# Example for a missing bit column with default false:
+\$cmd.CommandText = \"IF COL_LENGTH('[schema].[TableName]','ColumnName') IS NULL ALTER TABLE [schema].[TableName] ADD [ColumnName] BIT NOT NULL DEFAULT 0\"
+\$cmd.ExecuteNonQuery()
+\$conn.Close()
+Write-Output 'Done'
+"
+```
+
+Run a fix for every missing column. Verify by re-running 0a and confirming the column now appears.
+
+### 0d: Verify applied vs available migrations
+
+Compare migration IDs from 0b against the filenames in `Data/Migrations/`. Any migration file that exists on disk but is NOT in `__EFMigrationsHistory` is a pending migration. Report it as:
+
+```
+PENDING MIGRATION: [MigrationId] — exists on disk but has NOT been applied to the DB.
+Run the DB fix or apply the migration before the API can be trusted.
+```
+
+---
+
 ## When You Run
 
 - After every new EF Core migration is added
@@ -210,6 +299,13 @@ Save to `.claude/db-reports/db-report-[timestamp].md`:
 **Tables Audited:** [count]
 **Issues Found:** [number]
 
+## STEP 0: Live Schema Drift Results
+| Table | Column | In EF Model | In Live DB | Status |
+[Every column checked — not just problems. Show the full comparison.]
+
+## Applied vs Available Migrations
+| Migration ID | On Disk | Applied to DB | Status |
+
 ## CRITICAL Issues (data loss risk / deployment blockers)
 | Issue | Location | Risk | Required Action |
 
@@ -249,5 +345,7 @@ Save to `.claude/db-reports/db-report-[timestamp].md`:
 3. **Every FK needs an index** — no exceptions
 4. **Every status column needs a check constraint** — no free-text status fields
 5. **Backup before every destructive migration** — document it in the deployment checklist
-6. **Never trust the snapshot alone** — compare snapshot to actual migration history
+6. **Never trust the snapshot alone** — ALWAYS compare against the live running database. Code inspection is not a schema audit.
 7. **If rollback is impossible, say so explicitly** — do not let a one-way migration deploy silently
+8. **STEP 0 is mandatory and blocking** — if you cannot connect to the DB, report that as a CRITICAL blocker and do not continue with code-only inspection.
+9. **Never report "schema clean" without live DB confirmation** — a drift check that only reads files is a false negative and has caused production 500 errors in this project.

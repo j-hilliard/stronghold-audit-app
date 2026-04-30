@@ -12,6 +12,7 @@ using NSwag.Generation.Processors.Security;
 using Stronghold.AppDashboard.Api.Authorization;
 using Stronghold.AppDashboard.Api.Configuration;
 using Stronghold.AppDashboard.Api.Domain;
+using Stronghold.AppDashboard.Api.Infrastructure;
 using Stronghold.AppDashboard.Api.Services;
 using Stronghold.AppDashboard.Data;
 using ZymLabs.NSwag.FluentValidation;
@@ -109,6 +110,8 @@ builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 // Logging services
 builder.Services.AddScoped<IProcessLogService, ProcessLogService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddSingleton<AuditTrailInterceptor>();
 builder.Services.AddHostedService<LogPurgeService>();
 
 // Email + background services
@@ -215,7 +218,7 @@ builder.Services.AddOpenApiDocument(
 );
 
 #if DEBUG
-builder.Services.AddDbContextFactory<AppDbContext>(options =>
+builder.Services.AddDbContextFactory<AppDbContext>((sp, options) =>
     options
         .UseSqlServer(
             builder.Configuration.GetConnectionString("SqlDb"),
@@ -226,11 +229,12 @@ builder.Services.AddDbContextFactory<AppDbContext>(options =>
                 providerOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
             }
         )
+        .AddInterceptors(sp.GetRequiredService<AuditTrailInterceptor>())
         .ConfigureWarnings(warnings => warnings.Ignore(CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning))
         .EnableSensitiveDataLogging()
 );
 #else
-builder.Services.AddDbContextFactory<AppDbContext>(options =>
+builder.Services.AddDbContextFactory<AppDbContext>((sp, options) =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("SqlDb"),
         providerOptions =>
@@ -239,7 +243,9 @@ builder.Services.AddDbContextFactory<AppDbContext>(options =>
                 providerOptions.EnableRetryOnFailure();
             providerOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
         }
-    ).ConfigureWarnings(warnings => warnings.Ignore(CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning))
+    )
+    .AddInterceptors(sp.GetRequiredService<AuditTrailInterceptor>())
+    .ConfigureWarnings(warnings => warnings.Ignore(CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning))
 );
 #endif
 
@@ -299,6 +305,7 @@ if (!AppConfigExtensions.IsRunningForNswagCodegen())
         // Also seeds full dev data (users, divisions, templates, etc.).
         context.Database.Migrate();
         DbInitializer.Initialize(context);
+        DbInitializer.SeedLocalTestUsers(context);
     }
     else if (app.Environment.IsDevelopment())
     {

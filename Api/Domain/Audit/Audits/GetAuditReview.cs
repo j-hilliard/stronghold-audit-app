@@ -11,7 +11,8 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
     AuthorizationRole.CorrectiveActionOwner, AuthorizationRole.ReadOnlyViewer,
     AuthorizationRole.ExecutiveViewer, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.Auditor, AuthorizationRole.AuditAdmin, AuthorizationRole.Executive)]
 public class GetAuditReview : IRequest<AuditReviewDto?>
 {
     public int AuditId { get; set; }
@@ -30,14 +31,23 @@ public class GetAuditReviewHandler : IRequestHandler<GetAuditReview, AuditReview
             .Include(a => a.Header)
             .Include(a => a.Responses)
             .Include(a => a.Findings).ThenInclude(f => f.CorrectiveActions)
+            .Include(a => a.Attachments)
+            .Include(a => a.SectionNaOverrides).ThenInclude(n => n.Section)
             .FirstOrDefaultAsync(a => a.Id == request.AuditId, cancellationToken);
 
         if (audit == null) return null;
 
+        // ── Exclude responses from sections the auditor explicitly marked N/A ─
+        var naSectionNames = audit.SectionNaOverrides
+            .Select(n => n.Section.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         // ── Score calculation (two-level weighted) ────────────────────────────
         // Level 1: within each section → sectionScore = Σ(conforming × qWeight) / Σ(scored × qWeight)
         // Level 2: overall → Σ(sectionScore × sWeight) / Σ(sWeight with answered questions) × 100
-        var responses = audit.Responses.ToList();
+        var responses = audit.Responses
+            .Where(r => !naSectionNames.Contains(r.SectionNameSnapshot ?? ""))
+            .ToList();
         int conforming = responses.Count(r => r.Status == "Conforming");
         int nonConforming = responses.Count(r => r.Status == "NonConforming");
         int warning = responses.Count(r => r.Status == "Warning");
@@ -58,6 +68,12 @@ public class GetAuditReviewHandler : IRequestHandler<GetAuditReview, AuditReview
         var emailRules = await _context.EmailRoutingRules
             .Where(r => r.DivisionId == audit.DivisionId && r.IsActive)
             .OrderBy(r => r.Id)
+            .ToListAsync(cancellationToken);
+
+        // ── Per-audit distribution recipients ────────────────────────────────
+        var distributionRecipients = await _context.AuditDistributionRecipients
+            .Where(r => r.AuditId == request.AuditId)
+            .OrderBy(r => r.AddedAt)
             .ToListAsync(cancellationToken);
 
         // ── Benchmark: avg score of last 10 submitted audits in this division ─
@@ -136,8 +152,10 @@ public class GetAuditReviewHandler : IRequestHandler<GetAuditReview, AuditReview
                 ResponsibleParty = audit.Header.ResponsibleParty,
                 Location = audit.Header.Location,
                 AuditDate = audit.Header.AuditDate?.ToString("yyyy-MM-dd"),
-                Auditor = audit.Header.Auditor
+                Auditor = audit.Header.Auditor,
+                SiteCode = audit.Header.SiteCode
             },
+            TrackingNumber = audit.TrackingNumber,
             ConformingCount = conforming,
             NonConformingCount = nonConforming,
             WarningCount = warning,
@@ -204,6 +222,23 @@ public class GetAuditReviewHandler : IRequestHandler<GetAuditReview, AuditReview
                 }).ToList(),
             ReviewEmailRouting = emailRules
                 .Select(r => new EmailRoutingDto { EmailAddress = r.EmailAddress })
+                .ToList(),
+            ReviewSummary = audit.ReviewSummary,
+            ReviewedAt = audit.ReviewedAt,
+            ReviewedBy = audit.ReviewedBy,
+            DistributionRecipients = distributionRecipients
+                .Select(r => new DistributionRecipientDto { Id = r.Id, EmailAddress = r.EmailAddress, Name = r.Name })
+                .ToList(),
+            Attachments = audit.Attachments
+                .Where(a => !a.IsDeleted)
+                .OrderByDescending(a => a.UploadedAt)
+                .Select(a => new AuditAttachmentRefDto
+                {
+                    Id = a.Id,
+                    FileName = a.FileName,
+                    FileSizeBytes = a.FileSizeBytes,
+                    HasFile = !string.IsNullOrEmpty(a.BlobPath) && File.Exists(a.BlobPath),
+                })
                 .ToList()
         };
     }

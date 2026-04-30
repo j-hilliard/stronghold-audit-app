@@ -7,18 +7,21 @@ using Stronghold.AppDashboard.Data;
 using Stronghold.AppDashboard.Shared.Enumerations;
 using AuditHeaderEntity = Stronghold.AppDashboard.Data.Models.Audit.AuditHeader;
 using AuditResponseEntity = Stronghold.AppDashboard.Data.Models.Audit.AuditResponse;
+using AuditSectionNaOverrideEntity = Stronghold.AppDashboard.Data.Models.Audit.AuditSectionNaOverride;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.TemplateAdmin,
-    AuthorizationRole.Administrator)]
+    AuthorizationRole.Administrator,
+    AuthorizationRole.Auditor, AuthorizationRole.AuditAdmin)]
 public class SaveAuditResponses : IRequest<Unit>
 {
     public int AuditId { get; set; }
     public string SavedBy { get; set; } = null!;
     public AuditHeaderDto? Header { get; set; }
     public List<AuditResponseUpsertDto> Responses { get; set; } = new();
+    public List<SectionNaOverrideDto> SectionNaOverrides { get; set; } = new();
 }
 
 public class SaveAuditResponsesHandler : IRequestHandler<SaveAuditResponses, Unit>
@@ -37,6 +40,7 @@ public class SaveAuditResponsesHandler : IRequestHandler<SaveAuditResponses, Uni
         var audit = await _context.Audits
             .Include(a => a.Header)
             .Include(a => a.Responses)
+            .Include(a => a.SectionNaOverrides)
             .FirstOrDefaultAsync(a => a.Id == request.AuditId, cancellationToken)
             ?? throw new ArgumentException($"Audit {request.AuditId} not found.");
 
@@ -72,6 +76,7 @@ public class SaveAuditResponsesHandler : IRequestHandler<SaveAuditResponses, Uni
                     Location = request.Header.Location,
                     AuditDate = parsedDate,
                     Auditor = request.Header.Auditor,
+                    SiteCode = request.Header.SiteCode,
                     CreatedAt = now,
                     CreatedBy = request.SavedBy
                 };
@@ -94,8 +99,20 @@ public class SaveAuditResponsesHandler : IRequestHandler<SaveAuditResponses, Uni
                 h.Location = request.Header.Location;
                 h.AuditDate = parsedDate;
                 h.Auditor = request.Header.Auditor;
+                h.SiteCode = request.Header.SiteCode;
                 h.UpdatedAt = now;
                 h.UpdatedBy = request.SavedBy;
+            }
+
+            // Keep Audit.TrackingNumber in sync with the (possibly changed) site code.
+            if (audit.TrackingNumber != null)
+            {
+                var parts = audit.TrackingNumber.Split('-');
+                var trackingBase = string.Join("-", parts.Take(2));
+                var newSite = request.Header.SiteCode?.Trim().ToUpperInvariant();
+                audit.TrackingNumber = string.IsNullOrEmpty(newSite)
+                    ? trackingBase
+                    : $"{trackingBase}-{newSite}";
             }
         }
 
@@ -151,6 +168,34 @@ public class SaveAuditResponsesHandler : IRequestHandler<SaveAuditResponses, Uni
                     IsLifeCriticalSnapshot = lc,
                     CreatedAt = now,
                     CreatedBy = request.SavedBy
+                });
+            }
+        }
+
+        // ── Section N/A overrides — full replace ─────────────────────────────
+        var existingNa = audit.SectionNaOverrides.ToDictionary(n => n.SectionId);
+        var incomingNa = request.SectionNaOverrides.ToDictionary(n => n.SectionId);
+
+        // Remove overrides no longer in the incoming set
+        foreach (var sectionId in existingNa.Keys.Except(incomingNa.Keys).ToList())
+            _context.AuditSectionNaOverrides.Remove(existingNa[sectionId]);
+
+        // Add or update
+        foreach (var dto in request.SectionNaOverrides)
+        {
+            if (existingNa.TryGetValue(dto.SectionId, out var existing))
+            {
+                existing.Reason = dto.Reason;
+            }
+            else
+            {
+                _context.AuditSectionNaOverrides.Add(new AuditSectionNaOverrideEntity
+                {
+                    AuditId   = audit.Id,
+                    SectionId = dto.SectionId,
+                    Reason    = dto.Reason,
+                    CreatedAt = now,
+                    CreatedBy = request.SavedBy,
                 });
             }
         }

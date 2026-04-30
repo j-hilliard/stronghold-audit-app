@@ -33,6 +33,30 @@ public class Audit : AuditableEntity
     /// <summary>Optional section groups enabled at audit creation (immutable after create).</summary>
     public ICollection<AuditEnabledSection> EnabledSections { get; set; } = new List<AuditEnabledSection>();
 
+    /// <summary>Sections the auditor has explicitly marked N/A during this audit (mutable while Draft/Reopened).</summary>
+    public ICollection<AuditSectionNaOverride> SectionNaOverrides { get; set; } = new List<AuditSectionNaOverride>();
+
     /// <summary>AI-generated plain-language summary generated at submission time. Null when AI is disabled or unavailable.</summary>
     public string? AiSummary { get; set; }
+
+    /// <summary>AuditAdmin-authored findings narrative included in the distribution email.</summary>
+    public string? ReviewSummary { get; set; }
+
+    /// <summary>Timestamp when the AuditAdmin sent the distribution email.</summary>
+    public DateTime? ReviewedAt { get; set; }
+
+    /// <summary>Display name of the AuditAdmin who sent the distribution email.</summary>
+    public string? ReviewedBy { get; set; }
+
+    /// <summary>
+    /// Auto-generated tracking number assigned at creation (e.g. "H26-012-IPT").
+    /// Format: {Prefix}{YY}-{NNN}-{SiteCode} where NNN is per-division per-year sequence.
+    /// Null only for audits created before this feature was introduced.
+    /// </summary>
+    public string? TrackingNumber { get; set; }
+
+    /// <summary>FK to the DivisionJobPrefix used when generating the tracking number.</summary>
+    public int? JobPrefixId { get; set; }
+
+    public DivisionJobPrefix? JobPrefix { get; set; }
 }

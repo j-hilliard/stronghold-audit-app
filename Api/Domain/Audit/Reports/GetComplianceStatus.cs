@@ -10,7 +10,8 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Reports;
 [AllowedAuthorizationRole(
     AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
     AuthorizationRole.ReadOnlyViewer, AuthorizationRole.ExecutiveViewer,
-    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator)]
+    AuthorizationRole.TemplateAdmin, AuthorizationRole.Administrator,
+    AuthorizationRole.AuditAdmin, AuthorizationRole.Executive)]
 public class GetComplianceStatus : IRequest<List<ComplianceStatusDto>> { }
 
 public class GetComplianceStatusHandler : IRequestHandler<GetComplianceStatus, List<ComplianceStatusDto>>

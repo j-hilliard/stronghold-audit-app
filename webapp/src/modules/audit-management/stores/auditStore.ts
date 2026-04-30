@@ -1,18 +1,19 @@
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
 import { useToast } from 'primevue/usetoast';
-import { useApiStore } from '@/stores/apiStore';
 import { useUserStore } from '@/stores/userStore';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 import {
-    AuditClient,
     type DivisionDto,
     type TemplateDto,
     type TemplateSectionDto,
     type AuditHeaderDto,
     type AuditListItemDto,
     type AuditReviewDto,
+    type DistributionRecipientDto,
     type LogicRuleDto,
     type RepeatFindingDto,
+    type SectionNaOverrideDto,
 } from '@/apiclient/auditClient';
 
 // ── Local types ───────────────────────────────────────────────────────────────
@@ -38,6 +39,7 @@ interface LocalDraft {
     auditId: number;
     header: AuditHeaderDto;
     responses: Record<number, ResponseState>;
+    sectionNaOverrides?: Record<number, string>;
     savedAt: string;
 }
 
@@ -71,11 +73,10 @@ export function calculateScore(responses: ResponseState[]): { counts: ScoreCount
 const DRAFT_KEY = (id: number) => `audit-draft-${id}`;
 
 export const useAuditStore = defineStore('audit', () => {
-    const apiStore = useApiStore();
     const toast = useToast();
 
     function getClient() {
-        return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
+        return useAuditService();
     }
 
     // ── State ──────────────────────────────────────────────────────────────────
@@ -83,10 +84,15 @@ export const useAuditStore = defineStore('audit', () => {
     const divisions = ref<DivisionDto[]>([]);
     const template = ref<TemplateDto | null>(null);
     const auditId = ref<number | null>(null);
+    const auditDivisionId = ref<number | null>(null);
     const auditStatus = ref<string>('Draft');
+    const trackingNumber = ref<string | null>(null);
 
     /** Optional section group keys enabled at audit creation. Null = audit not yet loaded. */
     const enabledOptionalGroupKeys = ref<string[]>([]);
+
+    /** Sections the auditor has explicitly marked N/A for this audit. Keyed by sectionId → reason. */
+    const sectionNaOverrides = ref<Map<number, string>>(new Map());
 
     const header = ref<AuditHeaderDto>({});
     // Keyed by questionId
@@ -97,6 +103,16 @@ export const useAuditStore = defineStore('audit', () => {
 
     /** questionIds that are repeat findings for the current audit's division (last 180 days). */
     const repeatFindingQuestionIds = ref<Set<number>>(new Set());
+
+    // ── Prior prefill state ────────────────────────────────────────────────────
+    /** True when a prior conforming-answer set is available to load. */
+    const priorPrefillAvailable = ref(false);
+    /** ISO date of the prior audit, for display in the banner. */
+    const priorPrefillDate = ref<string | null>(null);
+    /** Internal cache: questionId → 'Conforming' map from the API. */
+    const _priorPrefillMap = ref<Record<number, string>>({});
+    /** Set of questionIds that have been prefilled but not yet touched by the auditor. */
+    const prefillQuestionIds = ref<Set<number>>(new Set());
 
     const loading = ref(false);      // audit form loading (loadAudit)
     const listLoading = ref(false);  // dashboard list loading
@@ -116,7 +132,22 @@ export const useAuditStore = defineStore('audit', () => {
 
     // ── Computed ───────────────────────────────────────────────────────────────
 
-    const allResponses = computed(() => Array.from(responses.value.values()));
+    /** Question IDs that belong to sections the auditor has marked N/A — excluded from scoring. */
+    const naQuestionIds = computed((): Set<number> => {
+        if (!template.value || sectionNaOverrides.value.size === 0) return new Set();
+        const ids = new Set<number>();
+        for (const section of template.value.sections) {
+            if (sectionNaOverrides.value.has(section.id)) {
+                for (const q of section.questions) ids.add(q.questionId);
+            }
+        }
+        return ids;
+    });
+
+    const allResponses = computed(() => {
+        const naIds = naQuestionIds.value;
+        return Array.from(responses.value.values()).filter(r => !naIds.has(r.questionId));
+    });
 
     const score = computed(() => calculateScore(allResponses.value));
 
@@ -181,6 +212,7 @@ export const useAuditStore = defineStore('audit', () => {
             auditId: auditId.value,
             header: { ...header.value },
             responses: Object.fromEntries(responses.value),
+            sectionNaOverrides: Object.fromEntries(sectionNaOverrides.value),
             savedAt: new Date().toISOString(),
         };
         localStorage.setItem(DRAFT_KEY(auditId.value), JSON.stringify(draft));
@@ -206,6 +238,9 @@ export const useAuditStore = defineStore('audit', () => {
         for (const [qid, r] of Object.entries(draft.responses)) {
             responses.value.set(Number(qid), r);
         }
+        sectionNaOverrides.value = new Map(
+            Object.entries(draft.sectionNaOverrides ?? {}).map(([k, v]) => [Number(k), v])
+        );
         hasPendingDraft.value = false;
         isDirty.value = true;
     }
@@ -263,29 +298,21 @@ export const useAuditStore = defineStore('audit', () => {
     async function loadDivisions(force = false) {
         if (!force && divisions.value.length > 0) return;
         try {
-            const raw = await getClient().getDivisions() as unknown as Record<string, unknown>[];
-            const seen = new Set<number>();
-            divisions.value = raw
-                .map((r): DivisionDto | null => {
-                    const id = Number(r.id ?? r.Id ?? 0);
-                    if (!id) return null;
-                    return {
-                        id,
-                        code:      String(r.code      ?? r.Code      ?? ''),
-                        name:      String(r.name      ?? r.Name      ?? ''),
-                        auditType: String(r.auditType ?? r.AuditType ?? ''),
-                    };
-                })
-                .filter((d): d is DivisionDto => d !== null && !seen.has(d.id) && !!seen.add(d.id));
+            divisions.value = await getClient().getDivisions();
         } catch {
             toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load divisions.', life: 4000 });
         }
     }
 
-    async function createAudit(divisionId: number, enabledKeys: string[] = []): Promise<number | null> {
+    async function createAudit(
+        divisionId: number,
+        enabledKeys: string[] = [],
+        jobPrefixId?: number | null,
+        siteCode?: string | null,
+    ): Promise<number | null> {
         saving.value = true;
         try {
-            const created = await getClient().createAudit(divisionId, enabledKeys);
+            const created = await getClient().createAudit(divisionId, enabledKeys, jobPrefixId, siteCode);
 
             // Defensive handling: API contract may return either an ID or a detail DTO.
             if (typeof created === 'number' && Number.isFinite(created) && created > 0) {
@@ -310,14 +337,13 @@ export const useAuditStore = defineStore('audit', () => {
         loading.value = true;
         resetForm();
         try {
-            const [audit, tpl] = await Promise.all([
-                getClient().getAudit(id),
-                // We need divisionId to load the template; it comes from the audit
-                getClient().getAudit(id).then(a => getClient().getActiveTemplate(a.divisionId)),
-            ]);
+            const audit = await getClient().getAudit(id);
+            const tpl = await getClient().getActiveTemplate(audit.divisionId);
 
             auditId.value = audit.id;
+            auditDivisionId.value = audit.divisionId;
             auditStatus.value = audit.status;
+            trackingNumber.value = audit.trackingNumber ?? null;
             header.value = audit.header ?? {};
 
             // 2A-5: Pre-fill audit metadata on new Draft audits
@@ -345,6 +371,11 @@ export const useAuditStore = defineStore('audit', () => {
 
             template.value = tpl;
             enabledOptionalGroupKeys.value = audit.enabledOptionalGroupKeys ?? [];
+
+            // Restore section N/A overrides
+            sectionNaOverrides.value = new Map(
+                (audit.sectionNaOverrides ?? []).map(n => [n.sectionId, n.reason])
+            );
 
             // Seed response map from template (visible sections only)
             initResponsesFromTemplate(tpl, enabledOptionalGroupKeys.value);
@@ -400,6 +431,50 @@ export const useAuditStore = defineStore('audit', () => {
         _pendingDraft.value = null;
     }
 
+    // ── Prior prefill actions ──────────────────────────────────────────────────
+
+    /** Fetch conforming answers from the most recent completed audit for this division+template. */
+    async function loadPriorPrefill(divisionId: number, templateVersionId: number) {
+        try {
+            const result = await getClient().getPriorAuditPrefill(divisionId, templateVersionId);
+            if (result.hasPrior && Object.keys(result.responses ?? {}).length > 0) {
+                _priorPrefillMap.value = result.responses;
+                priorPrefillDate.value = result.auditDate ?? null;
+                priorPrefillAvailable.value = true;
+            }
+        } catch {
+            // Non-fatal — prefill is optional, silently skip
+        }
+    }
+
+    /** Apply the prefilled responses to the current form (only fills unanswered questions). */
+    function applyPrefill() {
+        const newPrefilled = new Set<number>();
+        for (const [qIdStr, status] of Object.entries(_priorPrefillMap.value)) {
+            const questionId = Number(qIdStr);
+            const r = responses.value.get(questionId);
+            if (r && r.status === null) {
+                r.status = status;
+                newPrefilled.add(questionId);
+            }
+        }
+        prefillQuestionIds.value = newPrefilled;
+        priorPrefillAvailable.value = false;
+        _priorPrefillMap.value = {};
+        isDirty.value = true;
+    }
+
+    /** Dismiss the prefill banner without applying. */
+    function dismissPrefill() {
+        priorPrefillAvailable.value = false;
+        _priorPrefillMap.value = {};
+    }
+
+    /** Called when the auditor actively changes a prefilled question's answer. */
+    function markPrefillTouched(questionId: number) {
+        prefillQuestionIds.value.delete(questionId);
+    }
+
     function setResponse(
         questionId: number,
         status: string | null,
@@ -428,20 +503,46 @@ export const useAuditStore = defineStore('audit', () => {
         if (r && r.status === 'NonConforming') r.correctedOnSite = value;
     }
 
+    /**
+     * Mark a section as N/A (reason required) or remove the N/A mark (reason = null).
+     * Triggers autosave so the override is persisted locally immediately.
+     */
+    function setSectionNa(sectionId: number, reason: string | null) {
+        if (reason === null) {
+            sectionNaOverrides.value.delete(sectionId);
+        } else {
+            sectionNaOverrides.value.set(sectionId, reason);
+        }
+        // Trigger Vue reactivity on the Map
+        sectionNaOverrides.value = new Map(sectionNaOverrides.value);
+        isDirty.value = true;
+        scheduleAutosave();
+    }
+
     async function saveDraft(): Promise<boolean> {
         if (!auditId.value) return false;
         saving.value = true;
         try {
             await getClient().saveResponses(auditId.value, {
                 header: { ...header.value },
-                responses: allResponses.value.map(r => ({
+                responses: Array.from(responses.value.values()).map(r => ({
                     questionId: r.questionId,
                     questionTextSnapshot: r.questionTextSnapshot,
                     status: r.status,
                     comment: r.comment,
                     correctedOnSite: r.correctedOnSite,
                 })),
+                sectionNaOverrides: Array.from(sectionNaOverrides.value.entries()).map(
+                    ([sectionId, reason]): SectionNaOverrideDto => ({ sectionId, reason })
+                ),
             });
+            // Sync trackingNumber with the saved site code
+            if (trackingNumber.value) {
+                const parts = trackingNumber.value.split('-');
+                const base = parts.slice(0, 2).join('-');
+                const site = header.value.siteCode?.trim().toUpperCase();
+                trackingNumber.value = site ? `${base}-${site}` : base;
+            }
             clearLocalDraft();
             isDirty.value = false;
             toast.add({ severity: 'success', summary: 'Saved', detail: 'Audit draft saved.', life: 2500 });
@@ -454,21 +555,21 @@ export const useAuditStore = defineStore('audit', () => {
         }
     }
 
-    async function submitAudit(): Promise<boolean> {
-        if (!auditId.value) return false;
+    async function submitAudit(): Promise<{ ok: boolean; recipients: string[]; subject: string; reviewUrl: string }> {
+        if (!auditId.value) return { ok: false, recipients: [], subject: '', reviewUrl: '' };
         // Save responses first
         const saved = await saveDraft();
-        if (!saved) return false;
+        if (!saved) return { ok: false, recipients: [], subject: '', reviewUrl: '' };
         saving.value = true;
         try {
-            await getClient().submitAudit(auditId.value);
+            const result = await getClient().submitAudit(auditId.value);
             auditStatus.value = 'Submitted';
             toast.add({ severity: 'success', summary: 'Submitted', detail: 'Audit submitted successfully.', life: 3000 });
-            return true;
+            return { ok: true, recipients: result?.recipients ?? [], subject: result?.subject ?? '', reviewUrl: result?.reviewUrl ?? '' };
         } catch (err: unknown) {
             const msg = (err as { response?: { data?: string } })?.response?.data ?? 'Failed to submit audit.';
             toast.add({ severity: 'error', summary: 'Error', detail: msg, life: 5000 });
-            return false;
+            return { ok: false, recipients: [], subject: '', reviewUrl: '' };
         } finally {
             saving.value = false;
         }
@@ -538,11 +639,52 @@ export const useAuditStore = defineStore('audit', () => {
         }
     }
 
+    // ── Review / Distribution actions ─────────────────────────────────────────
+
+    async function saveReviewSummary(auditId: number, summary: string | null): Promise<void> {
+        await getClient().saveReviewSummary(auditId, summary);
+        if (review.value && review.value.id === auditId) {
+            review.value = { ...review.value, reviewSummary: summary };
+        }
+    }
+
+    async function addDistributionRecipient(auditId: number, email: string, name?: string): Promise<DistributionRecipientDto> {
+        const result = await getClient().addDistributionRecipient(auditId, { email, name });
+        if (review.value && review.value.id === auditId) {
+            review.value = {
+                ...review.value,
+                distributionRecipients: [...(review.value.distributionRecipients ?? []), result],
+            };
+        }
+        return result;
+    }
+
+    async function removeDistributionRecipient(auditId: number, recipientId: number): Promise<void> {
+        await getClient().removeDistributionRecipient(auditId, recipientId);
+        if (review.value && review.value.id === auditId) {
+            review.value = {
+                ...review.value,
+                distributionRecipients: (review.value.distributionRecipients ?? []).filter(r => r.id !== recipientId),
+            };
+        }
+    }
+
+    async function getDistributionPreview(auditId: number, attachmentIds: number[]) {
+        return getClient().getDistributionPreview(auditId, attachmentIds);
+    }
+
+    async function sendDistributionEmail(auditId: number, attachmentIds: number[], subjectOverride?: string): Promise<void> {
+        await getClient().sendDistributionEmail(auditId, { attachmentIds, subjectOverride: subjectOverride || undefined });
+        await loadReview(auditId);
+    }
+
     function resetForm() {
         auditId.value = null;
+        auditDivisionId.value = null;
         auditStatus.value = 'Draft';
         template.value = null;
         enabledOptionalGroupKeys.value = [];
+        sectionNaOverrides.value = new Map();
         header.value = {};
         responses.value = new Map();
         isDirty.value = false;
@@ -550,6 +692,10 @@ export const useAuditStore = defineStore('audit', () => {
         _pendingDraft.value = null;
         review.value = null;
         repeatFindingQuestionIds.value = new Set();
+        priorPrefillAvailable.value = false;
+        priorPrefillDate.value = null;
+        _priorPrefillMap.value = {};
+        prefillQuestionIds.value = new Set();
     }
 
     return {
@@ -557,12 +703,17 @@ export const useAuditStore = defineStore('audit', () => {
         divisions,
         template,
         auditId,
+        auditDivisionId,
         auditStatus,
+        trackingNumber,
         header,
         responses,
         audits,
         review,
         repeatFindingQuestionIds,
+        priorPrefillAvailable,
+        priorPrefillDate,
+        prefillQuestionIds,
         loading,
         listLoading,
         reviewLoading,
@@ -580,6 +731,7 @@ export const useAuditStore = defineStore('audit', () => {
         isSubmitted,
         visibleSections,
         enabledOptionalGroupKeys,
+        sectionNaOverrides,
         // Actions
         loadDivisions,
         createAudit,
@@ -588,13 +740,23 @@ export const useAuditStore = defineStore('audit', () => {
         loadAudit,
         acceptPendingDraft,
         discardPendingDraft,
+        loadPriorPrefill,
+        applyPrefill,
+        dismissPrefill,
+        markPrefillTouched,
         setResponse,
         setComment,
         setCorrectedOnSite,
+        setSectionNa,
         saveDraft,
         submitAudit,
         loadAuditList,
         loadReview,
+        saveReviewSummary,
+        addDistributionRecipient,
+        removeDistributionRecipient,
+        getDistributionPreview,
+        sendDistributionEmail,
         resetForm,
     };
 });

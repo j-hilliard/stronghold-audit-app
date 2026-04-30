@@ -16,6 +16,7 @@ public class AuditListItemDto
     public string? AuditDate { get; set; }  // ISO date string from DateOnly
     public string? JobNumber { get; set; }
     public string? Location { get; set; }
+    public string? TrackingNumber { get; set; }
 }
 
 // ── Full detail ───────────────────────────────────────────────────────────────
@@ -37,6 +38,10 @@ public class AuditDetailDto
 
     /// <summary>Optional section group keys enabled at creation (immutable).</summary>
     public List<string> EnabledOptionalGroupKeys { get; set; } = new();
+    public string? TrackingNumber { get; set; }
+
+    /// <summary>Sections the auditor has marked N/A for this audit (mutable while Draft/Reopened).</summary>
+    public List<SectionNaOverrideDto> SectionNaOverrides { get; set; } = new();
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
@@ -61,6 +66,7 @@ public class AuditHeaderDto
     public string? AuditDate { get; set; }
 
     public string? Auditor { get; set; }
+    public string? SiteCode { get; set; }
 }
 
 // ── Response ──────────────────────────────────────────────────────────────────
@@ -89,6 +95,46 @@ public class CreateAuditRequest
     /// Sections whose OptionalGroupKey matches are included; unmatched optional sections are excluded.
     /// </summary>
     public List<string> EnabledOptionalGroupKeys { get; set; } = new();
+
+    /// <summary>
+    /// FK to DivisionJobPrefix. Required when division has multiple prefixes (e.g. ETS: H vs B).
+    /// Null = use the division's default prefix.
+    /// </summary>
+    public int? JobPrefixId { get; set; }
+
+    /// <summary>3-char site code for the tracking number suffix (e.g. "IPT" = INEOS Pasadena TX). Optional.</summary>
+    public string? SiteCode { get; set; }
+}
+
+// ── Division job prefix ────────────────────────────────────────────────────────
+
+public class DivisionJobPrefixDto
+{
+    public int Id { get; set; }
+    public string Prefix { get; set; } = "";
+    public string Label { get; set; } = null!;
+    public bool IsDefault { get; set; }
+}
+
+public class SaveDivisionJobPrefixesRequest
+{
+    public List<DivisionJobPrefixUpsertDto> Prefixes { get; set; } = new();
+}
+
+public class DivisionJobPrefixUpsertDto
+{
+    public string Prefix { get; set; } = "";
+    public string Label { get; set; } = null!;
+    public bool IsDefault { get; set; }
+    public int SortOrder { get; set; }
+}
+
+// ── Section N/A Override ──────────────────────────────────────────────────────
+
+public class SectionNaOverrideDto
+{
+    public int SectionId { get; set; }
+    public string Reason { get; set; } = null!;
 }
 
 // ── Save request ──────────────────────────────────────────────────────────────
@@ -97,6 +143,9 @@ public class SaveResponsesRequest
 {
     public AuditHeaderDto? Header { get; set; }
     public List<AuditResponseUpsertDto> Responses { get; set; } = new();
+
+    /// <summary>Current set of section N/A overrides. Full replace — any omitted entry is deleted.</summary>
+    public List<SectionNaOverrideDto> SectionNaOverrides { get; set; } = new();
 }
 
 public class AuditResponseUpsertDto
@@ -154,6 +203,51 @@ public class AuditReviewDto
     /// <summary>All responses grouped by section — for full audit record / print view</summary>
     public List<ReviewSectionDto> Sections { get; set; } = new();
     public List<EmailRoutingDto> ReviewEmailRouting { get; set; } = new();
+
+    public string? TrackingNumber { get; set; }
+
+    // ── Review / Distribution fields ─────────────────────────────────────────
+    public string? ReviewSummary { get; set; }
+    public DateTime? ReviewedAt { get; set; }
+    public string? ReviewedBy { get; set; }
+    public List<DistributionRecipientDto> DistributionRecipients { get; set; } = new();
+
+    /// <summary>Attachments available for selection when sending the distribution email.</summary>
+    public List<AuditAttachmentRefDto> Attachments { get; set; } = new();
+}
+
+public class DistributionRecipientDto
+{
+    public int Id { get; set; }
+    public string EmailAddress { get; set; } = null!;
+    public string? Name { get; set; }
+}
+
+public class AuditAttachmentRefDto
+{
+    public int Id { get; set; }
+    public string FileName { get; set; } = null!;
+    public long FileSizeBytes { get; set; }
+    public bool HasFile { get; set; }
+}
+
+public class SaveReviewSummaryRequest
+{
+    public string? Summary { get; set; }
+}
+
+public class AddDistributionRecipientRequest
+{
+    public string Email { get; set; } = null!;
+    public string? Name { get; set; }
+}
+
+public class SendDistributionEmailRequest
+{
+    /// <summary>IDs of AuditAttachments to include as SMTP attachments in the distribution email.</summary>
+    public List<int> AttachmentIds { get; set; } = new();
+    /// <summary>Optional override for the email subject line.</summary>
+    public string? SubjectOverride { get; set; }
 }
 
 public class AuditFindingDto
@@ -213,12 +307,16 @@ public class AssignCorrectiveActionRequest
     public string Description { get; set; } = null!;
     public string? AssignedTo { get; set; }
     public string? DueDate { get; set; }
+    /// <summary>"Normal" (default) or "Urgent". Drives SLA-based due date when DueDate is not supplied.</summary>
+    public string Priority { get; set; } = "Normal";
+    public string? RootCause { get; set; }
 }
 
 public class CloseCorrectiveActionRequest
 {
     public string Notes { get; set; } = null!;
     public string? CompletedDate { get; set; }
+    public string? RootCause { get; set; }
 }
 
 public class UpdateCorrectiveActionRequest
@@ -228,6 +326,7 @@ public class UpdateCorrectiveActionRequest
     public int?    AssignedToUserId { get; set; }
     /// <summary>ISO "YYYY-MM-DD". Send empty string to clear the due date.</summary>
     public string? DueDate          { get; set; }
+    public string? RootCause        { get; set; }
 }
 
 public class BulkUpdateCorrectiveActionsRequest

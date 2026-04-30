@@ -37,7 +37,7 @@
                 @click="store.saveDraft()"
             />
             <Button
-                v-if="!store.isSubmitted"
+                v-if="!store.isSubmitted && hasPermission('audit.submit')"
                 label="Submit for Review"
                 icon="pi pi-send"
                 :loading="store.saving"
@@ -84,12 +84,41 @@
                 </template>
             </Dialog>
 
+            <!-- Prior Audit Prefill Banner -->
+            <div
+                v-if="store.priorPrefillAvailable"
+                class="mx-4 mt-3 mb-1 flex items-center gap-3 bg-blue-950/70 border border-blue-700/50 rounded-xl px-4 py-3"
+            >
+                <i class="pi pi-history text-blue-400 text-lg shrink-0" />
+                <div class="flex-1 text-sm text-slate-200">
+                    <strong class="text-white">Load prior answers?</strong>
+                    {{ store.priorPrefillDate
+                        ? ` Conforming answers from ${new Date(store.priorPrefillDate + 'T00:00:00').toLocaleDateString()} are available.`
+                        : ' Conforming answers from a prior audit are available.' }}
+                </div>
+                <Button
+                    label="Load Answers"
+                    size="small"
+                    severity="info"
+                    @click="store.applyPrefill()"
+                />
+                <Button
+                    icon="pi pi-times"
+                    size="small"
+                    text
+                    severity="secondary"
+                    title="Dismiss"
+                    @click="store.dismissPrefill()"
+                />
+            </div>
+
             <!-- Audit Header fields -->
             <div class="px-4 pt-2">
                 <AuditHeader
                     :header="store.header"
                     :audit-type="store.template.auditType"
                     :disabled="store.isSubmitted"
+                    :tracking-number="store.trackingNumber"
                 />
             </div>
 
@@ -121,10 +150,22 @@
             :counts="store.score.counts"
             :score-percent="store.score.scorePercent"
         />
+
+        <!-- Sticky bottom action bar (visible while editing) -->
+        <StickyFormActions
+            v-if="store.template"
+            :visible="!store.isSubmitted"
+            :saving="store.saving"
+            :can-submit="hasPermission('audit.submit')"
+            :status-label="store.auditStatus ? `Status: ${store.auditStatus}` : 'Editing draft'"
+            @save="store.saveDraft()"
+            @submit="onSubmit"
+            @delete="onDeleteDraft"
+        />
     </div>
 
     <!-- Submit confirmation -->
-    <ConfirmDialog />
+
 
     <!-- Post-submit summary modal -->
     <Dialog
@@ -186,6 +227,15 @@
 
         <template #footer>
             <Button label="Back to Audits" severity="secondary" outlined @click="goBackToAudits" />
+            <a
+                v-if="submitEmailHref"
+                :href="submitEmailHref"
+                target="_blank"
+                class="p-button p-button-warning p-button-outlined"
+                style="text-decoration:none;"
+            >
+                <i class="pi pi-envelope mr-2" />Notify Team
+            </a>
             <Button label="View Full Review" icon="pi pi-eye" @click="goToReview" />
         </template>
     </Dialog>
@@ -193,18 +243,19 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import { useRouter, useRoute, onBeforeRouteUpdate } from 'vue-router';
 import { useConfirm } from 'primevue/useconfirm';
 import Tag from 'primevue/tag';
 import Dialog from 'primevue/dialog';
-import ConfirmDialog from 'primevue/confirmdialog';
 import ProgressSpinner from 'primevue/progressspinner';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import BaseButtonSave from '@/components/buttons/BaseButtonSave.vue';
 import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
+import { usePermissions } from '@/modules/audit-management/composables/usePermissions';
 import AuditHeader from '../components/AuditHeader.vue';
 import AuditSection from '../components/AuditSection.vue';
 import ScoreSummaryBar from '../components/ScoreSummaryBar.vue';
+import StickyFormActions from '../components/StickyFormActions.vue';
 import AuditAttachments from '../components/AuditAttachments.vue';
 
 interface SectionRef {
@@ -215,9 +266,11 @@ interface SectionRef {
 const router = useRouter();
 const route = useRoute();
 const store = useAuditStore();
+const { hasPermission } = usePermissions();
 const confirm = useConfirm();
 const sectionRefs = ref<Map<number, SectionRef>>(new Map());
 const showSummary = ref(false);
+const submitEmailHref = ref<string | null>(null);
 
 const summaryNcItems = computed(() =>
     Array.from(store.responses.values()).filter(r => r.status === 'NonConforming'),
@@ -233,11 +286,23 @@ const summaryScoreClass = computed(() => {
     return 'bg-red-900/60 text-red-100';
 });
 
+async function loadAuditById(id: number) {
+    await store.loadAudit(id);
+    if (store.auditStatus === 'Draft' && store.auditDivisionId && store.template?.versionId) {
+        void store.loadPriorPrefill(store.auditDivisionId, store.template.versionId);
+    }
+}
+
 onMounted(async () => {
     const id = Number(route.params.id);
-    if (!isNaN(id)) {
-        await store.loadAudit(id);
-    }
+    if (!isNaN(id)) await loadAuditById(id);
+});
+
+// Vue Router reuses this component instance when navigating between audit IDs.
+// onMounted doesn't re-fire — this guard catches param changes and reloads.
+onBeforeRouteUpdate(async (to) => {
+    const id = Number(to.params.id);
+    if (!isNaN(id)) await loadAuditById(id);
 });
 
 function collapseAll() {
@@ -270,14 +335,15 @@ function onDeleteDraft() {
         acceptLabel: 'Delete',
         rejectLabel: 'Cancel',
         acceptClass: 'p-button-danger',
-        accept: async () => {
+        accept: () => {
             if (!store.auditId) return;
             const id = store.auditId;
-            const ok = await store.deleteAudit(id);
-            if (ok) {
-                store.resetForm();
-                router.push('/audit-management/audits');
-            }
+            store.deleteAudit(id).then(ok => {
+                if (ok) {
+                    store.resetForm();
+                    router.push('/audit-management/audits');
+                }
+            });
         },
     });
 }
@@ -302,11 +368,17 @@ function onSubmit() {
         icon: 'pi pi-exclamation-triangle',
         acceptLabel: 'Submit',
         rejectLabel: 'Cancel',
-        accept: async () => {
-            const ok = await store.submitAudit();
-            if (ok) {
-                showSummary.value = true;
-            }
+        accept: () => {
+            store.submitAudit().then(result => {
+                if (result.ok) {
+                    if (result.recipients.length) {
+                        const to   = result.recipients.join(',');
+                        const body = `An audit has been submitted for your review.\n\nReview it here: ${result.reviewUrl}`;
+                        submitEmailHref.value = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(result.subject)}&body=${encodeURIComponent(body)}`;
+                    }
+                    showSummary.value = true;
+                }
+            });
         },
     });
 }

@@ -20,7 +20,7 @@
 | reference-table-regions-tab | Incident mgmt | `/incident-management/ref-tables` | Regions tab | Switches tab content | `button-contract.spec.ts` | Active |
 | reference-table-lookup-tab | Incident mgmt | `/incident-management/ref-tables` | Lookup Tables tab | Switches tab content | `button-contract.spec.ts` | Active |
 | audit-dashboard-new-audit-button | Audit mgmt | `/audit-management/audits` | New Audit | Routes to new audit page | `audit-navigation-stability.spec.ts` | Active |
-| audit-new-audit-card-selection | Audit mgmt | `/audit-management/audits/new` | Division card | Exactly one selected card at a time | `audit-new-audit.spec.ts` | Active |
+| audit-new-audit-division-dropdown | Audit mgmt | `/audit-management/audits/new` | Division dropdown | Selects one division; selected division drives required job prefix / site code fields | `audit-new-audit.spec.ts` | Active |
 | audit-new-audit-start-button | Audit mgmt | `/audit-management/audits/new` | Start Audit | Starts draft and routes to `/audits/:id` | `audit-new-audit.spec.ts` | Active |
 | audit-new-audit-cancel-button | Audit mgmt | `/audit-management/audits/new` | Cancel | Routes back to audit dashboard | `audit-new-audit.spec.ts` | Active |
 | audit-form-status-buttons | Audit mgmt | `/audit-management/audits/:id` | C/NC/W/NA | Applies status and updates summary | `audit-parity.spec.ts` | Active |
@@ -38,6 +38,11 @@
 | reports-apply-filters | Reporting | `/audit-management/reports` | Apply Filters | Filters KPI/cards/table by scope and date | `audit-kpi-reporting-contract.spec.ts` | Feature-gated |
 | reports-download-export | Reporting | `/audit-management/reports` | Export | Exports selected report payload | `audit-kpi-reporting-contract.spec.ts` | Feature-gated |
 | reports-view-audit-action | Reporting | `/audit-management/reports` | View Audit | Opens selected audit detail route | `audit-kpi-reporting-contract.spec.ts` | Feature-gated |
+
+## Pending Full-Stack Audit Coverage Expansion
+- `AUDIT-20260427-FULLSTACK-BENCHMARK` must add or update rows for dashboard action clusters, audit-list filters, corrective-action bulk controls, template draft/edit/publish controls, reports menu/dropdowns, newsletter generation/template-editor actions, report composer draft/bulk delete/print/export controls, blank-form print dialog controls, and route-guard-visible navigation controls.
+- Candidate UI items U-001 through U-008 need screenshot-backed coverage before being promoted from `VERIFY` to `OPEN` or `ACCEPTED AS-IS`.
+- Candidate logic items B-001 through B-015 need matching automated or manual coverage listed in `QA_REGRESSION_CHECKLIST.md` section 15 before closure.
 
 ## Update Rule
 - Every newly introduced button in strict scope must be added here before merge.
