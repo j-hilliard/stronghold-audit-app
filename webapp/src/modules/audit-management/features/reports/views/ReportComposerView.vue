@@ -1,749 +1,563 @@
 <template>
-    <div class="flex flex-col h-full composer-view">
+    <div class="flex flex-col h-full">
         <BasePageHeader
             title="Report Composer"
-            subtitle="Build, edit, and export compliance reports"
+            subtitle="Structured compliance reports — template-driven, admin-controlled"
             icon="pi pi-file-edit"
-        />
+        >
+            <button
+                @click="saveDraft"
+                :disabled="saving"
+                class="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-700 hover:bg-blue-600 text-white rounded-lg disabled:opacity-50 transition-colors"
+            >
+                <i class="pi pi-save text-xs" />
+                {{ saving ? 'Saving…' : 'Save Draft' }}
+            </button>
+            <button
+                @click="printReport"
+                :disabled="!builder.hasData.value"
+                class="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg disabled:opacity-50 transition-colors"
+            >
+                <i class="pi pi-print text-xs" />
+                Print / PDF
+            </button>
+        </BasePageHeader>
 
-        <!-- Top bar: draft selector + filters -->
+        <!-- Context bar -->
         <div class="flex items-center gap-2 px-4 py-2.5 bg-surface-2 border-b border-slate-700/60 flex-wrap shadow-elevation-1">
-            <!-- Group 1: context filters -->
-            <div class="flex items-center gap-2 flex-wrap">
-                <!-- Division -->
-                <select v-model="selectedDivisionId" @change="onDivisionChange"
-                    data-testid="composer-filter-division"
-                    class="composer-select">
-                    <option :value="null" disabled>Select division…</option>
-                    <option v-for="d in divisions" :key="d.id" :value="d.id">{{ d.code }} — {{ d.name }}</option>
-                </select>
+            <select
+                v-model="selectedDivisionId"
+                data-testid="composer-filter-division"
+                class="composer-select"
+            >
+                <option :value="null" disabled>Select division…</option>
+                <option v-for="d in divisions" :key="d.id" :value="d.id">{{ d.code }} — {{ d.name }}</option>
+            </select>
 
-                <!-- Report type -->
-                <select v-model="reportType" class="composer-select">
-                    <option value="custom">Custom Report</option>
-                    <option value="newsletter">Newsletter</option>
-                </select>
+            <input type="date" v-model="dateFrom" data-testid="composer-filter-from" class="composer-input w-36" />
+            <span class="text-slate-600 text-xs font-medium">→</span>
+            <input type="date" v-model="dateTo" data-testid="composer-filter-to" class="composer-input w-36" />
 
-                <!-- Newsletter settings toggle -->
-                <button
-                    v-if="reportType === 'newsletter'"
-                    @click="showNewsletterSettings = !showNewsletterSettings"
-                    :class="['flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors border',
-                        showNewsletterSettings
-                            ? 'bg-blue-700 border-blue-600 text-white'
-                            : 'bg-slate-700/60 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white']"
+            <button
+                @click="generate"
+                :disabled="!selectedDivisionId || builder.loading.value"
+                data-testid="composer-generate"
+                class="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-700 hover:bg-blue-600 text-white rounded-lg disabled:opacity-50 transition-colors"
+            >
+                <i :class="builder.loading.value ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'" class="text-xs" />
+                {{ builder.loading.value ? 'Loading…' : 'Generate' }}
+            </button>
+
+            <div class="h-5 w-px bg-slate-700 mx-1 hidden sm:block" />
+
+            <input
+                v-model="draftTitle"
+                type="text"
+                placeholder="Draft title…"
+                data-testid="composer-draft-title"
+                class="composer-input w-44"
+            />
+
+            <select
+                v-model="selectedDraftId"
+                @change="onLoadDraft"
+                data-testid="composer-draft-select"
+                class="composer-select"
+            >
+                <option :value="null">New draft</option>
+                <option v-for="d in draftList" :key="d.id" :value="d.id">
+                    {{ d.divisionCode }} — {{ d.title }} ({{ d.period }})
+                </option>
+            </select>
+
+            <button
+                v-if="draftId !== null"
+                @click="deleteDraft"
+                class="px-2 py-1.5 text-xs text-red-500 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors"
+                title="Delete current draft"
+            >
+                <i class="pi pi-trash" />
+            </button>
+        </div>
+
+        <!-- Error banners -->
+        <div v-if="saveError" class="px-4 py-2 text-sm text-red-400 bg-red-900/20 border-b border-red-800">
+            {{ saveError }}
+        </div>
+        <div v-if="builder.error.value" class="px-4 py-2 text-sm text-amber-400 bg-amber-900/20 border-b border-amber-800">
+            {{ builder.error.value }}
+        </div>
+
+        <!-- Main layout -->
+        <div class="flex flex-1 min-h-0">
+
+            <!-- Left sidebar: template selector + section toggles -->
+            <div class="w-64 shrink-0 border-r border-slate-700/60 overflow-y-auto bg-slate-900/50 flex flex-col gap-5 p-4">
+
+                <!-- Template selector -->
+                <div>
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Template</div>
+                    <div class="flex flex-col gap-1.5">
+                        <label
+                            v-for="tmpl in REPORT_TEMPLATES"
+                            :key="tmpl.type"
+                            class="flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-colors"
+                            :class="report.templateType === tmpl.type
+                                ? 'border-blue-500/60 bg-blue-900/20'
+                                : 'border-slate-700/60 hover:border-slate-600 bg-slate-800/30'"
+                        >
+                            <input
+                                type="radio"
+                                :value="tmpl.type"
+                                v-model="report.templateType"
+                                @change="selectTemplate(tmpl.type as ReportType)"
+                                class="mt-0.5 accent-blue-500 cursor-pointer"
+                            />
+                            <div>
+                                <div class="text-xs font-medium text-slate-200 flex items-center gap-1.5">
+                                    <i :class="tmpl.icon + ' text-[11px] text-blue-400'" />
+                                    {{ tmpl.label }}
+                                </div>
+                                <div class="text-[11px] text-slate-500 mt-0.5 leading-tight">{{ tmpl.description }}</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Section toggles -->
+                <div>
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Sections</div>
+                    <div class="flex flex-col gap-1">
+                        <label
+                            v-for="sec in report.sections"
+                            :key="sec.type"
+                            class="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs transition-colors"
+                            :class="sec.enabled ? 'bg-slate-800/50' : 'opacity-50'"
+                        >
+                            <input
+                                type="checkbox"
+                                :checked="sec.enabled"
+                                :disabled="isRequired(sec.type)"
+                                @change="toggleSection(sec.type)"
+                                class="accent-blue-500 cursor-pointer disabled:cursor-not-allowed shrink-0"
+                            />
+                            <i :class="SECTION_ICONS[sec.type] + ' text-[10px] text-slate-400 shrink-0'" />
+                            <span class="text-slate-300 truncate">{{ SECTION_LABELS[sec.type] }}</span>
+                            <span v-if="isRequired(sec.type)" class="ml-auto text-[10px] text-slate-600 shrink-0">req</span>
+                            <span v-else-if="EDITABLE_SECTIONS.includes(sec.type)" class="ml-auto text-[10px] text-amber-500/70 shrink-0">edit</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Save status -->
+                <div v-if="lastSavedAt" class="text-[11px] text-slate-600 mt-auto pt-2 border-t border-slate-700/50">
+                    <i class="pi pi-check text-emerald-600 mr-1" />
+                    Saved {{ lastSavedAt.toLocaleTimeString() }}
+                </div>
+            </div>
+
+            <!-- Preview area -->
+            <div class="flex-1 overflow-y-auto bg-slate-950 p-6" id="report-preview">
+                <div
+                    v-if="!builder.hasData.value"
+                    class="flex flex-col items-center justify-center h-full gap-4 text-slate-600 text-center"
                 >
-                    <i class="pi pi-palette text-[11px]" />
-                    Newsletter Settings
-                </button>
-
-                <!-- Date range -->
-                <input type="date" v-model="dateFrom" data-testid="composer-filter-from"
-                    class="composer-input w-36" />
-                <span class="text-slate-600 text-xs font-medium">→</span>
-                <input type="date" v-model="dateTo" data-testid="composer-filter-to"
-                    class="composer-input w-36" />
-            </div>
-
-            <!-- Divider -->
-            <div class="h-6 w-px bg-slate-700 hidden sm:block mx-1" />
-
-            <!-- Group 2: draft management -->
-            <div class="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
-                <!-- Draft title -->
-                <input
-                    v-model="draft.meta.value.title"
-                    type="text"
-                    placeholder="Draft title…"
-                    data-testid="composer-draft-title"
-                    class="composer-input flex-1 min-w-36"
-                />
-
-                <!-- Load existing draft -->
-                <select v-model="selectedDraftId" @change="onLoadDraft"
-                    data-testid="composer-draft-select"
-                    class="composer-select">
-                    <option :value="null">New draft</option>
-                    <option v-for="d in draftList" :key="d.id" :value="d.id">
-                        {{ d.divisionCode }} — {{ d.title }} ({{ d.period }})
-                    </option>
-                </select>
-
-                <button v-if="draft.meta.value.id !== null" @click="confirmDelete"
-                    class="px-2 py-1.5 text-xs text-red-500 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors"
-                    title="Delete current draft">
-                    <i class="pi pi-trash" />
-                </button>
-
-                <!-- Manage all drafts -->
-                <button @click="openManageDrafts"
-                    class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-slate-700/60 border border-slate-600 rounded-md text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
-                    title="View and delete all drafts">
-                    <i class="pi pi-list text-[11px]" /> Manage Drafts
-                </button>
-            </div>
-        </div>
-
-        <!-- Manage Drafts dialog -->
-        <Dialog v-model:visible="showManageDrafts" modal header="Manage Drafts" :style="{ width: '680px' }">
-            <div class="flex flex-col gap-3">
-                <!-- Loading -->
-                <div v-if="draftsLoading" class="py-6 text-center text-slate-400 text-sm">
-                    <i class="pi pi-spin pi-spinner mr-2" />Loading…
+                    <i class="pi pi-file-edit text-5xl" />
+                    <p class="text-sm max-w-xs">
+                        Select a division and date range, then click
+                        <strong class="text-slate-400">Generate</strong>
+                        to build the report.
+                    </p>
                 </div>
 
-                <!-- Empty -->
-                <div v-else-if="allDrafts.length === 0" class="py-6 text-center text-slate-400 text-sm">
-                    No saved drafts found.
-                </div>
+                <div v-else class="max-w-4xl mx-auto flex flex-col gap-5">
+                    <template v-for="sec in enabledSections" :key="sec.type">
+                        <div
+                            class="report-section-card relative"
+                            :class="editingSection === sec.type ? 'ring-2 ring-amber-400/60' : ''"
+                        >
+                            <!-- Edit toggle — only for editable sections -->
+                            <button
+                                v-if="EDITABLE_SECTIONS.includes(sec.type)"
+                                @click="toggleEdit(sec.type)"
+                                class="absolute top-3 right-3 z-10 flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-colors border"
+                                :class="editingSection === sec.type
+                                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                                    : 'bg-slate-700/60 text-slate-400 hover:bg-slate-700 border-slate-600'"
+                            >
+                                <i :class="editingSection === sec.type ? 'pi pi-check' : 'pi pi-pencil'" class="text-[10px]" />
+                                {{ editingSection === sec.type ? 'Done' : 'Edit' }}
+                            </button>
 
-                <!-- Table -->
-                <div v-else class="overflow-auto max-h-96">
-                    <table class="w-full text-sm border-collapse">
-                        <thead class="sticky top-0 bg-slate-800">
-                            <tr class="text-left text-xs text-slate-400 uppercase border-b border-slate-700">
-                                <th class="pb-2 pr-2 w-8">
-                                    <input type="checkbox"
-                                        :checked="selectedDraftIds.length === allDrafts.length"
-                                        @change="toggleSelectAll"
-                                        class="accent-blue-500 cursor-pointer" />
-                                </th>
-                                <th class="pb-2 pr-3">Division</th>
-                                <th class="pb-2 pr-3">Title</th>
-                                <th class="pb-2 pr-3">Period</th>
-                                <th class="pb-2 pr-3">Updated</th>
-                                <th class="pb-2"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="d in allDrafts" :key="d.id"
-                                class="border-b border-slate-700/50 cursor-pointer transition-colors"
-                                :class="selectedDraftIds.includes(d.id) ? 'bg-blue-900/30' : 'hover:bg-slate-700/30'"
-                                @click="toggleDraftSelection(d.id)">
-                                <td class="py-2 pr-2" @click.stop>
-                                    <input type="checkbox"
-                                        :checked="selectedDraftIds.includes(d.id)"
-                                        @change="toggleDraftSelection(d.id)"
-                                        class="accent-blue-500 cursor-pointer" />
-                                </td>
-                                <td class="py-2 pr-3 text-slate-300 text-xs">{{ d.divisionCode }}</td>
-                                <td class="py-2 pr-3 text-slate-200">{{ d.title || '(Untitled)' }}</td>
-                                <td class="py-2 pr-3 text-slate-400 text-xs whitespace-nowrap">{{ d.dateFrom ?? '?' }} – {{ d.dateTo ?? '?' }}</td>
-                                <td class="py-2 pr-3 text-slate-500 text-xs whitespace-nowrap">{{ new Date(d.updatedAt ?? d.createdAt).toLocaleDateString() }}</td>
-                                <td class="py-2 text-right" @click.stop>
-                                    <button @click="loadDraftFromManager(d)"
-                                        class="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 rounded">Load</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                            <!-- Editable section (summary-text, highlights, findings-examples) -->
+                            <component
+                                v-if="EDITABLE_SECTIONS.includes(sec.type)"
+                                :is="sectionComponent(sec.type)"
+                                v-bind="sectionProps(sec)"
+                                :is-editable="editingSection === sec.type"
+                                @update="updateSection"
+                            />
 
-                <!-- Footer actions -->
-                <div class="flex items-center justify-between pt-1 border-t border-slate-700">
-                    <button
-                        v-if="selectedDraftIds.length > 0"
-                        @click="bulkDeleteDrafts"
-                        :disabled="bulkDeleting"
-                        class="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-800 hover:bg-red-700 text-white rounded disabled:opacity-50"
-                    >
-                        <i class="pi pi-trash text-xs" />
-                        Delete Selected ({{ selectedDraftIds.length }})
-                    </button>
-                    <span v-else class="text-xs text-slate-500">Select rows to bulk delete</span>
-                    <button @click="showManageDrafts = false"
-                        class="px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 rounded">Close</button>
+                            <!-- Non-editable section -->
+                            <component
+                                v-else
+                                :is="sectionComponent(sec.type)"
+                                v-bind="sectionProps(sec)"
+                            />
+                        </div>
+                    </template>
                 </div>
             </div>
-        </Dialog>
-
-        <!-- Error / loading states -->
-        <div v-if="engine.error.value" class="px-4 py-2 text-sm text-red-400 bg-red-900/20 border-b border-red-800">
-            {{ engine.error.value }}
-        </div>
-
-        <!-- Main composer layout -->
-        <div class="flex flex-1 min-h-0 composer-main">
-            <ComposerToolbar
-                :generating="engine.loading.value"
-                :saving="draft.saving.value"
-                :is-dirty="draft.isDirty.value"
-                :save-error="draft.saveError.value"
-                :last-saved-at="draft.lastSavedAt.value"
-                :can-undo="draft.canUndo.value"
-                :can-redo="draft.canRedo.value"
-                :active-theme-id="activeThemeId"
-                :sections="engine.sections.value"
-                :used-line-sections="usedLineSections"
-                :used-bar-sections="usedBarSections"
-                @generate="onGenerate"
-                @save="draft.save()"
-                @print="printReport"
-                @undo="draft.undo()"
-                @redo="draft.redo()"
-                @apply-theme="onApplyTheme"
-                @add-block="onAddBlock"
-            />
-
-            <ComposerCanvas
-                :blocks="draft.blocks.value"
-                :selected-id="selectedBlockId"
-                @select="selectedBlock = $event"
-                @remove="draft.removeBlock($event)"
-                @move-up="onMoveUp"
-                @move-down="onMoveDown"
-                @duplicate="draft.duplicateBlock($event); draft.scheduleAutosave()"
-                @update-content="onUpdateContent"
-                @update-is-edited="onUpdateIsEdited"
-                @update-layout="onUpdateLayout"
-            />
-
-            <NewsletterSettingsPanel
-                v-if="reportType === 'newsletter' && showNewsletterSettings"
-                v-model="newsletterTemplate"
-                :available-sections="engine.sections.value"
-                :saving="newsletterSaving"
-                :save-error="newsletterSaveError"
-                :saved-at="newsletterSavedAt"
-                @save="saveNewsletterTemplate"
-                @close="showNewsletterSettings = false"
-            />
-
-            <ComposerPropertyPanel
-                v-if="!(reportType === 'newsletter' && showNewsletterSettings)"
-                :block="selectedBlock"
-                @update="onBlockUpdate"
-                @bring-forward="draft.bringForward($event); draft.scheduleAutosave()"
-                @send-backward="draft.sendBackward($event); draft.scheduleAutosave()"
-            />
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
-import { useUserStore } from '@/stores/userStore';
+import { ref, computed, onMounted } from 'vue';
 import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 import type { DivisionDto, ReportDraftListItemDto } from '@/apiclient/auditClient';
-import Dialog from 'primevue/dialog';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
-import ComposerToolbar from '../components/ComposerToolbar.vue';
-import ComposerCanvas from '../components/ComposerCanvas.vue';
-import ComposerPropertyPanel from '../components/ComposerPropertyPanel.vue';
-import NewsletterSettingsPanel from '../components/NewsletterSettingsPanel.vue';
-import { useReportEngine } from '../composables/useReportEngine';
-import { useReportDraft } from '../composables/useReportDraft';
-import type { ReportBlock } from '../types/report-block';
-import type { NewsletterTemplateDto } from '@/apiclient/auditClient';
+import { useReportBuilder } from '../composables/useReportBuilder';
+import {
+    REPORT_TEMPLATES,
+    SECTION_LABELS,
+    SECTION_ICONS,
+    EDITABLE_SECTIONS,
+    buildDefaultReport,
+    buildDefaultSections,
+    getTemplateDefinition,
+    isStructuredReport,
+    type ReportType,
+    type SectionType,
+    type StructuredSection,
+    type StructuredReport,
+} from '../types/report-template';
+import ReportSectionCover from '../components/sections/ReportSectionCover.vue';
+import ReportSectionKpis from '../components/sections/ReportSectionKpis.vue';
+import ReportSectionTrend from '../components/sections/ReportSectionTrend.vue';
+import ReportSectionCategoryBreakdown from '../components/sections/ReportSectionCategoryBreakdown.vue';
+import ReportSectionFindings from '../components/sections/ReportSectionFindings.vue';
+import ReportSectionCaTable from '../components/sections/ReportSectionCaTable.vue';
+import ReportSectionSummaryText from '../components/sections/ReportSectionSummaryText.vue';
+import ReportSectionHighlights from '../components/sections/ReportSectionHighlights.vue';
 
 const service = useAuditService();
-const userStore = useUserStore();
-const engine = useReportEngine();
-const draft = useReportDraft();
+const builder = useReportBuilder();
+
+// ── Filter state ──────────────────────────────────────────────────────────────
 
 const divisions = ref<DivisionDto[]>([]);
-const draftList = ref<ReportDraftListItemDto[]>([]);
 const selectedDivisionId = ref<number | null>(null);
-const selectedDraftId = ref<number | null>(null);
-const selectedBlock = ref<ReportBlock | null>(null);
 const dateFrom = ref('');
 const dateTo = ref('');
 
-// Newsletter mode
-const reportType = ref<'custom' | 'newsletter'>('custom');
-const showNewsletterSettings = ref(false);
-const newsletterTemplate = ref<NewsletterTemplateDto>({
-    divisionId: 0,
-    name: '',
-    primaryColor: '#1e3a5f',
-    accentColor: '#f59e0b',
-    coverImageUrl: null,
-    visibleSections: null,
-    isDefault: true,
-});
-const newsletterSaving = ref(false);
-const newsletterSaveError = ref<string | null>(null);
-const newsletterSavedAt = ref<Date | null>(null);
+// ── Report state ──────────────────────────────────────────────────────────────
 
-const selectedBlockId = computed(() => selectedBlock.value?.id ?? null);
+const report = ref<StructuredReport>(
+    buildDefaultReport(getTemplateDefinition('QuarterlySummary'), 0, '', '', null, null),
+);
 
-// Active theme tracking (purely visual — highlights the active swatch)
-const activeThemeId = ref<string | null>(null);
+const editingSection = ref<SectionType | null>(null);
 
-function onApplyTheme(themeId: string) {
-    draft.applyTheme(themeId);
-    activeThemeId.value = themeId;
-    draft.scheduleAutosave();
+const enabledSections = computed(() =>
+    report.value.sections.filter(s => s.enabled),
+);
+
+// ── Draft persistence ─────────────────────────────────────────────────────────
+
+const draftList = ref<ReportDraftListItemDto[]>([]);
+const selectedDraftId = ref<number | null>(null);
+const draftId = ref<number | null>(null);
+const draftTitle = ref('');
+const draftRowVersion = ref<string | null>(null);
+const saving = ref(false);
+const saveError = ref<string | null>(null);
+const lastSavedAt = ref<Date | null>(null);
+
+async function saveDraft() {
+    if (!selectedDivisionId.value) { saveError.value = 'Select a division first.'; return; }
+    saving.value = true;
+    saveError.value = null;
+    const div = divisions.value.find(d => d.id === selectedDivisionId.value);
+    report.value.divisionId   = selectedDivisionId.value;
+    report.value.divisionCode = div?.code ?? '';
+    report.value.period       = buildPeriodLabel(dateFrom.value, dateTo.value);
+    report.value.dateFrom     = dateFrom.value || null;
+    report.value.dateTo       = dateTo.value || null;
+    const blocksJson = JSON.stringify(report.value);
+    try {
+        if (draftId.value === null) {
+            const newId = await service.createReportDraft({
+                divisionId: selectedDivisionId.value,
+                title: draftTitle.value || 'Untitled Draft',
+                period: report.value.period,
+                dateFrom: report.value.dateFrom,
+                dateTo: report.value.dateTo,
+                blocksJson,
+            });
+            draftId.value = newId;
+            selectedDraftId.value = newId;
+            const fresh = await service.getReportDraft(newId);
+            draftRowVersion.value = fresh.rowVersion;
+        } else {
+            if (!draftRowVersion.value) throw new Error('rowVersion missing — cannot update draft.');
+            await service.updateReportDraft(draftId.value, {
+                title: draftTitle.value || 'Untitled Draft',
+                period: report.value.period,
+                dateFrom: report.value.dateFrom,
+                dateTo: report.value.dateTo,
+                blocksJson,
+                rowVersion: draftRowVersion.value,
+            });
+            const fresh = await service.getReportDraft(draftId.value);
+            draftRowVersion.value = fresh.rowVersion;
+        }
+        lastSavedAt.value = new Date();
+        await loadDraftList();
+    } catch (e: unknown) {
+        saveError.value = e instanceof Error ? e.message : 'Save failed.';
+    } finally {
+        saving.value = false;
+    }
 }
 
-// ── Keyboard shortcuts ────────────────────────────────────────────────────────
-function onKeyDown(e: KeyboardEvent) {
-    const target = e.target as HTMLElement;
-    const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
-
-    if (e.ctrlKey || e.metaKey) {
-        if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); draft.undo(); return; }
-        if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); draft.redo(); return; }
-        if (e.key === 'd' && selectedBlock.value) {
-            e.preventDefault();
-            draft.duplicateBlock(selectedBlock.value.id);
-            draft.scheduleAutosave();
-            return;
-        }
-    }
-
-    if ((e.key === 'Delete' || e.key === 'Backspace') && !isTyping && selectedBlock.value) {
-        e.preventDefault();
-        draft.removeBlock(selectedBlock.value.id);
-        selectedBlock.value = null;
-        draft.scheduleAutosave();
-    }
-}
-
-onMounted(() => document.addEventListener('keydown', onKeyDown));
-onUnmounted(() => document.removeEventListener('keydown', onKeyDown));
-
-/**
- * Sections that already have at least one chart-line block on the canvas.
- * Passed to the toolbar so it can show a green "already added" indicator.
- */
-const usedLineSections = computed(() => {
-    const s = new Set<string>();
-    for (const b of draft.blocks.value) {
-        if (b.type === 'chart-line') s.add(b.content.sectionName);
-    }
-    return s;
-});
-
-/**
- * Sections that already have a section-specific chart-bar block.
- * The all-sections overview bar chart has labels.length > 2; single-section has labels = ['Division','Company'].
- */
-const usedBarSections = computed(() => {
-    const s = new Set<string>();
-    for (const b of draft.blocks.value) {
-        if (b.type === 'chart-bar' && b.content.labels.length === 2
-            && b.content.labels[0] === 'Division') {
-            s.add(b.content.title.replace(' — Division vs Company', ''));
-        }
-    }
-    return s;
-});
-
-// Keep draft meta in sync with the filter bar
-watch([dateFrom, dateTo], ([f, t]) => {
-    draft.meta.value.dateFrom = f || null;
-    draft.meta.value.dateTo = t || null;
-});
-
-watch(selectedDivisionId, (id) => {
-    if (id) draft.meta.value.divisionId = id;
-});
-
-async function loadDivisions() {
-    const client = service;
-    divisions.value = await client.getDivisions();
-    if (divisions.value.length && !selectedDivisionId.value) {
-        selectedDivisionId.value = divisions.value[0].id;
-        draft.meta.value.divisionId = divisions.value[0].id;
-        draft.meta.value.divisionCode = divisions.value[0].code;
-    }
+async function deleteDraft() {
+    if (draftId.value === null) return;
+    if (!confirm('Delete this draft? This cannot be undone.')) return;
+    await service.deleteReportDraft(draftId.value);
+    draftId.value = null;
+    draftRowVersion.value = null;
+    selectedDraftId.value = null;
+    await loadDraftList();
 }
 
 async function loadDraftList() {
-    const client = service;
-    draftList.value = await client.getReportDrafts(selectedDivisionId.value);
-}
-
-async function onDivisionChange() {
-    const div = divisions.value.find(d => d.id === selectedDivisionId.value);
-    if (div) {
-        draft.meta.value.divisionId = div.id;
-        draft.meta.value.divisionCode = div.code;
-    }
-    await Promise.all([loadDraftList(), loadNewsletterTemplate()]);
-}
-
-async function loadNewsletterTemplate() {
-    if (!selectedDivisionId.value) return;
-    const client = service;
     try {
-        const tmpl = await client.getNewsletterTemplate(selectedDivisionId.value);
-        if (tmpl) {
-            newsletterTemplate.value = tmpl;
-        } else {
-            newsletterTemplate.value = {
-                divisionId: selectedDivisionId.value,
-                name: `${divisions.value.find(d => d.id === selectedDivisionId.value)?.code ?? ''} Newsletter`,
-                primaryColor: '#1e3a5f',
-                accentColor: '#f59e0b',
-                coverImageUrl: null,
-                visibleSections: null,
-                isDefault: true,
-            };
-        }
+        draftList.value = await service.getReportDrafts(selectedDivisionId.value ?? undefined);
     } catch {
-        // non-fatal — defaults already set
-    }
-}
-
-async function saveNewsletterTemplate() {
-    if (!selectedDivisionId.value) return;
-    newsletterSaving.value = true;
-    newsletterSaveError.value = null;
-    try {
-        const client = service;
-        const saved = await client.saveNewsletterTemplate({
-            ...newsletterTemplate.value,
-            divisionId: selectedDivisionId.value,
-        });
-        newsletterTemplate.value = saved;
-        newsletterSavedAt.value = new Date();
-    } catch (e: unknown) {
-        newsletterSaveError.value = (e as Error)?.message ?? 'Save failed';
-    } finally {
-        newsletterSaving.value = false;
+        draftList.value = [];
     }
 }
 
 async function onLoadDraft() {
     if (!selectedDraftId.value) return;
-    await draft.loadDraft(selectedDraftId.value);
-    selectedDivisionId.value = draft.meta.value.divisionId;
-    dateFrom.value = draft.meta.value.dateFrom ?? '';
-    dateTo.value = draft.meta.value.dateTo ?? '';
-    selectedBlock.value = null;
+    const dto = await service.getReportDraft(selectedDraftId.value);
+    if (!isStructuredReport(dto.blocksJson)) {
+        alert('This draft was created with the old report builder and cannot be opened here. Starting a new draft instead.');
+        selectedDraftId.value = null;
+        return;
+    }
+    const loaded: StructuredReport = JSON.parse(dto.blocksJson);
+    report.value      = loaded;
+    draftId.value     = dto.id;
+    draftTitle.value  = dto.title;
+    draftRowVersion.value = dto.rowVersion;
+    selectedDivisionId.value = dto.divisionId;
+    dateFrom.value = dto.dateFrom ?? '';
+    dateTo.value   = dto.dateTo   ?? '';
+    editingSection.value = null;
 }
 
-async function onGenerate() {
+// ── Template / section helpers ────────────────────────────────────────────────
+
+function selectTemplate(type: ReportType) {
+    const tmpl = getTemplateDefinition(type);
+    const newSections = buildDefaultSections(tmpl);
+    report.value.sections = newSections.map(s => {
+        const existing = report.value.sections.find(e => e.type === s.type);
+        return existing ? { ...existing, enabled: s.enabled } : s;
+    });
+    report.value.templateType = type;
+    editingSection.value = null;
+}
+
+function isRequired(type: SectionType): boolean {
+    return getTemplateDefinition(report.value.templateType).requiredSections.includes(type);
+}
+
+function toggleSection(type: SectionType) {
+    if (isRequired(type)) return;
+    const sec = report.value.sections.find(s => s.type === type);
+    if (sec) sec.enabled = !sec.enabled;
+    if (editingSection.value === type && !sec?.enabled) editingSection.value = null;
+}
+
+function toggleEdit(type: SectionType) {
+    editingSection.value = editingSection.value === type ? null : type;
+}
+
+function updateSection(updated: StructuredSection) {
+    const idx = report.value.sections.findIndex(s => s.type === updated.type);
+    if (idx >= 0) Object.assign(report.value.sections[idx], updated);
+}
+
+// ── Component dispatch ────────────────────────────────────────────────────────
+
+const SECTION_COMPONENTS = {
+    'cover':              ReportSectionCover,
+    'kpis':               ReportSectionKpis,
+    'trend':              ReportSectionTrend,
+    'category-breakdown': ReportSectionCategoryBreakdown,
+    'findings-examples':  ReportSectionFindings,
+    'ca-table':           ReportSectionCaTable,
+    'summary-text':       ReportSectionSummaryText,
+    'highlights':         ReportSectionHighlights,
+} as const;
+
+function sectionComponent(type: SectionType) {
+    return SECTION_COMPONENTS[type];
+}
+
+function sectionProps(sec: StructuredSection): Record<string, unknown> {
+    const div = divisions.value.find(d => d.id === selectedDivisionId.value);
+    switch (sec.type) {
+        case 'cover':
+            return {
+                templateType: report.value.templateType,
+                divisionCode: div?.code ?? report.value.divisionCode,
+                divisionName: div?.name ?? '',
+                period:   report.value.period || buildPeriodLabel(dateFrom.value, dateTo.value),
+                dateFrom: report.value.dateFrom,
+                dateTo:   report.value.dateTo,
+            };
+        case 'kpis':
+            return { kpis: builder.kpis.value };
+        case 'trend':
+            return { trends: builder.trends.value };
+        case 'category-breakdown':
+            return { categories: builder.categories.value };
+        case 'findings-examples':
+            return { section: sec, sectionNames: builder.sectionNames.value };
+        case 'ca-table':
+            return { caRows: builder.caRows.value };
+        case 'summary-text':
+            return { section: sec };
+        case 'highlights':
+            return { section: sec };
+        default:
+            return {};
+    }
+}
+
+// ── Generate ──────────────────────────────────────────────────────────────────
+
+async function generate() {
     const div = divisions.value.find(d => d.id === selectedDivisionId.value);
     if (!div) return;
-
-    const period = buildPeriodLabel(dateFrom.value, dateTo.value);
-    draft.meta.value.period = period;
-
-    const newBlocks = await engine.generateBlocks({
+    await builder.build({
         divisionId: div.id,
-        divisionCode: div.code,
-        divisionName: div.name,
-        period,
-        dateFrom: dateFrom.value || null,
-        dateTo: dateTo.value || null,
-        preparedBy: userStore.userAccountInfo?.name ?? 'Stronghold',
-        existingBlocks: draft.blocks.value,
+        division:   div,
+        dateFrom:   dateFrom.value || null,
+        dateTo:     dateTo.value   || null,
     });
-
-    draft.setBlocks(newBlocks);
-    draft.scheduleAutosave();
+    report.value.divisionId   = div.id;
+    report.value.divisionCode = div.code;
+    report.value.period   = buildPeriodLabel(dateFrom.value, dateTo.value);
+    report.value.dateFrom = dateFrom.value || null;
+    report.value.dateTo   = dateTo.value   || null;
 }
 
-async function onAddBlock(type: ReportBlock['type'], sectionName?: string) {
-    const div = divisions.value.find(d => d.id === selectedDivisionId.value);
-    const newBlock = await engine.buildSingleBlock(
-        type,
-        selectedDivisionId.value ?? 0,
-        div?.code ?? '',
-        draft.meta.value.period,
-        userStore.userAccountInfo?.name ?? 'Stronghold',
-        sectionName,
-        draft.blocks.value,
-    );
-    draft.blocks.value.push(newBlock);
-    selectedBlock.value = newBlock;
-    draft.scheduleAutosave();
+// ── Print ─────────────────────────────────────────────────────────────────────
 
-    // Scroll the new block into view after Vue flushes the DOM
-    await nextTick();
-    const el = document.querySelector(`[data-testid="composer-block-${newBlock.id}"]`);
-    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-function onBlockUpdate(updated: ReportBlock) {
-    draft.updateBlock(updated);
-    selectedBlock.value = updated;
-    draft.scheduleAutosave();
-}
-
-function onUpdateContent(id: string, content: unknown) {
-    const block = draft.blocks.value.find(b => b.id === id);
-    if (!block) return;
-    const updated = { ...block, content } as ReportBlock;
-    draft.updateBlock(updated);
-    if (selectedBlock.value?.id === id) selectedBlock.value = updated;
-    draft.scheduleAutosave();
-}
-
-function onUpdateIsEdited(id: string, value: boolean) {
-    const block = draft.blocks.value.find(b => b.id === id);
-    if (!block) return;
-    const updated = { ...block, isEdited: value };
-    draft.updateBlock(updated);
-    if (selectedBlock.value?.id === id) selectedBlock.value = updated;
-}
-
-function onUpdateLayout(id: string, layout: Partial<import('../types/report-block').BlockLayout>) {
-    draft.updateLayout(id, layout);
-    // Keep selectedBlock in sync so the property panel shows current coords
-    if (selectedBlock.value?.id === id) {
-        const found = draft.blocks.value.find(b => b.id === id);
-        if (found) selectedBlock.value = found;
-    }
-    draft.scheduleAutosave();
-}
-
-function onMoveUp(id: string) {
-    const idx = draft.blocks.value.findIndex(b => b.id === id);
-    if (idx > 0) {
-        const arr = [...draft.blocks.value];
-        [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
-        draft.setBlocks(arr);
-        draft.scheduleAutosave();
-    }
-}
-
-function onReorder(orderedIds: string[]) {
-    const map = new Map(draft.blocks.value.map(b => [b.id, b]));
-    draft.setBlocks(orderedIds.map(id => map.get(id)!).filter(Boolean));
-    draft.scheduleAutosave();
-}
-
-function onMoveDown(id: string) {
-    const idx = draft.blocks.value.findIndex(b => b.id === id);
-    if (idx < draft.blocks.value.length - 1) {
-        const arr = [...draft.blocks.value];
-        [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]];
-        draft.setBlocks(arr);
-        draft.scheduleAutosave();
-    }
-}
-
-async function confirmDelete() {
-    if (!confirm('Delete this draft? This cannot be undone.')) return;
-    await draft.deleteDraft();
-    selectedDraftId.value = null;
-    await loadDraftList();
-}
-
-// ── Manage Drafts dialog ───────────────────────────────────────────────────────
-
-const showManageDrafts = ref(false);
-const allDrafts = ref<ReportDraftListItemDto[]>([]);
-const draftsLoading = ref(false);
-const selectedDraftIds = ref<number[]>([]);
-const bulkDeleting = ref(false);
-
-async function openManageDrafts() {
-    allDrafts.value = [];
-    selectedDraftIds.value = [];
-    draftsLoading.value = true;
-    showManageDrafts.value = true;
-    try {
-        const client = service;
-        allDrafts.value = await client.getReportDrafts(selectedDivisionId.value);
-    } catch {
-        // allDrafts stays empty — dialog still shows "No saved drafts found"
-    } finally {
-        draftsLoading.value = false;
-    }
-}
-
-function toggleDraftSelection(id: number) {
-    const idx = selectedDraftIds.value.indexOf(id);
-    if (idx >= 0) {
-        selectedDraftIds.value.splice(idx, 1);
-    } else {
-        selectedDraftIds.value.push(id);
-    }
-}
-
-function toggleSelectAll() {
-    if (selectedDraftIds.value.length === allDrafts.value.length) {
-        selectedDraftIds.value = [];
-    } else {
-        selectedDraftIds.value = allDrafts.value.map(d => d.id);
-    }
-}
-
-async function bulkDeleteDrafts() {
-    const count = selectedDraftIds.value.length;
-    if (!confirm(`Delete ${count} draft${count !== 1 ? 's' : ''}? This cannot be undone.`)) return;
-    bulkDeleting.value = true;
-    try {
-        const client = service;
-        const ids = [...selectedDraftIds.value];
-        await Promise.all(ids.map(id => client.deleteReportDraft(id)));
-        // If the active draft was among the deleted, clear local state only —
-        // do not call draft.deleteDraft() since it was already deleted above.
-        if (draft.meta.value.id !== null && ids.includes(draft.meta.value.id)) {
-            draft.meta.value.id = null;
-            draft.meta.value.rowVersion = null;
-            selectedDraftId.value = null;
-        }
-        allDrafts.value = allDrafts.value.filter(d => !ids.includes(d.id));
-        selectedDraftIds.value = [];
-        await loadDraftList();
-    } finally {
-        bulkDeleting.value = false;
-    }
-}
-
-async function loadDraftFromManager(d: ReportDraftListItemDto) {
-    showManageDrafts.value = false;
-    selectedDivisionId.value = d.divisionId;
-    await loadDraftList();
-    selectedDraftId.value = d.id;
-    await onLoadDraft();
-}
-
-async function waitForPrintImages(root: HTMLElement) {
-    const images = Array.from(root.querySelectorAll('img')) as HTMLImageElement[];
-    await Promise.all(images.map(async (img) => {
-        if (img.complete && img.naturalWidth > 0) return;
-        try {
-            await img.decode();
-        } catch {
-            await new Promise<void>((resolve) => {
-                const done = () => resolve();
-                img.addEventListener('load', done, { once: true });
-                img.addEventListener('error', done, { once: true });
-                setTimeout(done, 1200);
-            });
-        }
-    }));
-}
-
-async function printReport() {
-    const docPage = document.querySelector('.document-page') as HTMLElement | null;
-    if (!docPage) { window.print(); return; }
-
-    // Clone the document page so we can manipulate it without affecting the live DOM
-    const clone = docPage.cloneNode(true) as HTMLElement;
-
-    // Chart.js renders to <canvas>; cloned canvases lose bitmap pixels.
-    // Convert each canvas to an <img> so print preview preserves chart content.
-    const originalCanvases = Array.from(docPage.querySelectorAll('canvas')) as HTMLCanvasElement[];
-    const clonedCanvases = Array.from(clone.querySelectorAll('canvas')) as HTMLCanvasElement[];
-    originalCanvases.forEach((canvas, i) => {
-        const cloneCanvas = clonedCanvases[i];
-        if (!cloneCanvas) return;
-
-        const rect = canvas.getBoundingClientRect();
-        const width = Math.max(1, Math.round(rect.width || canvas.width || 1));
-        const height = Math.max(1, Math.round(rect.height || canvas.height || 1));
-
-        try {
-            const img = document.createElement('img');
-            img.src = canvas.toDataURL('image/png');
-            img.style.width = `${width}px`;
-            img.style.height = `${height}px`;
-            img.style.display = 'block';
-            cloneCanvas.replaceWith(img);
-        } catch {
-            // Fallback: copy pixels directly into the cloned canvas.
-            try {
-                cloneCanvas.width = canvas.width;
-                cloneCanvas.height = canvas.height;
-                cloneCanvas.style.width = `${width}px`;
-                cloneCanvas.style.height = `${height}px`;
-                const ctx = cloneCanvas.getContext('2d');
-                if (ctx) {
-                    ctx.clearRect(0, 0, cloneCanvas.width, cloneCanvas.height);
-                    ctx.drawImage(canvas, 0, 0);
-                }
-            } catch {
-                // Keep clone canvas as last-resort fallback.
-            }
-        }
-    });
-
-    // Remove block-control buttons (drag handles, up/down, remove) from the clone
-    clone.querySelectorAll('.drag-handle, [title="Move up"], [title="Move down"], [title="Remove block"]')
-        .forEach(el => el.remove());
-
-    // Mount print root; CSS hides all other body children while this is present
-    const printRoot = document.createElement('div');
-    printRoot.id = 'print-root';
-    printRoot.appendChild(clone);
-    document.body.appendChild(printRoot);
-
-    // afterprint fires when the print dialog closes (or is cancelled)
-    // More reliable than calling removeChild synchronously since Firefox
-    // doesn't block on window.print()
-    const cleanup = () => {
-        if (document.body.contains(printRoot)) document.body.removeChild(printRoot);
-        window.removeEventListener('afterprint', cleanup);
-    };
-    window.addEventListener('afterprint', cleanup);
-
-    // Ensure converted chart images are decoded before print opens.
-    await waitForPrintImages(printRoot);
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-
+function printReport() {
     window.print();
 }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function buildPeriodLabel(from: string, to: string): string {
     if (!from && !to) return 'All Time';
     if (!from) return `Up to ${to}`;
-    if (!to) return `From ${from}`;
-    // Try to detect a clean quarter
+    if (!to)   return `From ${from}`;
     const f = new Date(from);
     const t = new Date(to);
     const q = Math.floor(f.getMonth() / 3) + 1;
     const qStart = new Date(f.getFullYear(), (q - 1) * 3, 1);
-    const qEnd = new Date(f.getFullYear(), q * 3, 0);
-    if (
-        f.getTime() === qStart.getTime() &&
-        t.toDateString() === qEnd.toDateString()
-    ) {
+    const qEnd   = new Date(f.getFullYear(), q * 3, 0);
+    if (f.getTime() === qStart.getTime() && t.toDateString() === qEnd.toDateString()) {
         return `Q${q} ${f.getFullYear()}`;
     }
     return `${from} – ${to}`;
 }
 
-onMounted(async () => {
-    await loadDivisions();
-    await Promise.all([loadDraftList(), loadNewsletterTemplate()]);
+// ── Lifecycle ─────────────────────────────────────────────────────────────────
 
-    // Default date range: current quarter
+onMounted(async () => {
+    divisions.value = await service.getDivisions();
+    if (divisions.value.length) {
+        selectedDivisionId.value = divisions.value[0].id;
+        await loadDraftList();
+    }
     const now = new Date();
-    const q = Math.floor(now.getMonth() / 3);
+    const q   = Math.floor(now.getMonth() / 3);
     dateFrom.value = new Date(now.getFullYear(), q * 3, 1).toISOString().split('T')[0];
-    dateTo.value = new Date(now.getFullYear(), q * 3 + 3, 0).toISOString().split('T')[0];
+    dateTo.value   = new Date(now.getFullYear(), q * 3 + 3, 0).toISOString().split('T')[0];
 });
 </script>
 
 <style scoped>
 .composer-select {
-    background: rgb(51,65,85,0.5);
-    border: 1px solid rgba(100,116,139,0.5);
+    background: rgb(51 65 85 / 0.5);
+    border: 1px solid rgb(100 116 139 / 0.5);
     border-radius: 0.375rem;
     padding: 0.375rem 0.625rem;
     font-size: 0.8125rem;
     color: #e2e8f0;
     outline: none;
-    transition: border-color 0.15s ease;
+    transition: border-color 0.15s;
 }
 .composer-select:focus {
-    border-color: rgba(59,130,246,0.7);
-    box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+    border-color: rgb(59 130 246 / 0.7);
+    box-shadow: 0 0 0 2px rgb(59 130 246 / 0.2);
 }
 .composer-input {
-    background: rgb(51,65,85,0.5);
-    border: 1px solid rgba(100,116,139,0.5);
+    background: rgb(51 65 85 / 0.5);
+    border: 1px solid rgb(100 116 139 / 0.5);
     border-radius: 0.375rem;
     padding: 0.375rem 0.625rem;
     font-size: 0.8125rem;
     color: #e2e8f0;
     outline: none;
-    transition: border-color 0.15s ease;
+    transition: border-color 0.15s;
 }
 .composer-input:focus {
-    border-color: rgba(59,130,246,0.7);
-    box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+    border-color: rgb(59 130 246 / 0.7);
+    box-shadow: 0 0 0 2px rgb(59 130 246 / 0.2);
 }
-.composer-input::placeholder {
-    color: #475569;
+.composer-input::placeholder { color: #475569; }
+
+.report-section-card {
+    background: rgb(15 23 42 / 0.6);
+    border: 1px solid rgb(51 65 85 / 0.6);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+}
+
+/* Shared heading used by all section child components */
+:deep(.section-heading) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.875rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgb(51 65 85 / 0.5);
+}
+
+@media print {
+    :deep(.section-heading) {
+        color: #334155;
+        border-bottom-color: #e2e8f0;
+    }
+    .report-section-card {
+        background: white;
+        border-color: #e2e8f0;
+        break-inside: avoid;
+    }
+    button { display: none !important; }
 }
 </style>
-
