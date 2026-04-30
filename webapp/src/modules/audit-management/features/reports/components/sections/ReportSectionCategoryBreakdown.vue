@@ -18,15 +18,14 @@
                 <div class="w-44 shrink-0 text-xs text-slate-300 truncate" :title="row.sectionName">
                     {{ row.sectionName }}
                 </div>
-                <div class="flex-1 h-5 bg-slate-800 rounded overflow-hidden">
+                <div class="flex-1 h-4 rounded overflow-hidden" style="background: var(--surface-2);">
                     <div
                         class="h-full rounded transition-all duration-500"
-                        :class="barColor(row.variant)"
-                        :style="{ width: `${Math.min(100, row.rate * 100)}%` }"
+                        :style="{ width: `${Math.min(100, row.rate * 100)}%`, background: barColor(row.variant) }"
                     />
                 </div>
                 <div class="w-20 text-right shrink-0">
-                    <span class="text-xs font-semibold" :class="textColor(row.variant)">
+                    <span class="text-xs font-semibold" :style="{ color: textColor(row.variant) }">
                         {{ row.ncCount }} NC
                     </span>
                     <span class="text-xs text-slate-500 ml-1">({{ (row.rate * 100).toFixed(0) }}%)</span>
@@ -37,19 +36,20 @@
 </template>
 
 <script setup lang="ts">
+import { status } from '@/design-system';
 import type { ReportCategoryRow } from '../../composables/useReportBuilder';
 
 defineProps<{ categories: ReportCategoryRow[] }>();
 
 function barColor(v: ReportCategoryRow['variant']): string {
-    if (v === 'good') return 'bg-emerald-500/70';
-    if (v === 'warn') return 'bg-amber-500/70';
-    return 'bg-red-500/70';
+    if (v === 'good') return `${status.success.DEFAULT}b3`;   // 70% opacity
+    if (v === 'warn') return `${status.warning.DEFAULT}b3`;
+    return `${status.danger.DEFAULT}b3`;
 }
 
 function textColor(v: ReportCategoryRow['variant']): string {
-    if (v === 'good') return 'text-emerald-400';
-    if (v === 'warn') return 'text-amber-400';
-    return 'text-red-400';
+    if (v === 'good') return status.success.DEFAULT;
+    if (v === 'warn') return status.warning.DEFAULT;
+    return status.danger.DEFAULT;
 }
 </script>

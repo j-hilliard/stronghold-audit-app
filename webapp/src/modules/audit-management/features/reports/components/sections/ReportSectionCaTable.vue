@@ -28,8 +28,8 @@
                     <tr
                         v-for="row in caRows"
                         :key="row.id"
-                        class="border-b border-slate-800"
-                        :class="row.isOverdue ? 'bg-red-950/20' : ''"
+                        class="border-b border-slate-800 transition-colors"
+                        :class="row.isOverdue ? 'ca-overdue-row' : ''"
                     >
                         <td class="py-2.5 pr-4 text-slate-200 max-w-xs">
                             <span class="line-clamp-2">{{ row.description }}</span>
@@ -40,10 +40,11 @@
                             {{ row.dueDate }}
                         </td>
                         <td class="py-2.5 pr-4">
-                            <span class="text-xs px-2 py-0.5 rounded-full font-medium"
-                                :class="statusClass(row.status, row.isOverdue)">
-                                {{ row.isOverdue ? 'Overdue' : row.status }}
-                            </span>
+                            <StatusBadge
+                                :value="row.isOverdue ? 'Overdue' : row.status"
+                                :dot="true"
+                                :map="STATUS_MAP"
+                            />
                         </td>
                         <td class="py-2.5 text-right text-xs"
                             :class="row.isOverdue ? 'text-red-400 font-bold' : 'text-slate-400'">
@@ -58,16 +59,27 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { StatusBadge } from '@/design-system';
 import type { ReportCaRow } from '../../composables/useReportBuilder';
 
 const props = defineProps<{ caRows: ReportCaRow[] }>();
 
 const overdueCount = computed(() => props.caRows.filter(r => r.isOverdue).length);
 
-function statusClass(status: string, isOverdue: boolean): string {
-    if (isOverdue) return 'bg-red-900/50 text-red-300';
-    if (status === 'Closed') return 'bg-emerald-900/50 text-emerald-300';
-    if (status === 'InProgress') return 'bg-blue-900/50 text-blue-300';
-    return 'bg-slate-700 text-slate-300';
-}
+const STATUS_MAP: Record<string, { classes: string; dot: string }> = {
+    Overdue:    { classes: 'bg-red-950/60 border-red-700/60 text-red-300',         dot: 'bg-red-400' },
+    Open:       { classes: 'bg-red-950/60 border-red-700/60 text-red-300',         dot: 'bg-red-400' },
+    InProgress: { classes: 'bg-amber-950/60 border-amber-700/60 text-amber-300',   dot: 'bg-amber-400' },
+    Closed:     { classes: 'bg-emerald-950/60 border-emerald-700/60 text-emerald-300', dot: 'bg-emerald-400' },
+    Voided:     { classes: 'bg-slate-800 border-slate-700 text-slate-400',         dot: 'bg-slate-500' },
+};
 </script>
+
+<style scoped>
+.ca-overdue-row td {
+    background-color: rgba(239, 68, 68, 0.035);
+}
+.ca-overdue-row td:first-child {
+    border-left: 3px solid #ef4444;
+}
+</style>

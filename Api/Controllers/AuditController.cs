@@ -1465,6 +1465,32 @@ public class AuditController : V1ControllerBase
         );
     }
 
+    // ── Reports — Generate Structured PDF ────────────────────────────────────
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPost("reports/generate-structured")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GenerateStructuredReport([FromBody] GenerateStructuredReportRequest body)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                await GetUser();
+                if (string.IsNullOrWhiteSpace(body.StructuredReportJson))
+                    return BadRequest("structuredReportJson is required.");
+
+                var pdfBytes = await Mediator.Send(new GenerateStructuredReportCommand { Payload = body });
+
+                var fileName = $"structured-report-{DateTime.UtcNow:yyyyMMdd}.pdf";
+                return File(pdfBytes, "application/pdf", fileName);
+            },
+            ex => ex is InvalidOperationException
+                ? Task.FromResult<IActionResult>(BadRequest(ex.Message))
+                : Error(ex)
+        );
+    }
+
     // ── Reports — Scheduled Delivery ─────────────────────────────────────────
 
     [MapToApiVersion(Constants.ApiVersions.V1)]

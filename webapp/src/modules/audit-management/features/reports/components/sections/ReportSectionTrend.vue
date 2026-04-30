@@ -13,12 +13,12 @@
             <Chart type="line" :data="chartData" :options="chartOptions" class="w-full" style="height:220px" />
             <div class="flex items-center gap-4 mt-3 justify-center">
                 <div class="flex items-center gap-1.5">
-                    <div class="w-3 h-0.5 bg-blue-400 rounded" />
+                    <div class="w-3 h-0.5 rounded" :style="{ background: chart.division }" />
                     <span class="text-xs text-slate-400">Division</span>
                 </div>
-                <div class="flex items-center gap-1.5">
-                    <div class="w-3 h-0.5 bg-slate-500 rounded" style="border-top: 2px dashed #64748b" />
-                    <span class="text-xs text-slate-400">Company</span>
+                <div class="flex items-center gap-1.5 opacity-60">
+                    <div class="w-3 h-0.5 rounded" :style="{ background: chart.company }" />
+                    <span class="text-xs text-slate-400">Company avg</span>
                 </div>
             </div>
         </div>
@@ -28,6 +28,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import Chart from 'primevue/chart';
+import { chart, makeChartDefaults } from '@/design-system';
 import type { ReportTrendPoint } from '../../composables/useReportBuilder';
 
 const props = defineProps<{ trends: ReportTrendPoint[] }>();
@@ -38,8 +39,8 @@ const chartData = computed(() => ({
         {
             label: 'Division NC/Audit',
             data: props.trends.map(t => +t.divisionNcRate.toFixed(2)),
-            borderColor: '#3b82f6',
-            backgroundColor: 'rgba(59,130,246,0.1)',
+            borderColor: chart.division,
+            backgroundColor: chart.divisionFill,
             tension: 0.3,
             fill: true,
             pointRadius: 4,
@@ -47,8 +48,8 @@ const chartData = computed(() => ({
         {
             label: 'Company NC/Audit',
             data: props.trends.map(t => t.companyNcRate != null ? +t.companyNcRate.toFixed(2) : null),
-            borderColor: '#64748b',
-            borderDash: [5, 5],
+            borderColor: chart.company,
+            borderDash: chart.companyDash,
             tension: 0.3,
             fill: false,
             pointRadius: 3,
@@ -57,21 +58,17 @@ const chartData = computed(() => ({
 }));
 
 const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-        legend: { display: false },
-        tooltip: { mode: 'index', intersect: false },
-    },
+    ...makeChartDefaults(),
     scales: {
-        x: {
-            grid: { color: 'rgba(148,163,184,0.1)' },
-            ticks: { color: '#94a3b8', font: { size: 11 } },
-        },
+        ...makeChartDefaults().scales,
         y: {
-            grid: { color: 'rgba(148,163,184,0.1)' },
-            ticks: { color: '#94a3b8', font: { size: 11 } },
-            title: { display: true, text: 'NC / Audit', color: '#64748b', font: { size: 11 } },
+            ...makeChartDefaults().scales.y,
+            title: {
+                display: true,
+                text: 'NC / Audit',
+                color: chart.axisTitle,
+                font: { size: 11 },
+            },
         },
     },
 };

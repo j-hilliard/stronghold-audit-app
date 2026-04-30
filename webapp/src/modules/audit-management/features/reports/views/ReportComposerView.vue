@@ -1,5 +1,5 @@
 <template>
-    <div class="flex flex-col h-full">
+    <div class="flex flex-col h-full composer-view">
         <BasePageHeader
             title="Report Composer"
             subtitle="Structured compliance reports — template-driven, admin-controlled"
@@ -15,11 +15,11 @@
             </button>
             <button
                 @click="printReport"
-                :disabled="!builder.hasData.value"
+                :disabled="!builder.hasData.value || pdfGenerating"
                 class="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg disabled:opacity-50 transition-colors"
             >
-                <i class="pi pi-print text-xs" />
-                Print / PDF
+                <i :class="pdfGenerating ? 'pi pi-spin pi-spinner' : 'pi pi-file-pdf'" class="text-xs" />
+                {{ pdfGenerating ? 'Generating…' : 'Export PDF' }}
             </button>
         </BasePageHeader>
 
@@ -86,6 +86,9 @@
         </div>
         <div v-if="builder.error.value" class="px-4 py-2 text-sm text-amber-400 bg-amber-900/20 border-b border-amber-800">
             {{ builder.error.value }}
+        </div>
+        <div v-if="pdfError" class="px-4 py-2 text-sm text-red-400 bg-red-900/20 border-b border-red-800">
+            {{ pdfError }}
         </div>
 
         <!-- Main layout -->
@@ -457,10 +460,36 @@ async function generate() {
     report.value.dateTo   = dateTo.value   || null;
 }
 
-// ── Print ─────────────────────────────────────────────────────────────────────
+// ── PDF export ────────────────────────────────────────────────────────────────
 
-function printReport() {
-    window.print();
+const pdfGenerating = ref(false);
+const pdfError = ref<string | null>(null);
+
+async function printReport() {
+    if (!builder.hasData.value) return;
+    pdfGenerating.value = true;
+    pdfError.value = null;
+    const div = divisions.value.find(d => d.id === selectedDivisionId.value);
+    report.value.divisionId   = selectedDivisionId.value ?? 0;
+    report.value.divisionCode = div?.code ?? report.value.divisionCode;
+    report.value.period       = buildPeriodLabel(dateFrom.value, dateTo.value);
+    report.value.dateFrom     = dateFrom.value || null;
+    report.value.dateTo       = dateTo.value   || null;
+    try {
+        const blob = await service.postBlob('/v1/reports/generate-structured', {
+            structuredReportJson: JSON.stringify(report.value),
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `report-${report.value.divisionCode}-${report.value.period.replace(/\s/g, '-')}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+        pdfError.value = e instanceof Error ? e.message : 'PDF generation failed. Please try again.';
+    } finally {
+        pdfGenerating.value = false;
+    }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -496,68 +525,25 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.composer-select {
-    background: rgb(51 65 85 / 0.5);
-    border: 1px solid rgb(100 116 139 / 0.5);
-    border-radius: 0.375rem;
-    padding: 0.375rem 0.625rem;
-    font-size: 0.8125rem;
-    color: #e2e8f0;
-    outline: none;
-    transition: border-color 0.15s;
-}
-.composer-select:focus {
-    border-color: rgb(59 130 246 / 0.7);
-    box-shadow: 0 0 0 2px rgb(59 130 246 / 0.2);
-}
+.composer-select,
 .composer-input {
-    background: rgb(51 65 85 / 0.5);
-    border: 1px solid rgb(100 116 139 / 0.5);
-    border-radius: 0.375rem;
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
     padding: 0.375rem 0.625rem;
     font-size: 0.8125rem;
-    color: #e2e8f0;
+    color: var(--text-primary);
     outline: none;
-    transition: border-color 0.15s;
+    transition: border-color var(--transition-base);
 }
+.composer-select:focus,
 .composer-input:focus {
-    border-color: rgb(59 130 246 / 0.7);
-    box-shadow: 0 0 0 2px rgb(59 130 246 / 0.2);
+    border-color: rgba(59, 130, 246, 0.7);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
-.composer-input::placeholder { color: #475569; }
-
-.report-section-card {
-    background: rgb(15 23 42 / 0.6);
-    border: 1px solid rgb(51 65 85 / 0.6);
-    border-radius: 0.75rem;
-    padding: 1.25rem;
-}
-
-/* Shared heading used by all section child components */
-:deep(.section-heading) {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: #94a3b8;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.875rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid rgb(51 65 85 / 0.5);
-}
+.composer-input::placeholder { color: var(--text-muted); }
 
 @media print {
-    :deep(.section-heading) {
-        color: #334155;
-        border-bottom-color: #e2e8f0;
-    }
-    .report-section-card {
-        background: white;
-        border-color: #e2e8f0;
-        break-inside: avoid;
-    }
     button { display: none !important; }
 }
 </style>

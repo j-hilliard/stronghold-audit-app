@@ -863,7 +863,10 @@ onMounted(() => { load(); loadAuditUsers(); });
 </script>
 
 <style scoped>
-:deep(.ca-row-overdue td) { background-color: rgba(220, 38, 38, 0.08) !important; }
+/* Overdue: state indicator via left border + minimal tint — NOT a block */
+:deep(.ca-row-overdue td) { background-color: rgba(239, 68, 68, 0.035) !important; }
+:deep(.ca-row-overdue td:first-child) { border-left: 3px solid var(--color-danger) !important; }
+/* Closed / voided: de-emphasize only */
 :deep(.ca-row-closed td)  { opacity: 0.55; }
 :deep(.ca-row-voided td)  { opacity: 0.4; }
 
