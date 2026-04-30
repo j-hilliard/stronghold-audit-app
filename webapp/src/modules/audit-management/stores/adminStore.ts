@@ -1,9 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { useToast } from 'primevue/usetoast';
-import { useApiStore } from '@/stores/apiStore';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 import {
-    AuditClient,
     type TemplateVersionListItemDto,
     type DraftVersionDetailDto,
     type DraftSectionDto,
@@ -21,11 +20,10 @@ import {
 export type { DraftSectionDto };
 
 export const useAdminStore = defineStore('auditAdmin', () => {
-    const apiStore = useApiStore();
     const toast = useToast();
 
     function getClient() {
-        return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
+        return useAuditService();
     }
 
     // ── State ──────────────────────────────────────────────────────────────────

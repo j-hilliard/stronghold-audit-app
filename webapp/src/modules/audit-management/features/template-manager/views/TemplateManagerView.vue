@@ -494,9 +494,8 @@ import draggable from 'vuedraggable';
 import Dialog from 'primevue/dialog';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import { useAdminStore } from '../../../stores/adminStore';
-import { AuditClient } from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 import type { TemplateVersionListItemDto, DraftVersionDetailDto, DraftSectionDto, DraftQuestionDto, SectionLibraryItemDto, LogicRuleDto } from '@/apiclient/auditClient';
-import { useApiStore } from '@/stores/apiStore';
 
 const adminStore = useAdminStore();
 
@@ -919,10 +918,7 @@ function statusBadgeClass(status: string): string {
 
 // ── Logic rule client ──────────────────────────────────────────────────────────
 
-const apiStore = useApiStore();
-function getClient(): AuditClient {
-    return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-}
+const service = useAuditService();
 
 // ── Skip logic rules ───────────────────────────────────────────────────────────
 
@@ -961,7 +957,7 @@ function sectionLabel(sId: number | null | undefined): string {
 
 async function loadLogicRules(versionId: number) {
     try {
-        logicRules.value = await getClient().getLogicRules(versionId);
+        logicRules.value = await service.getLogicRules(versionId);
     } catch {
         logicRules.value = [];
     }
@@ -971,7 +967,7 @@ async function saveLogicRule() {
     if (!selectedVersionId.value || !newRule.triggerVersionQuestionId || !newRule.targetSectionId) return;
     logicSaving.value = true;
     try {
-        await getClient().upsertLogicRule({
+        await service.upsertLogicRule({
             templateVersionId: selectedVersionId.value,
             triggerVersionQuestionId: newRule.triggerVersionQuestionId,
             triggerResponse: newRule.triggerResponse,
@@ -990,7 +986,7 @@ async function saveLogicRule() {
 
 async function deleteLogicRule(id: number) {
     if (!selectedVersionId.value) return;
-    await getClient().deleteLogicRule(id);
+    await service.deleteLogicRule(id);
     await loadLogicRules(selectedVersionId.value);
 }
 

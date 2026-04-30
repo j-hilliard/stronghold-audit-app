@@ -134,11 +134,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { useApiStore } from '@/stores/apiStore';
-import { AuditClient, type TemplateDto } from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
+import type { TemplateDto } from '@/apiclient/auditClient';
 
 const route = useRoute();
-const apiStore = useApiStore();
 const formEl = ref<HTMLElement | null>(null);
 const loading = ref(true);
 const template = ref<TemplateDto | null>(null);
@@ -171,8 +170,7 @@ onMounted(async () => {
         const divisionId = Number(route.params.divisionId);
         if (!isNaN(divisionId) && divisionId > 0) {
             try {
-                const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-                template.value = await client.getActiveTemplate(divisionId);
+                template.value = await useAuditService().getActiveTemplate(divisionId);
             } catch { /* template stays null */ }
         }
     }

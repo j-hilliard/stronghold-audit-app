@@ -71,43 +71,44 @@ router.beforeEach((to, _from, next) => {
         const userStore = useUserStore();
 
         if (userStore.isAuthenticated) {
-            const meta = to.meta as Record<string, unknown>;
-            const path = to.path;
-
-            const fallback = () => {
-                if (userStore.canManageCas) return '/audit-management/corrective-actions';
-                if (userStore.isITAdmin || userStore.isAdmin) return '/audit-management/admin/users';
-                return '/audit-management/corrective-actions';
-            };
+            const meta         = to.meta as Record<string, unknown>;
+            const path         = to.path;
+            const unauthorized = '/audit-management/unauthorized';
 
             if (meta.requiresITAdmin && !userStore.isITAdmin && !userStore.isAdmin) {
-                next({ path: fallback() });
+                next({ path: unauthorized });
                 return;
             }
 
-            if (meta.requiresAuditAdmin && !userStore.canAccessAdminTemplates) {
-                next({ path: fallback() });
+            if (meta.requiresAuditAdmin && !userStore.canAccessAdminTemplates && !userStore.isITAdmin && !userStore.isAdmin) {
+                next({ path: unauthorized });
                 return;
             }
 
             if (meta.requiresCreateAudit && !userStore.canCreateAudit) {
-                next({ path: fallback() });
+                next({ path: unauthorized });
+                return;
+            }
+
+            const isReviewRoute = /^\/audit-management\/audits\/[^/]+\/review(\/|$)/.test(path);
+            if (isReviewRoute && !userStore.isAuditReviewer && !userStore.isAuditAdmin) {
+                next({ path: unauthorized });
                 return;
             }
 
             const isAuditRoute = /^\/audit-management\/audits(\/|$)/.test(path);
             if (isAuditRoute && !userStore.canViewAudits) {
-                next({ path: fallback() });
+                next({ path: unauthorized });
                 return;
             }
 
-            if (path.includes('/reports') && !userStore.canViewAudits) {
-                next({ path: fallback() });
+            if (path.includes('/reports') && !userStore.canViewReports) {
+                next({ path: unauthorized });
                 return;
             }
 
             if (path.includes('/corrective-actions') && !userStore.canManageCas) {
-                next({ path: fallback() });
+                next({ path: unauthorized });
                 return;
             }
         }

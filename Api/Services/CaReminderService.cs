@@ -7,10 +7,13 @@ namespace Stronghold.AppDashboard.Api.Services;
 /// <summary>
 /// Daily background service that sends CA reminder emails.
 /// Rules:
-///   - DueSoon:  DueDate = today + 3 days
-///   - DueToday: DueDate = today
-///   - Overdue:  DueDate &lt; today (sent every day until CA is closed)
-/// Deduplication via CaNotificationLog — one log entry per CA + type per calendar day.
+///   - DueSoon:       DueDate = today + 3 days (daily)
+///   - DueToday:      DueDate = today (daily)
+///   - Overdue:       DueDate &lt; today (sent every day until CA is closed)
+///   - Escalation15:  15+ days overdue — sent once per CA, all-time deduplicated
+///   - Escalation30:  30+ days overdue — sent once per CA, all-time deduplicated
+/// Deduplication via CaNotificationLog — one log entry per CA + type per calendar day
+/// (escalation types are all-time deduplicated).
 /// </summary>
 public class CaReminderService : BackgroundService
 {
@@ -79,7 +82,7 @@ public class CaReminderService : BackgroundService
                 .Where(ca => ca.Status != "Closed" && ca.DueDate.HasValue)
                 .ToListAsync(ct);
 
-            // Load today's existing log entries to deduplicate
+            // Load today's existing log entries for daily notifications (DueSoon / DueToday / Overdue)
             var todayLogs = await db.CaNotificationLogs
                 .Where(l => l.SentAt >= todayDt)
                 .Select(l => new { l.CorrectiveActionId, l.NotificationType })
@@ -87,6 +90,16 @@ public class CaReminderService : BackgroundService
 
             // Key: "{caId}:{notifType}" — one send per CA per type per day
             var alreadySent = todayLogs
+                .Select(l => $"{l.CorrectiveActionId}:{l.NotificationType}")
+                .ToHashSet();
+
+            // Escalation types are sent at most once ever — check all-time logs
+            var escalationLogs = await db.CaNotificationLogs
+                .Where(l => l.NotificationType == "Escalation15" || l.NotificationType == "Escalation30")
+                .Select(l => new { l.CorrectiveActionId, l.NotificationType })
+                .ToListAsync(ct);
+
+            var escalationSent = escalationLogs
                 .Select(l => $"{l.CorrectiveActionId}:{l.NotificationType}")
                 .ToHashSet();
 
@@ -105,18 +118,59 @@ public class CaReminderService : BackgroundService
                 if (notifType == null) continue;
 
                 var key = $"{ca.Id}:{notifType}";
-                if (alreadySent.Contains(key)) continue;
-
-                await SendCaReminderAsync(emailService, ca, notifType, appBaseUrl, ct);
-
-                db.CaNotificationLogs.Add(new CaNotificationLog
+                if (!alreadySent.Contains(key))
                 {
-                    CorrectiveActionId = ca.Id,
-                    NotificationType = notifType,
-                    SentAt = DateTime.UtcNow,
-                    Recipient = ca.AssignedTo,
-                });
-                sent++;
+                    await SendCaReminderAsync(emailService, ca, notifType, appBaseUrl, ct);
+                    db.CaNotificationLogs.Add(new CaNotificationLog
+                    {
+                        CorrectiveActionId = ca.Id,
+                        NotificationType = notifType,
+                        SentAt = DateTime.UtcNow,
+                        Recipient = ca.AssignedTo,
+                    });
+                    sent++;
+                }
+
+                // One-time escalation milestones for overdue CAs
+                if (notifType == "Overdue" && ca.DueDate.HasValue)
+                {
+                    var daysOverdue = today.DayNumber - ca.DueDate.Value.DayNumber;
+
+                    if (daysOverdue >= 30)
+                    {
+                        var e30Key = $"{ca.Id}:Escalation30";
+                        if (!escalationSent.Contains(e30Key))
+                        {
+                            await SendCaReminderAsync(emailService, ca, "Escalation30", appBaseUrl, ct);
+                            db.CaNotificationLogs.Add(new CaNotificationLog
+                            {
+                                CorrectiveActionId = ca.Id,
+                                NotificationType = "Escalation30",
+                                SentAt = DateTime.UtcNow,
+                                Recipient = ca.AssignedTo,
+                            });
+                            escalationSent.Add(e30Key);
+                            sent++;
+                        }
+                    }
+                    else if (daysOverdue >= 15)
+                    {
+                        var e15Key = $"{ca.Id}:Escalation15";
+                        if (!escalationSent.Contains(e15Key))
+                        {
+                            await SendCaReminderAsync(emailService, ca, "Escalation15", appBaseUrl, ct);
+                            db.CaNotificationLogs.Add(new CaNotificationLog
+                            {
+                                CorrectiveActionId = ca.Id,
+                                NotificationType = "Escalation15",
+                                SentAt = DateTime.UtcNow,
+                                Recipient = ca.AssignedTo,
+                            });
+                            escalationSent.Add(e15Key);
+                            sent++;
+                        }
+                    }
+                }
             }
 
             if (sent > 0)
@@ -146,10 +200,12 @@ public class CaReminderService : BackgroundService
 
         var (label, urgencyColor) = notifType switch
         {
-            "DueSoon"  => ("Due in 3 Days", "#d97706"),
-            "DueToday" => ("Due Today",     "#dc2626"),
-            "Overdue"  => ("OVERDUE",       "#dc2626"),
-            _          => ("Reminder",      "#1e3a5f"),
+            "DueSoon"       => ("Due in 3 Days",    "#d97706"),
+            "DueToday"      => ("Due Today",         "#dc2626"),
+            "Overdue"       => ("OVERDUE",           "#dc2626"),
+            "Escalation15"  => ("15-Day Escalation", "#b91c1c"),
+            "Escalation30"  => ("30-Day Escalation", "#7f1d1d"),
+            _               => ("Reminder",          "#1e3a5f"),
         };
 
         var subject = $"[Stronghold CA {label}] {ca.Description?[..Math.Min(60, ca.Description?.Length ?? 0)]}...";

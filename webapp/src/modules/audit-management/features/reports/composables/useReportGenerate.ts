@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { useApiStore } from '@/stores/apiStore';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 
 export interface ReportGenerateOptions {
     templateId: string;
@@ -11,7 +11,6 @@ export interface ReportGenerateOptions {
 }
 
 export function useReportGenerate() {
-    const apiStore = useApiStore();
     const generating = ref(false);
     const error = ref<string | null>(null);
 
@@ -20,20 +19,14 @@ export function useReportGenerate() {
         error.value = null;
 
         try {
-            const response = await apiStore.api.post(
-                '/v1/reports/generate',
-                {
-                    templateId:   opts.templateId,
-                    divisionId:   opts.divisionId ?? null,
-                    dateFrom:     opts.dateFrom ?? null,
-                    dateTo:       opts.dateTo ?? null,
-                    title:        opts.title ?? null,
-                    primaryColor: opts.primaryColor ?? null,
-                },
-                { responseType: 'blob' }
-            );
-
-            const blob = new Blob([response.data], { type: 'application/pdf' });
+            const blob = await useAuditService().postBlob('/v1/reports/generate', {
+                templateId:   opts.templateId,
+                divisionId:   opts.divisionId ?? null,
+                dateFrom:     opts.dateFrom ?? null,
+                dateTo:       opts.dateTo ?? null,
+                title:        opts.title ?? null,
+                primaryColor: opts.primaryColor ?? null,
+            });
             const url  = URL.createObjectURL(blob);
             const a    = document.createElement('a');
 

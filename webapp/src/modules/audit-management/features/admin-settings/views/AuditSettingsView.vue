@@ -185,23 +185,33 @@
 
             <!-- ── SCORE TARGETS TAB ── -->
             <template v-else-if="activeTab === 'targets'">
-                <div class="flex items-center justify-between mb-4">
-                    <p class="text-slate-400 text-sm flex-1">
-                        Set a compliance score target (0–100%) per division. This target appears in the audit review
-                        page benchmark card and turns the score indicator green/red.
-                        Leave blank to disable for that division.
-                    </p>
-                </div>
+                <p class="text-slate-400 text-sm mb-4">
+                    Configure compliance targets, audit schedules, and escalation rules per division.
+                </p>
 
                 <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
                     <table class="w-full text-sm table-fixed">
                         <thead>
+                            <!-- Section group headers -->
+                            <tr class="bg-slate-900/60 border-b border-slate-700/50">
+                                <th class="px-3 py-2 text-left w-40" />
+                                <th colspan="2" class="px-3 py-2 text-center text-[10px] font-semibold text-blue-400 uppercase tracking-widest border-l border-slate-700/40">
+                                    <i class="pi pi-chart-line mr-1 text-[9px]" />Score Targets
+                                </th>
+                                <th colspan="1" class="px-3 py-2 text-center text-[10px] font-semibold text-emerald-400 uppercase tracking-widest border-l border-slate-700/40">
+                                    <i class="pi pi-check-circle mr-1 text-[9px]" />Compliance
+                                </th>
+                                <th colspan="1" class="px-3 py-2 text-center text-[10px] font-semibold text-amber-400 uppercase tracking-widest border-l border-slate-700/40">
+                                    <i class="pi pi-exclamation-triangle mr-1 text-[9px]" />Escalation
+                                </th>
+                            </tr>
+                            <!-- Column headers -->
                             <tr class="border-b border-slate-700 text-slate-400 text-xs uppercase tracking-wide">
                                 <th class="px-3 py-3 text-left w-40">Division</th>
-                                <th class="px-3 py-3 text-center w-44">Score Target (%)</th>
+                                <th class="px-3 py-3 text-center w-44 border-l border-slate-700/40">Score Target (%)</th>
                                 <th class="px-3 py-3 text-center w-44">Audit Frequency (days)</th>
-                                <th class="px-3 py-3 text-center w-36" title="Require at least one photo when closing a corrective action">Closure Photo</th>
-                                <th class="px-3 py-3 text-center" title="SLA due-date window per priority level">SLA (Normal / Urgent / Escalate days + Email)</th>
+                                <th class="px-3 py-3 text-center w-36 border-l border-slate-700/40" title="Require at least one photo when closing a corrective action">Closure Photo</th>
+                                <th class="px-3 py-3 text-center border-l border-slate-700/40" title="SLA due-date window per priority level">SLA (Normal / Urgent / Escalate days + Email)</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-700/50">
@@ -343,6 +353,18 @@
                     </button>
                 </div>
 
+                <!-- Role legend -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
+                    <div v-for="role in AUDIT_ROLES" :key="role.value"
+                        class="flex items-start gap-2 px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                        <i class="pi pi-info-circle text-slate-500 text-xs mt-0.5 flex-shrink-0" />
+                        <div>
+                            <div class="text-xs font-semibold text-slate-300">{{ role.label }}</div>
+                            <div class="text-[11px] text-slate-500 mt-0.5 leading-tight">{{ role.desc }}</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="bg-slate-800 border border-slate-700 rounded-lg overflow-x-auto">
                     <table class="w-full text-sm" style="min-width: 500px;">
                         <thead>
@@ -367,7 +389,7 @@
                                         class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200 focus:outline-none focus:border-blue-500 disabled:opacity-50"
                                     >
                                         <option value="">— None —</option>
-                                        <option v-for="role in AUDIT_ROLES" :key="role.value" :value="role.value">
+                                        <option v-for="role in AUDIT_ROLES" :key="role.value" :value="role.value" :title="role.desc">
                                             {{ role.label }}
                                         </option>
                                     </select>
@@ -389,17 +411,12 @@ import { ref, computed, onMounted, watch } from 'vue';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import { useAdminStore } from '../../../stores/adminStore';
 import type { EmailRoutingRuleUpsertDto } from '@/apiclient/auditClient';
-import { AuditClient } from '@/apiclient/auditClient';
-import { useApiStore } from '@/stores/apiStore';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 import { useToast } from 'primevue/usetoast';
 
 const adminStore = useAdminStore();
-const apiStore = useApiStore();
 const toast = useToast();
-
-function getClient() {
-    return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-}
+const service = useAuditService();
 
 const TABS = [
     { key: 'email',   label: 'Email Routing' },
@@ -410,12 +427,15 @@ type TabKey = typeof TABS[number]['key'];
 const activeTab = ref<TabKey>('email');
 
 const AUDIT_ROLES = [
-    { value: 'TemplateAdmin',          label: 'Template Admin' },
-    { value: 'AuditManager',           label: 'Audit Manager' },
-    { value: 'AuditReviewer',          label: 'Audit Reviewer' },
-    { value: 'CorrectiveActionOwner',  label: 'Corrective Action Owner' },
-    { value: 'ReadOnlyViewer',         label: 'Read-Only Viewer' },
-    { value: 'ExecutiveViewer',        label: 'Executive Viewer' },
+    { value: 'TemplateAdmin',          label: 'Template Admin',             desc: 'Full admin — creates and edits audit templates, manages all settings' },
+    { value: 'AuditManager',           label: 'Audit Manager',              desc: 'Creates, saves, and submits audits; manages corrective actions' },
+    { value: 'AuditReviewer',          label: 'Audit Reviewer',             desc: 'Reviews submitted audits, closes/reopens, sends distribution emails' },
+    { value: 'CorrectiveActionOwner',  label: 'Corrective Action Owner',    desc: 'Views and resolves assigned corrective actions only' },
+    { value: 'ReadOnlyViewer',         label: 'Read-Only Viewer',           desc: 'Can view audits and reports but cannot make any changes' },
+    { value: 'ExecutiveViewer',        label: 'Executive Viewer',           desc: 'Dashboard and reports access only; executive summary view' },
+    { value: 'Auditor',                label: 'Auditor',                    desc: 'Field auditor — creates and submits audits; no review access' },
+    { value: 'ITAdmin',                label: 'IT Admin',                   desc: 'User management and system configuration access' },
+    { value: 'AuditAdmin',             label: 'Audit Admin',                desc: 'Full audit module admin — all capabilities except system config' },
 ];
 
 // ── Email routing ──────────────────────────────────────────────────────────────
@@ -489,7 +509,7 @@ const targetRows = ref<TargetRow[]>([]);
 
 async function loadScoreTargets() {
     try {
-        const dtos = await getClient().getDivisionScoreTargets();
+        const dtos = await service.getDivisionScoreTargets();
         targetRows.value = dtos.map(d => ({
             divisionId:            d.divisionId,
             divisionCode:          d.divisionCode,
@@ -524,7 +544,7 @@ async function saveTarget(row: TargetRow) {
         const val = row.pendingTarget != null && !Number.isNaN(Number(row.pendingTarget))
             ? Number(row.pendingTarget)
             : null;
-        const dto = await getClient().setDivisionScoreTarget(row.divisionId, val);
+        const dto = await service.setDivisionScoreTarget(row.divisionId, val);
         row.scoreTarget = dto.scoreTarget ?? null;
         row.pendingTarget = dto.scoreTarget ?? null;
         toast.add({ severity: 'success', summary: 'Saved', detail: `${row.divisionCode} target updated.`, life: 2500 });
@@ -541,7 +561,7 @@ async function saveFrequency(row: TargetRow) {
         const val = row.pendingFrequency != null && !Number.isNaN(Number(row.pendingFrequency)) && Number(row.pendingFrequency) > 0
             ? Number(row.pendingFrequency)
             : null;
-        const dto = await getClient().setDivisionAuditFrequency(row.divisionId, val);
+        const dto = await service.setDivisionAuditFrequency(row.divisionId, val);
         row.auditFrequencyDays = dto.auditFrequencyDays ?? null;
         row.pendingFrequency = dto.auditFrequencyDays ?? null;
         toast.add({ severity: 'success', summary: 'Saved', detail: `${row.divisionCode} audit frequency updated.`, life: 2500 });
@@ -555,7 +575,7 @@ async function saveFrequency(row: TargetRow) {
 async function toggleClosurePhoto(row: TargetRow, value: boolean) {
     row.savingClosurePhoto = true;
     try {
-        const dto = await getClient().setDivisionRequireClosurePhoto(row.divisionId, value);
+        const dto = await service.setDivisionRequireClosurePhoto(row.divisionId, value);
         row.requireClosurePhoto = dto.requireClosurePhoto ?? false;
         toast.add({ severity: 'success', summary: 'Saved', detail: `${row.divisionCode} closure photo requirement ${value ? 'enabled' : 'disabled'}.`, life: 2500 });
     } catch {
@@ -570,7 +590,7 @@ async function saveSla(row: TargetRow) {
     try {
         const toInt = (v: number | null | undefined) =>
             v != null && !Number.isNaN(Number(v)) && Number(v) > 0 ? Number(v) : null;
-        const dto = await getClient().setDivisionSla(row.divisionId, {
+        const dto = await service.setDivisionSla(row.divisionId, {
             slaNormalDays:        toInt(row.pendingSlaNormal),
             slaUrgentDays:        toInt(row.pendingSlaUrgent),
             slaEscalateAfterDays: toInt(row.pendingSlaEscalate),

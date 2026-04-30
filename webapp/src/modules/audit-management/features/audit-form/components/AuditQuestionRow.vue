@@ -339,8 +339,8 @@ import Textarea from 'primevue/textarea';
 import { useToast } from 'primevue/usetoast';
 import StatusButtons from './StatusButtons.vue';
 import { useAuditStore, type ResponseState } from '@/modules/audit-management/stores/auditStore';
-import { useApiStore } from '@/stores/apiStore';
-import { AuditClient, type FindingPhotoDto, type QuestionHistoryItemDto } from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
+import type { FindingPhotoDto, QuestionHistoryItemDto } from '@/apiclient/auditClient';
 
 const props = defineProps<{
     response: ResponseState;
@@ -350,12 +350,8 @@ const props = defineProps<{
 }>();
 
 const store = useAuditStore();
-const apiStore = useApiStore();
 const toast = useToast();
-
-function getClient() {
-    return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-}
+const service = useAuditService();
 
 // ── Photo state ────────────────────────────────────────────────────────────────
 
@@ -370,7 +366,7 @@ async function loadPhotos() {
     if (photosLoaded.value || !store.auditId) return;
     photosLoaded.value = true;
     try {
-        photos.value = await getClient().getFindingPhotos(store.auditId, props.response.questionId);
+        photos.value = await service.getFindingPhotos(store.auditId, props.response.questionId);
         for (const photo of photos.value) {
             loadBlobUrl(photo);
         }
@@ -381,7 +377,7 @@ async function loadPhotos() {
 
 function loadBlobUrl(photo: FindingPhotoDto) {
     if (photo.id in blobUrls.value || !store.auditId) return;
-    getClient()
+    service
         .downloadFindingPhoto(store.auditId, photo.questionId, photo.id)
         .then(blob => {
             blobUrls.value = { ...blobUrls.value, [photo.id]: URL.createObjectURL(blob) };
@@ -410,14 +406,14 @@ async function onFileChange(e: Event) {
         if (!photosLoaded.value) {
             photosLoaded.value = true;
             try {
-                photos.value = await getClient().getFindingPhotos(store.auditId, props.response.questionId);
+                photos.value = await service.getFindingPhotos(store.auditId, props.response.questionId);
                 for (const photo of photos.value) {
                     loadBlobUrl(photo);
                 }
             } catch { /* non-fatal */ }
         }
 
-        const dto = await getClient().uploadFindingPhoto(store.auditId, props.response.questionId, file);
+        const dto = await service.uploadFindingPhoto(store.auditId, props.response.questionId, file);
         photos.value.push(dto);
         loadBlobUrl(dto);
         toast.add({ severity: 'success', summary: 'Photo attached', life: 2000 });
@@ -431,7 +427,7 @@ async function onFileChange(e: Event) {
 async function deletePhoto(photo: FindingPhotoDto) {
     if (!store.auditId) return;
     try {
-        await getClient().deleteFindingPhoto(store.auditId, photo.questionId, photo.id);
+        await service.deleteFindingPhoto(store.auditId, photo.questionId, photo.id);
         const url = blobUrls.value[photo.id];
         if (url) {
             URL.revokeObjectURL(url);
@@ -496,7 +492,7 @@ async function toggleHistory() {
     if (!historyLoaded.value && store.auditDivisionId) {
         historyLoading.value = true;
         try {
-            historyItems.value = await getClient().getQuestionHistory(
+            historyItems.value = await service.getQuestionHistory(
                 props.response.questionId,
                 store.auditDivisionId,
                 3,

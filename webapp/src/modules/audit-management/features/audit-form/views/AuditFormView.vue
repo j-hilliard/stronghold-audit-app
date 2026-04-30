@@ -150,6 +150,18 @@
             :counts="store.score.counts"
             :score-percent="store.score.scorePercent"
         />
+
+        <!-- Sticky bottom action bar (visible while editing) -->
+        <StickyFormActions
+            v-if="store.template"
+            :visible="!store.isSubmitted"
+            :saving="store.saving"
+            :can-submit="userStore.isAuditor || userStore.isAuditAdmin || userStore.isAdmin"
+            :status-label="store.auditStatus ? `Status: ${store.auditStatus}` : 'Editing draft'"
+            @save="store.saveDraft()"
+            @submit="onSubmit"
+            @delete="onDeleteDraft"
+        />
     </div>
 
     <!-- Submit confirmation -->
@@ -243,6 +255,7 @@ import { useUserStore } from '@/stores/userStore';
 import AuditHeader from '../components/AuditHeader.vue';
 import AuditSection from '../components/AuditSection.vue';
 import ScoreSummaryBar from '../components/ScoreSummaryBar.vue';
+import StickyFormActions from '../components/StickyFormActions.vue';
 import AuditAttachments from '../components/AuditAttachments.vue';
 
 interface SectionRef {

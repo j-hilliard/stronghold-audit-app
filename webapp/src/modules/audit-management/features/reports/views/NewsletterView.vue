@@ -201,17 +201,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useApiStore } from '@/stores/apiStore';
-import {
-    AuditClient,
-    type AuditReportDto,
-    type DivisionDto,
-    type SectionTrendsReportDto,
-} from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
+import type { AuditReportDto, DivisionDto, SectionTrendsReportDto } from '@/apiclient/auditClient';
 
 const route = useRoute();
 const router = useRouter();
-const apiStore = useApiStore();
+const service = useAuditService();
 
 const loading = ref(false);
 const report = ref<AuditReportDto | null>(null);
@@ -232,10 +227,6 @@ const yearOptions = computed(() => {
 });
 
 const todayLabel = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-
-function getClient() {
-    return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-}
 
 function quarterDateRange(year: number, quarter: number) {
     const startMonth = (quarter - 1) * 3 + 1;
@@ -476,7 +467,7 @@ function generateNarrative() {
 async function loadData() {
     loading.value = true;
     try {
-        const client = getClient();
+        const client = service;
         const [nextReport, nextTrends] = await Promise.all([
             client.getAuditReport(selectedDivisionId.value || null, null, dateFrom.value, dateTo.value),
             client.getSectionTrends(selectedDivisionId.value || null, dateFrom.value, dateTo.value),
@@ -496,7 +487,7 @@ function printPage() {
 }
 
 onMounted(async () => {
-    divisions.value = await getClient().getDivisions();
+    divisions.value = await service.getDivisions();
     await loadData();
 });
 </script>

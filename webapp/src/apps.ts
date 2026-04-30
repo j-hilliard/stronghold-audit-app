@@ -9,7 +9,7 @@ export const apps = {
         menu: {
             user: [
                 { label: 'Dashboard',          icon: 'pi pi-fw pi-chart-bar',         to: '/audit-management/reports',
-                  visible: () => useUserStore().canViewAudits },
+                  visible: () => useUserStore().canViewReports },
                 { label: 'Audits',             icon: 'pi pi-fw pi-list',               to: '/audit-management/audits',
                   visible: () => useUserStore().canViewAudits },
                 { label: 'New Audit',          icon: 'pi pi-fw pi-plus',               to: '/audit-management/audits/new',

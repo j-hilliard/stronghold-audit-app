@@ -98,8 +98,8 @@
 import { ref, onMounted } from 'vue';
 import Button from 'primevue/button';
 import { useToast } from 'primevue/usetoast';
-import { useApiStore } from '@/stores/apiStore';
-import { AuditClient, type AuditAttachmentDto } from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
+import type { AuditAttachmentDto } from '@/apiclient/auditClient';
 
 const props = defineProps<{
     auditId: number;
@@ -110,7 +110,7 @@ const ACCEPTED_TYPES = '.pdf,.docx,.doc,.xlsx,.xls,.png,.jpg,.jpeg,.heic,.gif,.m
 const MAX_BYTES = 25 * 1024 * 1024;
 
 const toast = useToast();
-const apiStore = useApiStore();
+const service = useAuditService();
 const fileInput = ref<HTMLInputElement | null>(null);
 const attachments = ref<AuditAttachmentDto[]>([]);
 const uploading = ref<{ name: string }[]>([]);
@@ -118,20 +118,15 @@ const downloading = ref<number | null>(null);
 const deleting = ref<number | null>(null);
 const isDragging = ref(false);
 
-function getClient() {
-    return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-}
-
 async function loadAttachments() {
     try {
-        attachments.value = await getClient().getAttachments(props.auditId);
+        attachments.value = await service.getAttachments(props.auditId);
     } catch {
         // Non-fatal — attachment list is supplementary
     }
 }
 
 async function uploadFiles(files: File[]) {
-    const client = getClient();
     for (const file of files) {
         if (file.size > MAX_BYTES) {
             toast.add({ severity: 'warn', summary: 'File too large', detail: `${file.name} exceeds the 25 MB limit.`, life: 4000 });
@@ -139,7 +134,7 @@ async function uploadFiles(files: File[]) {
         }
         uploading.value.push({ name: file.name });
         try {
-            const dto = await client.uploadAttachment(props.auditId, file);
+            const dto = await service.uploadAttachment(props.auditId, file);
             attachments.value.unshift(dto);
             toast.add({ severity: 'success', summary: 'Uploaded', detail: file.name, life: 2500 });
         } catch {
@@ -166,7 +161,7 @@ function onFileInputChange(e: Event) {
 async function onDownload(a: AuditAttachmentDto) {
     downloading.value = a.id;
     try {
-        const { blob, fileName } = await getClient().downloadAttachment(props.auditId, a.id);
+        const { blob, fileName } = await service.downloadAttachment(props.auditId, a.id);
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
@@ -185,7 +180,7 @@ async function onDownload(a: AuditAttachmentDto) {
 async function onDelete(a: AuditAttachmentDto) {
     deleting.value = a.id;
     try {
-        await getClient().deleteAttachment(props.auditId, a.id);
+        await service.deleteAttachment(props.auditId, a.id);
         attachments.value = attachments.value.filter(x => x.id !== a.id);
         toast.add({ severity: 'info', summary: 'Deleted', detail: a.fileName, life: 2500 });
     } catch {

@@ -199,14 +199,12 @@ import BaseButtonIconEdit from '@/components/buttons/BaseButtonIconEdit.vue';
 import BaseButtonIconView from '@/components/buttons/BaseButtonIconView.vue';
 import BaseDataTable from '@/components/tables/BaseDataTable.vue';
 import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
-import { useApiStore } from '@/stores/apiStore';
 import { useUserStore } from '@/stores/userStore';
-import { AuditClient } from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 import type { AuditListItemDto } from '@/apiclient/auditClient';
 
 const router = useRouter();
 const store = useAuditStore();
-const apiStore = useApiStore();
 const userStore = useUserStore();
 const confirm = useConfirm();
 const loading = ref(false);
@@ -230,8 +228,7 @@ async function doPrint() {
     try {
         // Fetch the template in the authenticated main-app context, then pass
         // it to the print tab via sessionStorage — the print view has no auth token.
-        const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-        const template = await client.getActiveTemplate(printDivisionId.value);
+        const template = await useAuditService().getActiveTemplate(printDivisionId.value);
         sessionStorage.setItem('print-blank-form-data', JSON.stringify(template));
         window.open(`/audit-management/print/${printDivisionId.value}`, '_blank');
         showPrintDialog.value = false;

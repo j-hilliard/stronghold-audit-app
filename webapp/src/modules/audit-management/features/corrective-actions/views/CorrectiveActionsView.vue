@@ -455,14 +455,12 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import type { CorrectiveActionListItemDto, UserAuditRoleDto } from '@/apiclient/auditClient';
-import { AuditClient } from '@/apiclient/auditClient';
-import { useApiStore } from '@/stores/apiStore';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 
 const router   = useRouter();
 const toast    = useToast();
-const apiStore = useApiStore();
-function getClient() { return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api); }
+const service  = useAuditService();
 
 // ── Filter state ──────────────────────────────────────────────────────────────
 const loading          = ref(false);
@@ -564,7 +562,7 @@ function searchUsers(event: { query: string }) {
 
 async function loadAuditUsers() {
     try {
-        auditUsers.value = await getClient().getUsersWithAuditRoles();
+        auditUsers.value = await service.getUsersWithAuditRoles();
     } catch {
         // Non-admin roles may not have access; autocomplete degrades to free-text
     }
@@ -599,9 +597,8 @@ async function load(resetPage = false) {
     if (resetPage) currentPage.value = 1;
     loading.value = true;
     try {
-        const client = getClient();
         const [result, divisions] = await Promise.all([
-            client.getCorrectiveActions({
+            service.getCorrectiveActions({
                 divisionId:  filterDivisionId.value,
                 status:      filterStatus.value,
                 searchText:  filterSearch.value || null,
@@ -611,7 +608,7 @@ async function load(resetPage = false) {
                 pageNumber:  currentPage.value,
                 pageSize:    pageSize.value,
             }),
-            divisionsLoaded.value ? Promise.resolve(null) : client.getDivisions(),
+            divisionsLoaded.value ? Promise.resolve(null) : service.getDivisions(),
         ]);
         items.value          = result.items ?? [];
         totalCount.value     = result.totalCount ?? 0;
@@ -694,7 +691,7 @@ async function setClosurePhoto(file: File) {
     closurePhotoUploading.value = true;
     closurePhotoUploaded.value  = false;
     try {
-        await getClient().uploadCaClosurePhoto(selectedItem.value!.id, file);
+        await service.uploadCaClosurePhoto(selectedItem.value!.id, file);
         closurePhotoUploaded.value = true;
     } catch {
         toast.add({ severity: 'error', summary: 'Upload Failed', detail: 'Could not upload closure photo. Please try again.', life: 4000 });
@@ -708,7 +705,7 @@ async function submitClose() {
     if (!selectedItem.value) return;
     closeSaving.value = true;
     try {
-        await getClient().closeCorrectiveAction(selectedItem.value.id, {
+        await service.closeCorrectiveAction(selectedItem.value.id, {
             notes:         closeNotes.value,
             completedDate: closeCompletedDate.value || null,
             rootCause:     closeRootCause.value || null,
@@ -739,7 +736,7 @@ async function submitEdit() {
     if (!editItem.value) return;
     editSaving.value = true;
     try {
-        await getClient().updateCorrectiveAction(editItem.value.id, {
+        await service.updateCorrectiveAction(editItem.value.id, {
             description:      editDescription.value,
             rootCause:        editRootCause.value || null,
             assignedTo:       editAssignedTo.value || null,
@@ -782,7 +779,7 @@ async function bulkChangeStatus(newStatus: string) {
     if (!selectedItems.value.length) return;
     bulkSaving.value = true;
     try {
-        const result = await getClient().bulkUpdateCorrectiveActions({
+        const result = await service.bulkUpdateCorrectiveActions({
             correctiveActionIds: selectedItems.value.map(i => i.id),
             action:              'status',
             newStatus,
@@ -800,7 +797,7 @@ async function bulkChangeStatus(newStatus: string) {
 async function submitBulkClose() {
     bulkSaving.value = true;
     try {
-        const result = await getClient().bulkUpdateCorrectiveActions({
+        const result = await service.bulkUpdateCorrectiveActions({
             correctiveActionIds: selectedItems.value.map(i => i.id),
             action:              'status',
             newStatus:           'Closed',
@@ -820,7 +817,7 @@ async function submitBulkClose() {
 async function submitBulkReassign() {
     bulkSaving.value = true;
     try {
-        const result = await getClient().bulkUpdateCorrectiveActions({
+        const result = await service.bulkUpdateCorrectiveActions({
             correctiveActionIds: selectedItems.value.map(i => i.id),
             action:              'reassign',
             newAssignee:         bulkNewAssignee.value || null,
@@ -848,11 +845,8 @@ async function exportExcel() {
         if (filterPriority.value)    params.priority    = filterPriority.value;
         if (filterOverdueOnly.value) params.overdueOnly = 'true';
         if (filterSearch.value)      params.searchText  = filterSearch.value;
-        const res = await apiStore.api.get('/v1/corrective-actions/export', {
-            params,
-            responseType: 'blob',
-        });
-        const blobUrl = URL.createObjectURL(new Blob([res.data], {
+        const blob = await service.downloadBlob('/v1/corrective-actions/export', params);
+        const blobUrl = URL.createObjectURL(new Blob([blob], {
             type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         }));
         const link    = document.createElement('a');

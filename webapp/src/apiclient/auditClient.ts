@@ -1498,6 +1498,97 @@ export class AuditClient {
             .get<AuditLogsResult>(`${this.baseUrl}/v1/admin/audit-logs`, { params, cancelToken })
             .then(r => r.data);
     }
+
+    // ── Scheduled Reports ─────────────────────────────────────────────────────
+
+    getScheduledReports(cancelToken?: CancelToken): Promise<ScheduledReportDto[]> {
+        return this.instance
+            .get<ScheduledReportDto[]>(`${this.baseUrl}/v1/reports/scheduled`, { cancelToken })
+            .then(r => r.data);
+    }
+
+    saveScheduledReport(payload: ScheduledReportPayload, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .put(`${this.baseUrl}/v1/reports/scheduled`, payload, { cancelToken })
+            .then(() => undefined);
+    }
+
+    deleteScheduledReport(id: number, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .delete(`${this.baseUrl}/v1/reports/scheduled/${id}`, { cancelToken })
+            .then(() => undefined);
+    }
+
+    // ── Audits by Employee ────────────────────────────────────────────────────
+
+    getAuditsByEmployee(
+        params?: { divisionId?: string; dateFrom?: string; dateTo?: string },
+        cancelToken?: CancelToken,
+    ): Promise<EmployeeAuditRowDto[]> {
+        return this.instance
+            .get<EmployeeAuditRowDto[]>(`${this.baseUrl}/v1/audits/by-employee`, { params, cancelToken })
+            .then(r => r.data);
+    }
+
+    // ── Blob helpers (Excel exports, PDF generation) ──────────────────────────
+
+    downloadBlob(
+        endpoint: string,
+        params?: Record<string, unknown>,
+        cancelToken?: CancelToken,
+    ): Promise<Blob> {
+        return this.instance
+            .get(`${this.baseUrl}${endpoint}`, { params, responseType: 'blob', cancelToken })
+            .then(r => r.data as Blob);
+    }
+
+    postBlob(
+        endpoint: string,
+        data: unknown,
+        cancelToken?: CancelToken,
+    ): Promise<Blob> {
+        return this.instance
+            .post(`${this.baseUrl}${endpoint}`, data, { responseType: 'blob', cancelToken })
+            .then(r => r.data as Blob);
+    }
+}
+
+// ── Scheduled Reports ─────────────────────────────────────────────────────────
+
+export interface ScheduledReportDto {
+    id: number;
+    templateId: string;
+    title: string;
+    divisionId: number | null;
+    frequency: string;
+    timeUtc: string;
+    dateRangePreset: string;
+    recipients: string[];
+    isActive: boolean;
+}
+
+export interface ScheduledReportPayload {
+    id?: number | null;
+    templateId: string;
+    title: string;
+    divisionId: number | null;
+    frequency: string;
+    timeUtc: string;
+    dateRangePreset: string;
+    recipients: string[];
+    isActive: boolean;
+}
+
+// ── Audits by Employee ────────────────────────────────────────────────────────
+
+export interface EmployeeAuditRowDto {
+    auditor: string;
+    auditCount: number;
+    avgScorePercent: number | null;
+    totalNonConforming: number;
+    totalWarnings: number;
+    lastAuditDate: string | null;
+    lastDivisionCode: string | null;
 }
 
 export interface AuditLogsResult {

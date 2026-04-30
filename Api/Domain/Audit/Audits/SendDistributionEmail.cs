@@ -8,7 +8,9 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
-[AllowedAuthorizationRole(AuthorizationRole.AuditAdmin, AuthorizationRole.Administrator, AuthorizationRole.TemplateAdmin)]
+[AllowedAuthorizationRole(
+    AuthorizationRole.AuditAdmin, AuthorizationRole.Administrator,
+    AuthorizationRole.TemplateAdmin, AuthorizationRole.AuditReviewer)]
 public class SendDistributionEmail : IRequest<Unit>
 {
     public int AuditId { get; set; }

@@ -166,12 +166,11 @@ import { useConfirm } from 'primevue/useconfirm';
 import { useToast } from 'primevue/usetoast';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
-import { useApiStore } from '@/stores/apiStore';
-import { AuditClient } from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 
 const router   = useRouter();
 const store    = useAuditStore();
-const apiStore = useApiStore();
+const service  = useAuditService();
 const confirm  = useConfirm();
 const toast    = useToast();
 
@@ -209,15 +208,10 @@ function fmtDate(d: string | Date | null) {
     return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function getClient() {
-    return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-}
-
 async function load() {
     loading.value = true;
     try {
-        const res = await apiStore.api.get('/v1/reports/scheduled');
-        schedules.value = res.data;
+        schedules.value = await service.getScheduledReports();
     } finally {
         loading.value = false;
     }
@@ -253,7 +247,7 @@ async function save() {
             ...editing.value,
             recipients: recipientsText.value.split(',').map((e: string) => e.trim()).filter(Boolean),
         };
-        await apiStore.api.put('/v1/reports/scheduled', payload);
+        await service.saveScheduledReport(payload);
         toast.add({ severity: 'success', summary: 'Saved', life: 3000 });
         showEditor.value = false;
         await load();
@@ -271,7 +265,7 @@ function confirmDelete(s: any) {
         icon: 'pi pi-exclamation-triangle',
         acceptClass: 'p-button-danger',
         accept: () => {
-            apiStore.api.delete(`/v1/reports/scheduled/${s.id}`)
+            service.deleteScheduledReport(s.id)
                 .then(() => load())
                 .then(() => toast.add({ severity: 'success', summary: 'Deleted', life: 3000 }));
         },

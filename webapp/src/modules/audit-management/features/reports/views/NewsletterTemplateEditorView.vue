@@ -233,11 +233,11 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
-import { useApiStore } from '@/stores/apiStore';
-import { AuditClient, type DivisionDto } from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
+import type { DivisionDto } from '@/apiclient/auditClient';
 
 const router = useRouter();
-const apiStore = useApiStore();
+const service = useAuditService();
 
 const divisions = ref<DivisionDto[]>([]);
 const selectedDivisionId = ref<number | null>(null);
@@ -287,10 +287,6 @@ const saveError = ref('');
 const saving = ref(false);
 const divisionsWithTemplates = ref(new Set<number>());
 
-function getClient() {
-    return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-}
-
 function hasTemplate(divisionId: number): boolean {
     return divisionsWithTemplates.value.has(divisionId);
 }
@@ -300,7 +296,7 @@ async function selectDivision(d: DivisionDto) {
     saveMessage.value = '';
     saveError.value = '';
     try {
-        const template = await getClient().getNewsletterTemplate(d.id);
+        const template = await service.getNewsletterTemplate(d.id);
         if (template) {
             current.value = {
                 divisionId: template.divisionId,
@@ -355,7 +351,7 @@ async function saveTemplate() {
     saving.value = true;
     saveError.value = '';
     try {
-        await getClient().saveNewsletterTemplate({
+        await service.saveNewsletterTemplate({
             divisionId: current.value.divisionId,
             name: current.value.name,
             primaryColor: current.value.primaryColor,
@@ -382,8 +378,7 @@ function openNewsletter() {
 }
 
 onMounted(async () => {
-    const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-    divisions.value = await client.getDivisions();
+    divisions.value = await service.getDivisions();
     if (divisions.value.length > 0) {
         selectDivision(divisions.value[0]);
     }

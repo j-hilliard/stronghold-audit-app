@@ -130,11 +130,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
-import { useApiStore } from '@/stores/apiStore';
-import { AuditClient } from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 
 const route = useRoute();
-const apiStore = useApiStore();
 const docEl = ref<HTMLElement | null>(null);
 const loading = ref(true);
 const review = ref<any>(null);
@@ -194,8 +192,7 @@ onMounted(async () => {
             review.value = JSON.parse(cached);
         } else {
             const auditId = Number(route.params.auditId);
-            const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-            review.value = await client.getAuditReview(auditId);
+            review.value = await useAuditService().getAuditReview(auditId);
         }
     } catch (e) {
         console.error('Failed to load audit review for print:', e);

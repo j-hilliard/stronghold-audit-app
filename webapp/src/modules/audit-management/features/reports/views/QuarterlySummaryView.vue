@@ -211,11 +211,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { useApiStore } from '@/stores/apiStore';
-import { AuditClient, type AuditReportDto, type DivisionDto } from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
+import type { AuditReportDto, DivisionDto } from '@/apiclient/auditClient';
 
 const route = useRoute();
-const apiStore = useApiStore();
+const service = useAuditService();
 const pageEl = ref<HTMLElement | null>(null);
 
 const loading = ref(false);
@@ -244,15 +244,12 @@ function quarterDateRange(year: number, q: number) {
     };
 }
 
-function getClient() {
-    return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-}
 
 async function loadData() {
     loading.value = true;
     try {
         const { from, to } = quarterDateRange(selectedYear.value, selectedQuarter.value);
-        report.value = await getClient().getAuditReport(
+        report.value = await service.getAuditReport(
             selectedDivisionId.value || null,
             null,
             from,
@@ -264,7 +261,7 @@ async function loadData() {
 }
 
 onMounted(async () => {
-    divisions.value = await getClient().getDivisions();
+    divisions.value = await service.getDivisions();
     await loadData();
 });
 

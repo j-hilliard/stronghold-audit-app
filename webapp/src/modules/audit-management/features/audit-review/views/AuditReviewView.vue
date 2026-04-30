@@ -1,4 +1,4 @@
-<template>
+﻿<template>
     <div>
         <BasePageHeader
             icon="pi pi-eye"
@@ -21,14 +21,14 @@
                 @click="printPage"
             />
             <Button
-                v-if="review && userStore.isAuditAdmin"
+                v-if="review && hasPermission('audit.review')"
                 label="Send Distribution"
                 icon="pi pi-send"
                 :loading="distributionLoadingPreview"
                 @click="openDistributionDialog"
             />
             <Button
-                v-if="review && userStore.isAuditAdmin && (review.status === 'Submitted' || review.status === 'Closed')"
+                v-if="review && hasPermission('audit.reopen') && (review.status === 'Submitted' || review.status === 'Closed')"
                 label="Reopen"
                 icon="pi pi-refresh"
                 severity="warning"
@@ -43,7 +43,7 @@
                 @click="router.push(`/audit-management/audits/${route.params.id}`)"
             />
             <Button
-                v-if="review && userStore.isAuditAdmin && (review.status === 'Submitted' || review.status === 'Reopened')"
+                v-if="review && hasPermission('audit.close') && (review.status === 'Submitted' || review.status === 'Reopened')"
                 label="Close Audit"
                 icon="pi pi-check-circle"
                 severity="success"
@@ -81,7 +81,7 @@
             </template>
         </Dialog>
 
-        <div v-if="store.reviewLoading" class="flex justify-center py-12">
+        <div v-if="reviewLoading" class="flex justify-center py-12">
             <ProgressSpinner />
         </div>
 
@@ -194,15 +194,15 @@
             </Card>
 
             <!-- ── Findings Summary (AuditAdmin editable, others read-only) ──── -->
-            <Card v-if="userStore.isAuditAdmin || review.reviewSummary">
+            <Card v-if="hasPermission('audit.review') || review.reviewSummary">
                 <template #title>
                     <div class="flex items-center justify-between">
                         <span class="text-base font-semibold text-white">Findings Summary</span>
-                        <span v-if="!userStore.isAuditAdmin" class="text-xs text-slate-500 italic">Read-only</span>
+                        <span v-if="!hasPermission('audit.review')" class="text-xs text-slate-500 italic">Read-only</span>
                     </div>
                 </template>
                 <template #content>
-                    <div v-if="userStore.isAuditAdmin" class="space-y-3 no-print">
+                    <div v-if="hasPermission('audit.review')" class="space-y-3 no-print">
                         <Textarea
                             v-model="reviewSummaryDraft"
                             rows="5"
@@ -222,7 +222,7 @@
                             <span class="text-xs text-slate-500">Saved text appears in the distribution email.</span>
                         </div>
                     </div>
-                    <p v-if="userStore.isAuditAdmin" class="print-only text-sm leading-relaxed whitespace-pre-wrap">{{ reviewSummaryDraft || 'No findings summary written.' }}</p>
+                    <p v-if="hasPermission('audit.review')" class="print-only text-sm leading-relaxed whitespace-pre-wrap">{{ reviewSummaryDraft || 'No findings summary written.' }}</p>
                     <p v-else class="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{{ review.reviewSummary }}</p>
                 </template>
             </Card>
@@ -438,7 +438,7 @@
             </Card>
 
             <!-- ── Distribution Recipients ─────────────────────────────────── -->
-            <Card v-if="review.reviewEmailRouting.length > 0 || (review.distributionRecipients?.length ?? 0) > 0 || userStore.isAuditAdmin" class="distribution-section">
+            <Card v-if="review.reviewEmailRouting.length > 0 || (review.distributionRecipients?.length ?? 0) > 0 || hasPermission('audit.review')" class="distribution-section">
                 <template #title>
                     <span class="text-base font-semibold text-white">Distribution Recipients</span>
                 </template>
@@ -454,11 +454,11 @@
                             </ul>
                         </div>
                         <!-- Per-audit additions -->
-                        <div v-if="(review.distributionRecipients?.length ?? 0) > 0 || userStore.isAuditAdmin">
+                        <div v-if="(review.distributionRecipients?.length ?? 0) > 0 || hasPermission('audit.review')">
                             <div class="flex items-center justify-between mb-1">
                                 <p class="text-xs text-slate-500 uppercase tracking-wide">Additional Recipients</p>
                                 <Button
-                                    v-if="userStore.isAuditAdmin"
+                                    v-if="hasPermission('audit.review')"
                                     label="Add People"
                                     icon="pi pi-plus"
                                     size="small"
@@ -472,7 +472,7 @@
                                     <i class="pi pi-user text-slate-500 text-xs" />
                                     <span class="flex-1">{{ r.emailAddress }}<span v-if="r.name" class="text-slate-500"> — {{ r.name }}</span></span>
                                     <Button
-                                        v-if="userStore.isAuditAdmin"
+                                        v-if="hasPermission('audit.review')"
                                         icon="pi pi-times"
                                         severity="danger"
                                         text
@@ -483,7 +483,7 @@
                                     />
                                 </li>
                             </ul>
-                            <p v-else-if="!userStore.isAuditAdmin" class="text-sm text-slate-500 italic">No additional recipients added.</p>
+                            <p v-else-if="!hasPermission('audit.review')" class="text-sm text-slate-500 italic">No additional recipients added.</p>
                         </div>
                     </div>
                 </template>
@@ -685,467 +685,51 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { useToast } from 'primevue/usetoast';
 import ProgressSpinner from 'primevue/progressspinner';
 import Card from 'primevue/card';
 import Dialog from 'primevue/dialog';
 import Tag from 'primevue/tag';
 import Textarea from 'primevue/textarea';
 import InputText from 'primevue/inputtext';
+import Button from 'primevue/button';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import AuditAttachments from '@/modules/audit-management/features/audit-form/components/AuditAttachments.vue';
-import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
-import { useApiStore } from '@/stores/apiStore';
-import { useUserStore } from '@/stores/userStore';
-import { AuditClient, type AuditFindingDto, type CorrectiveActionDto, type EmailRoutingRuleDto, type DistributionPreviewDto } from '@/apiclient/auditClient';
+import { usePermissions } from '@/modules/audit-management/composables/usePermissions';
+import { useAuditReviewData } from '../composables/useAuditReviewData';
+import { useAuditReviewActions } from '../composables/useAuditReviewActions';
+import { useAuditReviewFormatting } from '../composables/useAuditReviewFormatting';
+import { useAuditReviewNavigation } from '../composables/useAuditReviewNavigation';
 
 const router = useRouter();
-const route = useRoute();
-const store = useAuditStore();
-const apiStore = useApiStore();
-const userStore = useUserStore();
-const toast = useToast();
+const route  = useRoute();
+const { hasPermission } = usePermissions();
 
-const review = computed(() => store.review);
-const saving = ref(false);
-const showFullRecord = ref(false);
-const showAiSummary = ref(true); // expanded by default
+const { review, reviewLoading, repeatFindingIdSet, allRoutingEntries } = useAuditReviewData();
 
-// ── Review Summary ────────────────────────────────────────────────────────────
-const reviewSummaryDraft = ref('');
-const summarySaving = ref(false);
+const {
+    saving, auditActionSaving,
+    reviewSummaryDraft, summarySaving, submitSaveSummary,
+    showReopenDialog, showCloseAuditDialog, reopenReason, closeAuditNotes,
+    submitReopen, submitCloseAudit,
+    showAssign, assignTarget, assignForm, openAssignModal, submitAssign,
+    showClose, closeTarget, closeForm, openCloseModal, submitClose,
+    addingRecipient, removingRecipientId,
+    showAddRecipientsDialog, addRecipientsSearch, addRecipientsDivisionFilter,
+    dialogSelectedEmails, manualEmail, manualName,
+    dialogDivisionOptions, filteredRoutingForDialog,
+    nameFromEmail, openAddRecipientsDialog, closeAddRecipientsDialog,
+    submitAddRecipients, removeRecipient,
+    showDistributionDialog, distributionLoadingPreview, distributionSending,
+    distributionPreview, distributionSummaryEdit, editableSubject, selectedAttachmentIds,
+    openDistributionDialog, submitDistributionEmail,
+} = useAuditReviewActions({ review, allRoutingEntries });
 
-watch(() => review.value?.reviewSummary, (val) => {
-    reviewSummaryDraft.value = val ?? '';
-}, { immediate: true });
+const {
+    scoreDisplay, scoreColor, barColor,
+    ringCircumference, ringDashoffset, ringColor,
+    benchmarkStatusClass, caSeverity, statusDotClass, statusTextClass, formatBytes,
+} = useAuditReviewFormatting(review);
 
-async function submitSaveSummary() {
-    const id = Number(route.params.id);
-    summarySaving.value = true;
-    try {
-        await store.saveReviewSummary(id, reviewSummaryDraft.value || null);
-        toast.add({ severity: 'success', summary: 'Saved', detail: 'Findings summary saved.', life: 2500 });
-    } catch {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to save summary.', life: 4000 });
-    } finally {
-        summarySaving.value = false;
-    }
-}
-
-// ── Distribution Recipients ───────────────────────────────────────────────────
-const addingRecipient = ref(false);
-const removingRecipientId = ref<number | null>(null);
-
-// Add recipients dialog
-const showAddRecipientsDialog = ref(false);
-const addRecipientsSearch = ref('');
-const addRecipientsDivisionFilter = ref('');
-const dialogSelectedEmails = ref<string[]>([]);
-const manualEmail = ref('');
-const manualName = ref('');
-
-// All active routing entries (loaded on mount) — source for the dialog list
-const allRoutingEntries = ref<EmailRoutingRuleDto[]>([]);
-
-// Unique sorted division codes from the routing table for the filter dropdown
-const dialogDivisionOptions = computed(() =>
-    [...new Set(allRoutingEntries.value.filter(r => r.isActive).map(r => r.divisionCode))].sort()
-);
-
-// Derive a human-readable name from an email address (brian.smith@... → "Brian Smith")
-function nameFromEmail(email: string): string {
-    const local = email.split('@')[0] ?? '';
-    return local.split(/[._-]/).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
-}
-
-const filteredRoutingForDialog = computed(() => {
-    const already = new Set((review.value?.distributionRecipients ?? []).map(r => r.emailAddress));
-    const q = addRecipientsSearch.value.toLowerCase();
-    const div = addRecipientsDivisionFilter.value;
-    return allRoutingEntries.value.filter(r => {
-        if (!r.isActive || already.has(r.emailAddress)) return false;
-        if (div && r.divisionCode !== div) return false;
-        if (q) {
-            const derivedName = nameFromEmail(r.emailAddress).toLowerCase();
-            if (!r.emailAddress.toLowerCase().includes(q) && !derivedName.includes(q)) return false;
-        }
-        return true;
-    });
-});
-
-function closeAddRecipientsDialog() {
-    showAddRecipientsDialog.value = false;
-    addRecipientsSearch.value = '';
-    addRecipientsDivisionFilter.value = '';
-    dialogSelectedEmails.value = [];
-    manualEmail.value = '';
-    manualName.value = '';
-}
-
-function openAddRecipientsDialog() {
-    // Default to the current audit's division so the list is pre-filtered
-    addRecipientsDivisionFilter.value = review.value?.divisionCode ?? '';
-    showAddRecipientsDialog.value = true;
-}
-
-async function submitAddRecipients() {
-    const id = Number(route.params.id);
-    addingRecipient.value = true;
-    try {
-        // Add all checked routing entries
-        for (const email of dialogSelectedEmails.value) {
-            await store.addDistributionRecipient(id, email, undefined);
-        }
-        // Add manual entry if provided
-        if (manualEmail.value.trim()) {
-            await store.addDistributionRecipient(id, manualEmail.value.trim(), manualName.value.trim() || undefined);
-        }
-        const total = dialogSelectedEmails.value.length + (manualEmail.value.trim() ? 1 : 0);
-        toast.add({ severity: 'success', summary: 'Added', detail: `${total} recipient(s) added.`, life: 2500 });
-        closeAddRecipientsDialog();
-    } catch {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to add recipients.', life: 4000 });
-    } finally {
-        addingRecipient.value = false;
-    }
-}
-
-async function removeRecipient(recipientId: number) {
-    const id = Number(route.params.id);
-    removingRecipientId.value = recipientId;
-    try {
-        await store.removeDistributionRecipient(id, recipientId);
-        toast.add({ severity: 'success', summary: 'Removed', detail: 'Recipient removed.', life: 2000 });
-    } catch {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to remove recipient.', life: 4000 });
-    } finally {
-        removingRecipientId.value = null;
-    }
-}
-
-// ── Send Distribution Email ───────────────────────────────────────────────────
-const showDistributionDialog = ref(false);
-const distributionLoadingPreview = ref(false);
-const distributionSending = ref(false);
-const distributionPreview = ref<DistributionPreviewDto | null>(null);
-const distributionSummaryEdit = ref('');
-const editableSubject = ref('');
-const selectedAttachmentIds = ref<number[]>([]);
-
-function escapeHtml(input: string): string {
-    return input
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
-}
-
-function buildFallbackDistributionPreview(auditId: number): DistributionPreviewDto | null {
-    if (!review.value) return null;
-
-    const division = review.value.divisionCode || 'Audit';
-    const trackingOrJob = review.value.trackingNumber || review.value.header?.jobNumber || `Audit ${auditId}`;
-    const auditDate = review.value.header?.auditDate ? ` — ${review.value.header.auditDate}` : '';
-    const recipients = (review.value.distributionRecipients ?? [])
-        .map(r => r.emailAddress)
-        .filter((v): v is string => Boolean(v && v.trim()))
-        .map(v => v.trim());
-    const findingsSummary = reviewSummaryDraft.value || review.value.reviewSummary || null;
-    const safeSummary = findingsSummary ? escapeHtml(findingsSummary) : 'No findings summary provided.';
-    const location = review.value.header?.location ? escapeHtml(review.value.header.location) : 'N/A';
-    const auditor = review.value.header?.auditor ? escapeHtml(review.value.header.auditor) : 'N/A';
-
-    return {
-        subject: `${division} Audit Distribution — ${trackingOrJob}${auditDate}`,
-        recipients,
-        findingsSummary,
-        bodyHtml: `
-            <div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.5;color:#111827">
-                <h2 style="margin:0 0 8px 0;">${escapeHtml(division)} Audit Distribution</h2>
-                <p style="margin:0 0 4px 0;"><strong>Reference:</strong> ${escapeHtml(trackingOrJob)}</p>
-                <p style="margin:0 0 4px 0;"><strong>Location:</strong> ${location}</p>
-                <p style="margin:0 0 12px 0;"><strong>Auditor:</strong> ${auditor}</p>
-                <h3 style="margin:0 0 6px 0;">Findings Summary</h3>
-                <div style="padding:10px;border:1px solid #d1d5db;border-radius:6px;white-space:pre-wrap;">${safeSummary}</div>
-            </div>
-        `,
-    };
-}
-
-async function openDistributionDialog() {
-    const id = Number(route.params.id);
-    distributionLoadingPreview.value = true;
-    try {
-        const preview = await store.getDistributionPreview(id, selectedAttachmentIds.value);
-        distributionPreview.value = preview;
-        distributionSummaryEdit.value = preview.findingsSummary ?? '';
-        editableSubject.value = preview.subject;
-        showDistributionDialog.value = true;
-    } catch (e: any) {
-        const status = e?.response?.status;
-        // Backward compatibility: if backend is not yet running the new preview endpoint,
-        // build a local preview so users can still send distribution emails.
-        if (status !== 403 && status !== 401) {
-            const fallback = buildFallbackDistributionPreview(id);
-            if (fallback) {
-                distributionPreview.value = fallback;
-                distributionSummaryEdit.value = fallback.findingsSummary ?? '';
-                editableSubject.value = fallback.subject;
-                showDistributionDialog.value = true;
-                toast.add({
-                    severity: 'warn',
-                    summary: 'Preview Fallback',
-                    detail: 'Live preview endpoint unavailable. Using local preview mode.',
-                    life: 4500,
-                });
-                return;
-            }
-        }
-
-        const detail = status === 403
-            ? 'You do not have permission to preview distribution emails.'
-            : status === 404
-            ? 'Audit not found.'
-            : (typeof e?.response?.data === 'string' ? e.response.data : null)
-              ?? e?.message
-              ?? 'Failed to load distribution preview.';
-        toast.add({ severity: 'error', summary: 'Error', detail, life: 6000 });
-    } finally {
-        distributionLoadingPreview.value = false;
-    }
-}
-
-async function submitDistributionEmail() {
-    const id = Number(route.params.id);
-    distributionSending.value = true;
-    try {
-        // Save edited summary back to the audit so the email uses the updated text
-        await store.saveReviewSummary(id, distributionSummaryEdit.value || null);
-        await store.sendDistributionEmail(id, selectedAttachmentIds.value, editableSubject.value || undefined);
-        showDistributionDialog.value = false;
-        distributionPreview.value = null;
-        selectedAttachmentIds.value = [];
-        toast.add({ severity: 'success', summary: 'Sent', detail: 'Distribution email sent successfully.', life: 4000 });
-    } catch {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to send distribution email.', life: 5000 });
-    } finally {
-        distributionSending.value = false;
-    }
-}
-
-function formatBytes(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/** O(1) set for repeat-finding badge lookups */
-const repeatFindingIdSet = computed(() => new Set(review.value?.repeatFindingQuestionIds ?? []));
-
-// ── Assign modal ──────────────────────────────────────────────────────────────
-const showAssign = ref(false);
-const assignTarget = ref<AuditFindingDto | null>(null);
-const assignForm = ref({ description: '', assignedTo: '', dueDate: '' });
-
-function openAssignModal(item: AuditFindingDto) {
-    assignTarget.value = item;
-    assignForm.value = { description: '', assignedTo: '', dueDate: '' };
-    showAssign.value = true;
-}
-
-// ── Reopen / Close audit ──────────────────────────────────────────────────────
-const showReopenDialog = ref(false);
-const showCloseAuditDialog = ref(false);
-const reopenReason = ref('');
-const closeAuditNotes = ref('');
-const auditActionSaving = ref(false);
-
-async function submitReopen() {
-    const id = Number(route.params.id);
-    auditActionSaving.value = true;
-    try {
-        await getClient().reopenAudit(id, reopenReason.value || null);
-        toast.add({ severity: 'warn', summary: 'Reopened', detail: 'Audit has been reopened.', life: 3000 });
-        showReopenDialog.value = false;
-        reopenReason.value = '';
-        await store.loadReview(id);
-    } catch (e: unknown) {
-        toast.add({ severity: 'error', summary: 'Error', detail: (e as Error)?.message ?? 'Failed to reopen.', life: 4000 });
-    } finally {
-        auditActionSaving.value = false;
-    }
-}
-
-async function submitCloseAudit() {
-    const id = Number(route.params.id);
-    auditActionSaving.value = true;
-    try {
-        await getClient().closeAudit(id, closeAuditNotes.value || null);
-        toast.add({ severity: 'success', summary: 'Closed', detail: 'Audit has been closed.', life: 3000 });
-        showCloseAuditDialog.value = false;
-        closeAuditNotes.value = '';
-        await store.loadReview(id);
-    } catch (e: unknown) {
-        // Extract the server error message for the open-CA gate (400 BadRequest with plain string body)
-        const axiosErr = e as { response?: { status?: number; data?: unknown } };
-        const serverMsg = typeof axiosErr?.response?.data === 'string'
-            ? axiosErr.response.data
-            : (e as Error)?.message ?? 'Failed to close audit.';
-        toast.add({ severity: 'error', summary: 'Cannot Close Audit', detail: serverMsg, life: 6000 });
-    } finally {
-        auditActionSaving.value = false;
-    }
-}
-
-// ── Close CA modal ─────────────────────────────────────────────────────────────
-const showClose = ref(false);
-const closeTarget = ref<CorrectiveActionDto | null>(null);
-const closeForm = ref({ notes: '', completedDate: '' });
-
-function openCloseModal(ca: CorrectiveActionDto) {
-    closeTarget.value = ca;
-    closeForm.value = { notes: '', completedDate: '' };
-    showClose.value = true;
-}
-
-function getClient() {
-    return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-}
-
-async function submitAssign() {
-    if (!assignTarget.value) return;
-    saving.value = true;
-    try {
-        await getClient().assignCorrectiveAction({
-            findingId: assignTarget.value.id,
-            description: assignForm.value.description,
-            assignedTo: assignForm.value.assignedTo || null,
-            dueDate: assignForm.value.dueDate || null,
-        });
-        toast.add({ severity: 'success', summary: 'Assigned', detail: 'Corrective action assigned.', life: 2500 });
-        showAssign.value = false;
-        // Reload review to get updated CA list
-        const id = Number(route.params.id);
-        await store.loadReview(id);
-    } catch {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to assign corrective action.', life: 4000 });
-    } finally {
-        saving.value = false;
-    }
-}
-
-async function submitClose() {
-    if (!closeTarget.value) return;
-    saving.value = true;
-    try {
-        await getClient().closeCorrectiveAction(closeTarget.value.id, {
-            notes: closeForm.value.notes,
-            completedDate: closeForm.value.completedDate || null,
-        });
-        toast.add({ severity: 'success', summary: 'Closed', detail: 'Corrective action closed.', life: 2500 });
-        showClose.value = false;
-        const id = Number(route.params.id);
-        await store.loadReview(id);
-    } catch {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to close corrective action.', life: 4000 });
-    } finally {
-        saving.value = false;
-    }
-}
-
-onMounted(async () => {
-    const id = Number(route.params.id);
-    if (!isNaN(id)) await store.loadReview(id);
-
-    // Load email routing entries for the recipient autocomplete suggestions
-    if (userStore.isAuditAdmin) {
-        try {
-            allRoutingEntries.value = await getClient().getEmailRouting();
-        } catch { /* non-fatal */ }
-    }
-});
-
-const scoreDisplay = computed(() => {
-    const pct = review.value?.scorePercent;
-    if (pct == null) return '—';
-    return `${Math.round(pct)}%`;
-});
-
-const scoreColor = computed(() => {
-    const pct = review.value?.scorePercent;
-    if (pct == null) return 'text-slate-400';
-    if (pct >= 90) return 'text-emerald-400';
-    if (pct >= 75) return 'text-amber-400';
-    return 'text-red-400';
-});
-
-const barColor = computed(() => {
-    const pct = review.value?.scorePercent;
-    if (pct == null) return 'bg-slate-500';
-    if (pct >= 90) return 'bg-emerald-500';
-    if (pct >= 75) return 'bg-amber-500';
-    return 'bg-red-500';
-});
-
-// ── Score ring ────────────────────────────────────────────────────────────────
-const ringCircumference = 2 * Math.PI * 42; // r=42
-const ringDashoffset = computed(() => {
-    const pct = review.value?.scorePercent ?? 0;
-    return ringCircumference - (pct / 100) * ringCircumference;
-});
-const ringColor = computed(() => {
-    const pct = review.value?.scorePercent;
-    if (pct == null) return '#475569';
-    if (pct >= 90) return '#34d399';
-    if (pct >= 75) return '#fbbf24';
-    return '#f87171';
-});
-
-const benchmarkStatusClass = computed(() => {
-    const pct = review.value?.scorePercent;
-    const target = review.value?.divisionScoreTarget;
-    if (pct == null) return 'bg-slate-700/60 border-slate-600 text-slate-300';
-    if (target == null) return 'bg-slate-700/60 border-slate-600 text-slate-300';
-    return pct >= Number(target)
-        ? 'bg-emerald-900/50 border-emerald-700 text-emerald-300'
-        : 'bg-red-900/50 border-red-700 text-red-300';
-});
-
-function caSeverity(status: string): string {
-    const map: Record<string, string> = { Open: 'danger', InProgress: 'warning', Closed: 'success' };
-    return map[status] ?? 'secondary';
-}
-
-function statusDotClass(status: string | null | undefined): string {
-    switch (status) {
-        case 'Conforming':    return 'bg-emerald-500';
-        case 'NonConforming': return 'bg-red-500';
-        case 'Warning':       return 'bg-amber-500';
-        case 'NA':            return 'bg-slate-500';
-        default:              return 'bg-slate-700 border border-slate-500';
-    }
-}
-
-function statusTextClass(status: string | null | undefined): string {
-    switch (status) {
-        case 'Conforming':    return 'text-emerald-400';
-        case 'NonConforming': return 'text-red-400';
-        case 'Warning':       return 'text-amber-400';
-        case 'NA':            return 'text-slate-500';
-        default:              return 'text-slate-600';
-    }
-}
-
-async function printPage() {
-    const wasOpen = showFullRecord.value;
-    showFullRecord.value = true;
-    await nextTick();
-    sessionStorage.setItem('print-review-data', JSON.stringify(review.value));
-    window.open(`/audit-management/print-review/${route.params.id}`, '_blank');
-    showFullRecord.value = wasOpen;
-}
-
+const { showFullRecord, showAiSummary, printPage } = useAuditReviewNavigation(review);
 </script>

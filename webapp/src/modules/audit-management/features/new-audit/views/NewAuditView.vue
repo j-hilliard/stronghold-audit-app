@@ -139,12 +139,11 @@ import { useRouter } from 'vue-router';
 import ProgressSpinner from 'primevue/progressspinner';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
-import { AuditClient, type DivisionDto, type DivisionJobPrefixDto } from '@/apiclient/auditClient';
-import { useApiStore } from '@/stores/apiStore';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
+import type { DivisionDto, DivisionJobPrefixDto } from '@/apiclient/auditClient';
 
 const router = useRouter();
 const store = useAuditStore();
-const apiStore = useApiStore();
 
 const loading = ref(false);
 const loadingTemplate = ref(false);
@@ -201,10 +200,10 @@ watch(selectedDivisionId, async (divId) => {
 
     loadingTemplate.value = true;
     try {
-        const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
+        const svc = useAuditService();
         const [prefixes, template] = await Promise.all([
-            client.getDivisionJobPrefixes(divId).catch(() => [] as DivisionJobPrefixDto[]),
-            client.getActiveTemplate(divId).catch(() => null),
+            svc.getDivisionJobPrefixes(divId).catch(() => [] as DivisionJobPrefixDto[]),
+            svc.getActiveTemplate(divId).catch(() => null),
         ]);
         jobPrefixes.value = prefixes;
         const defaultPrefix = prefixes.find(p => p.isDefault) ?? prefixes[0] ?? null;

@@ -255,18 +255,13 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { AuditClient } from '@/apiclient/auditClient';
 import type { AuditLogsResult } from '@/apiclient/auditClient';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
-import { useApiStore } from '@/stores/apiStore';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 
-const apiStore  = useApiStore();
+const service   = useAuditService();
 const loading   = ref(false);
 const activeTab = ref<'actions' | 'trail'>('actions');
-
-function getClient() {
-    return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
-}
 const page      = ref(1);
 const pageSize  = 50;
 
@@ -317,7 +312,7 @@ const totalPages = computed(() => {
 async function loadData() {
     loading.value = true;
     try {
-        result.value = await getClient().getAuditLogs({
+        result.value = await service.getAuditLogs({
             search:     filters.value.search     || null,
             userEmail:  filters.value.userEmail  || null,
             entityType: filters.value.entityType || null,

@@ -1,10 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
 import { useToast } from 'primevue/usetoast';
-import { useApiStore } from '@/stores/apiStore';
 import { useUserStore } from '@/stores/userStore';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 import {
-    AuditClient,
     type DivisionDto,
     type TemplateDto,
     type TemplateSectionDto,
@@ -74,11 +73,10 @@ export function calculateScore(responses: ResponseState[]): { counts: ScoreCount
 const DRAFT_KEY = (id: number) => `audit-draft-${id}`;
 
 export const useAuditStore = defineStore('audit', () => {
-    const apiStore = useApiStore();
     const toast = useToast();
 
     function getClient() {
-        return new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
+        return useAuditService();
     }
 
     // ── State ──────────────────────────────────────────────────────────────────

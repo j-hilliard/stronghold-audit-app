@@ -7,74 +7,81 @@
         />
 
         <!-- Top bar: draft selector + filters -->
-        <div class="flex items-center gap-3 px-4 py-2 bg-slate-800 border-b border-slate-700 flex-wrap">
-            <!-- Division -->
-            <select v-model="selectedDivisionId" @change="onDivisionChange"
-                data-testid="composer-filter-division"
-                class="bg-slate-700 border border-slate-600 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none">
-                <option :value="null" disabled>Select division…</option>
-                <option v-for="d in divisions" :key="d.id" :value="d.id">{{ d.code }} — {{ d.name }}</option>
-            </select>
+        <div class="flex items-center gap-2 px-4 py-2.5 bg-surface-2 border-b border-slate-700/60 flex-wrap shadow-elevation-1">
+            <!-- Group 1: context filters -->
+            <div class="flex items-center gap-2 flex-wrap">
+                <!-- Division -->
+                <select v-model="selectedDivisionId" @change="onDivisionChange"
+                    data-testid="composer-filter-division"
+                    class="composer-select">
+                    <option :value="null" disabled>Select division…</option>
+                    <option v-for="d in divisions" :key="d.id" :value="d.id">{{ d.code }} — {{ d.name }}</option>
+                </select>
 
-            <!-- Report type -->
-            <select v-model="reportType"
-                class="bg-slate-700 border border-slate-600 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none">
-                <option value="custom">Custom Report</option>
-                <option value="newsletter">Newsletter</option>
-            </select>
+                <!-- Report type -->
+                <select v-model="reportType" class="composer-select">
+                    <option value="custom">Custom Report</option>
+                    <option value="newsletter">Newsletter</option>
+                </select>
 
-            <!-- Newsletter settings toggle (only in newsletter mode) -->
-            <button
-                v-if="reportType === 'newsletter'"
-                @click="showNewsletterSettings = !showNewsletterSettings"
-                :class="['flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors',
-                    showNewsletterSettings
-                        ? 'bg-blue-700 text-white'
-                        : 'bg-slate-700 border border-slate-600 text-slate-200 hover:bg-slate-600']"
-            >
-                <i class="pi pi-palette text-xs" />
-                Newsletter Settings
-            </button>
+                <!-- Newsletter settings toggle -->
+                <button
+                    v-if="reportType === 'newsletter'"
+                    @click="showNewsletterSettings = !showNewsletterSettings"
+                    :class="['flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors border',
+                        showNewsletterSettings
+                            ? 'bg-blue-700 border-blue-600 text-white'
+                            : 'bg-slate-700/60 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white']"
+                >
+                    <i class="pi pi-palette text-[11px]" />
+                    Newsletter Settings
+                </button>
 
-            <!-- Date range -->
-            <input type="date" v-model="dateFrom"
-                data-testid="composer-filter-from"
-                class="bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm text-slate-200 focus:outline-none" />
-            <span class="text-slate-500 text-xs">to</span>
-            <input type="date" v-model="dateTo"
-                data-testid="composer-filter-to"
-                class="bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-sm text-slate-200 focus:outline-none" />
+                <!-- Date range -->
+                <input type="date" v-model="dateFrom" data-testid="composer-filter-from"
+                    class="composer-input w-36" />
+                <span class="text-slate-600 text-xs font-medium">→</span>
+                <input type="date" v-model="dateTo" data-testid="composer-filter-to"
+                    class="composer-input w-36" />
+            </div>
 
-            <!-- Draft title -->
-            <input
-                v-model="draft.meta.value.title"
-                type="text"
-                placeholder="Draft title…"
-                data-testid="composer-draft-title"
-                class="flex-1 min-w-36 bg-slate-700 border border-slate-600 rounded px-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
-            />
+            <!-- Divider -->
+            <div class="h-6 w-px bg-slate-700 hidden sm:block mx-1" />
 
-            <!-- Load existing draft -->
-            <select v-model="selectedDraftId" @change="onLoadDraft"
-                data-testid="composer-draft-select"
-                class="bg-slate-700 border border-slate-600 rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none">
-                <option :value="null">New draft</option>
-                <option v-for="d in draftList" :key="d.id" :value="d.id">
-                    {{ d.divisionCode }} — {{ d.title }} ({{ d.period }})
-                </option>
-            </select>
+            <!-- Group 2: draft management -->
+            <div class="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
+                <!-- Draft title -->
+                <input
+                    v-model="draft.meta.value.title"
+                    type="text"
+                    placeholder="Draft title…"
+                    data-testid="composer-draft-title"
+                    class="composer-input flex-1 min-w-36"
+                />
 
-            <button v-if="draft.meta.value.id !== null" @click="confirmDelete"
-                class="px-2 py-1.5 text-xs text-red-400 hover:text-red-300" title="Delete current draft">
-                <i class="pi pi-trash" />
-            </button>
+                <!-- Load existing draft -->
+                <select v-model="selectedDraftId" @change="onLoadDraft"
+                    data-testid="composer-draft-select"
+                    class="composer-select">
+                    <option :value="null">New draft</option>
+                    <option v-for="d in draftList" :key="d.id" :value="d.id">
+                        {{ d.divisionCode }} — {{ d.title }} ({{ d.period }})
+                    </option>
+                </select>
 
-            <!-- Manage all drafts -->
-            <button @click="openManageDrafts"
-                class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-slate-700 border border-slate-600 rounded text-slate-300 hover:bg-slate-600"
-                title="View and delete all drafts">
-                <i class="pi pi-list" /> Manage Drafts
-            </button>
+                <button v-if="draft.meta.value.id !== null" @click="confirmDelete"
+                    class="px-2 py-1.5 text-xs text-red-500 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors"
+                    title="Delete current draft">
+                    <i class="pi pi-trash" />
+                </button>
+
+                <!-- Manage all drafts -->
+                <button @click="openManageDrafts"
+                    class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-slate-700/60 border border-slate-600 rounded-md text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                    title="View and delete all drafts">
+                    <i class="pi pi-list text-[11px]" /> Manage Drafts
+                </button>
+            </div>
         </div>
 
         <!-- Manage Drafts dialog -->
@@ -215,9 +222,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
-import { useApiStore } from '@/stores/apiStore';
 import { useUserStore } from '@/stores/userStore';
-import { AuditClient } from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 import type { DivisionDto, ReportDraftListItemDto } from '@/apiclient/auditClient';
 import Dialog from 'primevue/dialog';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
@@ -231,7 +237,7 @@ import type { ReportBlock } from '../types/report-block';
 import type { NewsletterTemplateDto } from '@/apiclient/auditClient';
 import { REPORT_THEMES } from '../composables/useReportThemes';
 
-const apiStore = useApiStore();
+const service = useAuditService();
 const userStore = useUserStore();
 const engine = useReportEngine();
 const draft = useReportDraft();
@@ -336,7 +342,7 @@ watch(selectedDivisionId, (id) => {
 });
 
 async function loadDivisions() {
-    const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
+    const client = service;
     divisions.value = await client.getDivisions();
     if (divisions.value.length && !selectedDivisionId.value) {
         selectedDivisionId.value = divisions.value[0].id;
@@ -346,7 +352,7 @@ async function loadDivisions() {
 }
 
 async function loadDraftList() {
-    const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
+    const client = service;
     draftList.value = await client.getReportDrafts(selectedDivisionId.value);
 }
 
@@ -361,7 +367,7 @@ async function onDivisionChange() {
 
 async function loadNewsletterTemplate() {
     if (!selectedDivisionId.value) return;
-    const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
+    const client = service;
     try {
         const tmpl = await client.getNewsletterTemplate(selectedDivisionId.value);
         if (tmpl) {
@@ -387,7 +393,7 @@ async function saveNewsletterTemplate() {
     newsletterSaving.value = true;
     newsletterSaveError.value = null;
     try {
-        const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
+        const client = service;
         const saved = await client.saveNewsletterTemplate({
             ...newsletterTemplate.value,
             divisionId: selectedDivisionId.value,
@@ -533,7 +539,7 @@ async function openManageDrafts() {
     draftsLoading.value = true;
     showManageDrafts.value = true;
     try {
-        const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
+        const client = service;
         allDrafts.value = await client.getReportDrafts(selectedDivisionId.value);
     } catch {
         // allDrafts stays empty — dialog still shows "No saved drafts found"
@@ -564,7 +570,7 @@ async function bulkDeleteDrafts() {
     if (!confirm(`Delete ${count} draft${count !== 1 ? 's' : ''}? This cannot be undone.`)) return;
     bulkDeleting.value = true;
     try {
-        const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
+        const client = service;
         const ids = [...selectedDraftIds.value];
         await Promise.all(ids.map(id => client.deleteReportDraft(id)));
         // If the active draft was among the deleted, clear local state only —
@@ -707,4 +713,38 @@ onMounted(async () => {
     dateTo.value = new Date(now.getFullYear(), q * 3 + 3, 0).toISOString().split('T')[0];
 });
 </script>
+
+<style scoped>
+.composer-select {
+    background: rgb(51,65,85,0.5);
+    border: 1px solid rgba(100,116,139,0.5);
+    border-radius: 0.375rem;
+    padding: 0.375rem 0.625rem;
+    font-size: 0.8125rem;
+    color: #e2e8f0;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+.composer-select:focus {
+    border-color: rgba(59,130,246,0.7);
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+}
+.composer-input {
+    background: rgb(51,65,85,0.5);
+    border: 1px solid rgba(100,116,139,0.5);
+    border-radius: 0.375rem;
+    padding: 0.375rem 0.625rem;
+    font-size: 0.8125rem;
+    color: #e2e8f0;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+.composer-input:focus {
+    border-color: rgba(59,130,246,0.7);
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+}
+.composer-input::placeholder {
+    color: #475569;
+}
+</style>
 

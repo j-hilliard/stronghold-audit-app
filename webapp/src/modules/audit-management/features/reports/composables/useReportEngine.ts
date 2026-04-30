@@ -16,8 +16,7 @@
  * exclusively the responsibility of useReportDraft.ts.
  */
 import { ref } from 'vue';
-import { useApiStore } from '@/stores/apiStore';
-import { AuditClient } from '@/apiclient/auditClient';
+import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 import type { AuditReportDto, SectionTrendsReportDto } from '@/apiclient/auditClient';
 import type {
     ReportBlock, BlockStyle, BlockLayout,
@@ -462,7 +461,6 @@ function mergeBlocks(
 // ── Composable ────────────────────────────────────────────────────────────────
 
 export function useReportEngine() {
-    const apiStore = useApiStore();
     const loading = ref(false);
     const error = ref<string | null>(null);
     /** Available section names — populated after generateBlocks runs. Used by the toolbar picker. */
@@ -481,14 +479,14 @@ export function useReportEngine() {
         loading.value = true;
         error.value = null;
         try {
-            const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
+            const svc = useAuditService();
 
             const [report, companyReport, trends] = await Promise.all([
-                client.getAuditReport(params.divisionId, null, params.dateFrom, params.dateTo),
+                svc.getAuditReport(params.divisionId, null, params.dateFrom, params.dateTo),
                 // Company-wide report: no divisionId filter — gives comparison baseline
-                client.getAuditReport(null, null, params.dateFrom, params.dateTo),
+                svc.getAuditReport(null, null, params.dateFrom, params.dateTo),
                 // Full history for trend lines (no date filter)
-                client.getSectionTrends(params.divisionId, null, null),
+                svc.getSectionTrends(params.divisionId, null, null),
             ]);
 
             // Populate section picker list
@@ -531,7 +529,7 @@ export function useReportEngine() {
         sectionName?: string,
         existingBlocks: ReportBlock[] = [],
     ): Promise<ReportBlock> {
-        const client = new AuditClient(apiStore.api.defaults.baseURL, apiStore.api);
+        const client = useAuditService();
         const y = nextAvailableY(existingBlocks);
         const layout = makeLayout(y, type);
 
