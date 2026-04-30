@@ -127,6 +127,71 @@ body {
     }
 }
 
+/* ── Stronghold table — compact density, applied by class="stronghold-table" ─────
+   These rules MUST live in global CSS. BaseDataTable.vue uses this class, and
+   any raw <DataTable class="stronghold-table"> (like CA view) also relies on it.
+   Keeping them here ensures they load regardless of which routes are visited.
+─────────────────────────────────────────────────────────────────────────────── */
+.stronghold-table .p-datatable-thead > tr > th {
+    background: rgb(15, 23, 42) !important;
+    border-color: rgba(51, 65, 85, 0.6) !important;
+    color: #94a3b8 !important;
+    font-size: 0.72rem !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.6rem 1rem !important;
+}
+.stronghold-table .p-datatable-tbody > tr {
+    background: transparent !important;
+    transition: background 0.12s ease;
+    border-color: rgba(51, 65, 85, 0.4) !important;
+}
+.stronghold-table .p-datatable-tbody > tr:nth-child(even) {
+    background: rgba(15, 23, 42, 0.35) !important;
+}
+.stronghold-table .p-datatable-tbody > tr:hover {
+    background: rgba(59, 130, 246, 0.07) !important;
+    cursor: pointer;
+}
+.stronghold-table .p-datatable-tbody > tr > td {
+    padding: 0.65rem 1rem !important;
+    border-color: rgba(51, 65, 85, 0.35) !important;
+    font-size: 0.85rem;
+}
+.stronghold-table .p-datatable-emptymessage td {
+    text-align: center !important;
+    color: #475569 !important;
+    padding: 3rem 1rem !important;
+}
+.stronghold-table .p-datatable-tbody > tr > td .p-button {
+    padding-block: 0.25rem !important;
+}
+
+/* ── CA row state — global, full PrimeVue chain for correct specificity ──────────
+   Uses .p-datatable .p-datatable-tbody > tr.row--ca-overdue (specificity 0,3,1)
+   which beats the nth-child(even) rule at (0,3,0) without needing !important.
+   !important is added only where PrimeVue hover injects box-shadow.
+─────────────────────────────────────────────────────────────────────────────── */
+.p-datatable .p-datatable-tbody > tr.row--ca-overdue {
+    background: transparent !important;
+}
+.p-datatable .p-datatable-tbody > tr.row--ca-overdue > td {
+    background-color: rgba(239, 68, 68, 0.03);
+}
+.p-datatable .p-datatable-tbody > tr.row--ca-overdue > td:first-child {
+    border-left: 3px solid var(--color-danger);
+}
+.p-datatable .p-datatable-tbody > tr.row--ca-overdue:hover {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+.p-datatable .p-datatable-tbody > tr.row--ca-overdue:hover > td {
+    background-color: rgba(239, 68, 68, 0.06) !important;
+}
+.p-datatable .p-datatable-tbody > tr.row--ca-closed > td { opacity: 0.55; }
+.p-datatable .p-datatable-tbody > tr.row--ca-voided > td { opacity: 0.4; }
+
 /* ── Overdue pulse ring ───────────────────────────────────────────────────────── */
 @keyframes overdue-ring {
     0%   { box-shadow: 0 0 0 0   rgba(239, 68, 68, 0.55); }
