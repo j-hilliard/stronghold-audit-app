@@ -128,62 +128,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAuditService } from '@/modules/audit-management/services/useAuditService';
+import { useAuditPresentation } from '../composables/useAuditPresentation';
 
 const route = useRoute();
 const docEl = ref<HTMLElement | null>(null);
 const loading = ref(true);
 const review = ref<any>(null);
 
-const LOGO_MAP: Record<string, string> = {
-    ETS:  'https://www.thestrongholdcompanies.com/wp-content/uploads/2021/08/ETS-Logo-color-full.png',
-    STS:  'https://www.thestrongholdcompanies.com/wp-content/uploads/2021/08/STS-Logo-Full-Clr@2x-2.png',
-    STG:  'https://www.thestrongholdcompanies.com/wp-content/uploads/2021/08/STG-Logo-Full-Clr@2x-3.png',
-    SHI:  'https://www.thestrongholdcompanies.com/wp-content/uploads/2021/08/SHI-Logo-Full-color.png',
-    TKIE: 'https://www.thestrongholdcompanies.com/wp-content/uploads/2021/08/TKIE-Logo-Full-Clr@2x-2.png',
-    CSL:  'https://www.thestrongholdcompanies.com/wp-content/uploads/2021/08/CSL-Logo-Full-Clr@2x-3.png',
-    CC:   'https://www.thestrongholdcompanies.com/wp-content/uploads/2021/08/CC-Logo-Full-Clr@2x-1.png',
-};
-
-const logoUrl = computed(() => {
-    const code = review.value?.divisionCode?.toUpperCase() ?? '';
-    return LOGO_MAP[code] ?? null;
-});
-
-const scoreDisplay = computed(() => {
-    const s = review.value?.scorePercent;
-    return s != null ? `${Math.round(s)}%` : '—';
-});
-
-const scoreColorClass = computed(() => {
-    const s = review.value?.scorePercent;
-    if (s == null) return '';
-    if (s >= 90) return 'score-green';
-    if (s >= 75) return 'score-amber';
-    return 'score-red';
-});
-
-function statusCellClass(status: string | null | undefined): string {
-    switch (status) {
-        case 'Conforming':    return 'status-conforming';
-        case 'NonConforming': return 'status-nc';
-        case 'Warning':       return 'status-warning';
-        case 'NA':            return 'status-na';
-        default:              return 'status-unanswered';
-    }
-}
-
-function formatStatus(status: string | null | undefined): string {
-    switch (status) {
-        case 'Conforming':    return 'Conforming';
-        case 'NonConforming': return 'Non-Conforming';
-        case 'Warning':       return 'Warning';
-        case 'NA':            return 'N/A';
-        default:              return status ?? '';
-    }
-}
+const { logoUrl, scoreDisplay, scoreColorClass, statusCellClass, formatStatus } =
+    useAuditPresentation(() => review.value);
 
 onMounted(async () => {
     try {

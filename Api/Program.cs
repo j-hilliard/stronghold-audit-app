@@ -116,6 +116,7 @@ builder.Services.AddHostedService<LogPurgeService>();
 
 // Email + background services
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IAuditEmailBodyBuilder, AuditEmailBodyBuilder>();
 builder.Services.AddHostedService<CaReminderService>();
 
 // AI audit summary (Claude Haiku — fails gracefully when API key absent)
