@@ -487,7 +487,10 @@ export function useAuditReviewActions({ review, allRoutingEntries }: ActionOptio
     }
 
     function openMailtoFallback() {
-        const recipients = distributionPreview.value?.recipients ?? [];
+        const excluded   = new Set(distributionExcludedEmails.value.map(e => e.toLowerCase()));
+        const recipients = (distributionPreview.value?.recipientDetails ?? [])
+            .filter(r => !excluded.has(r.emailAddress.toLowerCase()))
+            .map(r => r.emailAddress);
         if (recipients.length === 0) {
             toast.add({ severity: 'warn', summary: 'No Recipients', detail: 'Add recipients before sending.', life: 4000 });
             return;
@@ -508,7 +511,10 @@ export function useAuditReviewActions({ review, allRoutingEntries }: ActionOptio
                 await store.saveReviewSummary(id, distributionSummaryEdit.value || null);
             }
 
-            const sentRecipients = distributionPreview.value?.recipients ?? [];
+            const excluded       = new Set(distributionExcludedEmails.value.map(e => e.toLowerCase()));
+            const sentRecipients = (distributionPreview.value?.recipientDetails ?? [])
+                .filter(r => !excluded.has(r.emailAddress.toLowerCase()))
+                .map(r => r.emailAddress);
             const sentItems      = buildSentItemsList();
 
             await store.sendDistributionEmail(
