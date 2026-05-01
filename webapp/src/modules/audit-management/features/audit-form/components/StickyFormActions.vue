@@ -17,7 +17,7 @@
                         <!-- Right: actions -->
                         <div class="flex items-center gap-2 ml-auto">
                             <Button
-                                label="Save Draft"
+                                :label="isReviewerMode ? 'Save Changes' : 'Save Draft'"
                                 icon="pi pi-save"
                                 severity="secondary"
                                 size="small"
@@ -26,7 +26,7 @@
                                 @click="$emit('save')"
                             />
                             <Button
-                                v-if="canSubmit"
+                                v-if="canSubmit && !isReviewerMode"
                                 label="Submit for Review"
                                 icon="pi pi-send"
                                 size="small"
@@ -34,6 +34,7 @@
                                 @click="$emit('submit')"
                             />
                             <Button
+                                v-if="!isReviewerMode"
                                 label="Delete"
                                 icon="pi pi-trash"
                                 severity="danger"
@@ -58,11 +59,13 @@ withDefaults(defineProps<{
     saving?: boolean;
     canSubmit?: boolean;
     statusLabel?: string;
+    isReviewerMode?: boolean;
 }>(), {
     visible: true,
     saving: false,
     canSubmit: false,
     statusLabel: 'Editing draft',
+    isReviewerMode: false,
 });
 
 defineEmits<{ save: []; submit: []; delete: [] }>();

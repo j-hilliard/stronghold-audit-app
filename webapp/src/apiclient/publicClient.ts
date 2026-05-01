@@ -5,7 +5,7 @@
  */
 
 import axios from 'axios';
-import type { CaPublicAccessDto } from './auditClient';
+import type { CaPublicAccessDto, CorrectiveActionPhotoDto } from './auditClient';
 
 export interface PublicCaUpdateRequest {
     newStatus:      string;
@@ -14,7 +14,6 @@ export interface PublicCaUpdateRequest {
 }
 
 function getBaseUrl(): string {
-    // Falls back to same-origin (works for both dev proxy and production)
     return (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '';
 }
 
@@ -35,5 +34,16 @@ export class PublicCaClient {
         return axios
             .put(`${this.baseUrl}/v1/public/ca/${token}`, payload)
             .then(() => undefined);
+    }
+
+    uploadCaPhoto(token: string, file: File, caption?: string): Promise<CorrectiveActionPhotoDto> {
+        const form = new FormData();
+        form.append('file', file);
+        if (caption) form.append('caption', caption);
+        return axios
+            .post<CorrectiveActionPhotoDto>(`${this.baseUrl}/v1/public/ca/${token}/photos`, form, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            })
+            .then(r => r.data);
     }
 }

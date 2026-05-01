@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
@@ -32,7 +33,7 @@ public class PublicController : ControllerBase
         catch (InvalidOperationException ex)   { return BadRequest(new ProblemDetails { Detail = ex.Message }); }
     }
 
-    /// <summary>Update corrective action status via public token (mark as InProgress).</summary>
+    /// <summary>Update corrective action status via public token (mark as InProgress or Submitted).</summary>
     [HttpPut("ca/{token}")]
     public async Task<IActionResult> UpdateCa(string token, [FromBody] PublicCaUpdateRequest body)
     {
@@ -46,6 +47,33 @@ public class PublicController : ControllerBase
                 UpdatedByName = body.UpdatedByName,
             });
             return NoContent();
+        }
+        catch (ArgumentException ex)           { return BadRequest(new ProblemDetails { Detail = ex.Message }); }
+        catch (UnauthorizedAccessException ex) { return Unauthorized(new ProblemDetails { Detail = ex.Message }); }
+        catch (InvalidOperationException ex)   { return BadRequest(new ProblemDetails { Detail = ex.Message }); }
+    }
+
+    /// <summary>Upload a closure photo via public token.</summary>
+    [HttpPost("ca/{token}/photos")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(CorrectiveActionPhotoDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UploadCaPhoto(string token, IFormFile file, [FromForm] string? caption)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(new ProblemDetails { Detail = "No file provided." });
+        try
+        {
+            using var ms = new System.IO.MemoryStream();
+            await file.CopyToAsync(ms);
+            var result = await _mediator.Send(new UploadCaPhotoByPublicToken
+            {
+                Token    = token,
+                FileName = file.FileName,
+                FileData = ms.ToArray(),
+                Caption  = caption,
+            });
+            return CreatedAtAction(nameof(GetCa), new { token }, result);
         }
         catch (ArgumentException ex)           { return BadRequest(new ProblemDetails { Detail = ex.Message }); }
         catch (UnauthorizedAccessException ex) { return Unauthorized(new ProblemDetails { Detail = ex.Message }); }

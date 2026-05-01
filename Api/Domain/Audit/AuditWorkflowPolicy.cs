@@ -36,10 +36,10 @@ public static class AuditWorkflowPolicy
     public static readonly string[] DistributableStatuses = [Approved, Distributed];
 
     /// <summary>Statuses from which ReopenAudit is valid.</summary>
-    public static readonly string[] ReopenableStatuses = [Submitted, Approved, Distributed, Closed];
+    public static readonly string[] ReopenableStatuses = [Submitted, UnderReview, Approved, Distributed, Closed];
 
-    /// <summary>Statuses from which CloseAudit is valid.</summary>
-    public static readonly string[] ClosableStatuses = [Submitted, Reopened, UnderReview, Approved, Distributed];
+    /// <summary>Statuses from which CloseAudit is valid (only after workflow completes).</summary>
+    public static readonly string[] ClosableStatuses = [Approved, Distributed];
 
     /// <summary>Statuses where SaveReviewSummary is valid.</summary>
     public static readonly string[] ReviewSummaryEditableStatuses = [UnderReview, Approved];

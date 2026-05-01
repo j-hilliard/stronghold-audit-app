@@ -112,7 +112,7 @@ export function useAuditReviewActions({ review, allRoutingEntries }: ActionOptio
                 toast.add({
                     severity: 'info',
                     summary: 'Review Mode Active',
-                    detail: 'Audit is now under review. Edit findings below, or use the form to update individual responses.',
+                    detail: 'Audit is now under review. Edit findings below, or use Edit Responses to update individual question answers.',
                     life: 4000,
                 });
                 await store.loadReview(id);
@@ -294,6 +294,46 @@ export function useAuditReviewActions({ review, allRoutingEntries }: ActionOptio
         removingRecipientId.value = recipientId;
         try {
             await store.removeDistributionRecipient(id, recipientId);
+            toast.add({ severity: 'success', summary: 'Removed', detail: 'Recipient removed.', life: 2000 });
+        } catch {
+            toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to remove recipient.', life: 4000 });
+        } finally {
+            removingRecipientId.value = null;
+        }
+    }
+
+    // Inline add/remove used by SendDistributionModal — also updates the preview recipients list
+    async function quickAddRecipient(email: string, name?: string) {
+        const id = Number(route.params.id);
+        addingRecipient.value = true;
+        try {
+            await store.addDistributionRecipient(id, email, name || undefined);
+            if (distributionPreview.value) {
+                distributionPreview.value = {
+                    ...distributionPreview.value,
+                    recipients: [...distributionPreview.value.recipients, email],
+                };
+            }
+            toast.add({ severity: 'success', summary: 'Recipient Added', detail: email, life: 2000 });
+        } catch {
+            toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to add recipient.', life: 4000 });
+        } finally {
+            addingRecipient.value = false;
+        }
+    }
+
+    async function quickRemoveRecipient(recipientId: number) {
+        const id = Number(route.params.id);
+        const emailToRemove = review.value?.distributionRecipients?.find(r => r.id === recipientId)?.emailAddress;
+        removingRecipientId.value = recipientId;
+        try {
+            await store.removeDistributionRecipient(id, recipientId);
+            if (distributionPreview.value && emailToRemove) {
+                distributionPreview.value = {
+                    ...distributionPreview.value,
+                    recipients: distributionPreview.value.recipients.filter(r => r !== emailToRemove),
+                };
+            }
             toast.add({ severity: 'success', summary: 'Removed', detail: 'Recipient removed.', life: 2000 });
         } catch {
             toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to remove recipient.', life: 4000 });
@@ -566,25 +606,18 @@ export function useAuditReviewActions({ review, allRoutingEntries }: ActionOptio
             const sentRecipients = distributionPreview.value?.recipients ?? [];
             const sentItems      = buildSentItemsList();
 
-            try {
-                await store.sendDistributionEmail(
-                    id,
-                    selectedAttachmentIds.value,
-                    editableSubject.value || undefined,
-                    includeCas.value,
-                    includeOpenCasOnly.value,
-                    distributionSummaryEdit.value || null,
-                    includeAuditPdf.value,
-                );
-                selectedAttachmentIds.value = [];
-                distributionSentInfo.value  = { type: 'api', recipients: sentRecipients, items: sentItems };
-                distributionStep.value      = 'sent';
-            } catch {
-                // API send failed — open email client as fallback
-                openMailtoFallback();
-                distributionSentInfo.value = { type: 'mailto', recipients: sentRecipients, items: sentItems };
-                distributionStep.value     = 'sent';
-            }
+            await store.sendDistributionEmail(
+                id,
+                selectedAttachmentIds.value,
+                editableSubject.value || undefined,
+                includeCas.value,
+                includeOpenCasOnly.value,
+                distributionSummaryEdit.value || null,
+                includeAuditPdf.value,
+            );
+            selectedAttachmentIds.value = [];
+            distributionSentInfo.value  = { type: 'api', recipients: sentRecipients, items: sentItems };
+            distributionStep.value      = 'sent';
         } catch {
             toast.add({ severity: 'error', summary: 'Distribution Failed', detail: 'Failed to prepare distribution. Please check recipients and try again.', life: 5000 });
         } finally {
@@ -613,7 +646,7 @@ export function useAuditReviewActions({ review, allRoutingEntries }: ActionOptio
         dialogSelectedEmails, manualEmail, manualName,
         dialogDivisionOptions, filteredRoutingForDialog,
         nameFromEmail, openAddRecipientsDialog, closeAddRecipientsDialog,
-        submitAddRecipients, removeRecipient,
+        submitAddRecipients, removeRecipient, quickAddRecipient, quickRemoveRecipient,
         // Distribution email
         showDistributionDialog, distributionLoadingPreview, distributionSending,
         distributionPreview, distributionSummaryEdit, editableSubject, selectedAttachmentIds,

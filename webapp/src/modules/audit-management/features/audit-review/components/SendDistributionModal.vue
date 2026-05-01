@@ -114,17 +114,55 @@
                 <div class="dist-section-header">
                     <i class="pi pi-users text-blue-400 text-sm" />
                     <span>Recipients</span>
-                    <span class="dist-count">{{ distributionPreview.recipients.length }}</span>
+                    <span class="dist-count">{{ review?.distributionRecipients?.length ?? 0 }}</span>
                 </div>
-                <div v-if="distributionPreview.recipients.length > 0" class="dist-recipients-list">
-                    <div v-for="email in distributionPreview.recipients" :key="email" class="flex items-center gap-2 text-xs text-slate-300">
-                        <i class="pi pi-envelope text-slate-500 text-[10px]" />{{ email }}
+                <div v-if="(review?.distributionRecipients?.length ?? 0) > 0" class="dist-recipients-list mb-2">
+                    <div
+                        v-for="r in review!.distributionRecipients"
+                        :key="r.id"
+                        class="flex items-center gap-2 text-xs text-slate-300 py-1"
+                    >
+                        <i class="pi pi-envelope text-slate-500 text-[10px] shrink-0" />
+                        <span class="flex-1 truncate">{{ r.name ? `${r.name} <${r.emailAddress}>` : r.emailAddress }}</span>
+                        <button
+                            class="text-slate-600 hover:text-red-400 transition-colors p-0.5 flex-shrink-0"
+                            :disabled="removingRecipientId === r.id"
+                            title="Remove recipient"
+                            @click="$emit('removeRecipient', r.id)"
+                        >
+                            <i :class="removingRecipientId === r.id ? 'pi pi-spin pi-spinner' : 'pi pi-times'" class="text-[10px]" />
+                        </button>
                     </div>
                 </div>
-                <p v-else class="text-xs text-amber-400 flex items-center gap-1.5 py-1">
+                <p v-else class="text-xs text-amber-400 flex items-center gap-1.5 py-1 mb-2">
                     <i class="pi pi-exclamation-triangle text-[11px]" />
-                    No recipients configured. Add recipients in the Distribution Recipients section.
+                    No recipients — add one below before sending.
                 </p>
+                <!-- Inline add -->
+                <div class="flex gap-2">
+                    <InputText
+                        v-model="newRecipientEmail"
+                        placeholder="email@example.com"
+                        size="small"
+                        class="flex-1 text-xs"
+                        @keyup.enter="submitInlineAdd"
+                    />
+                    <InputText
+                        v-model="newRecipientName"
+                        placeholder="Name (optional)"
+                        size="small"
+                        class="w-32 text-xs"
+                    />
+                    <Button
+                        icon="pi pi-plus"
+                        size="small"
+                        severity="secondary"
+                        :loading="addingRecipient"
+                        :disabled="!newRecipientEmail.trim()"
+                        title="Add recipient"
+                        @click="submitInlineAdd"
+                    />
+                </div>
             </div>
 
             <!-- Section 3 — Subject -->
@@ -160,13 +198,8 @@
                     <span>Email Preview</span>
                 </div>
                 <div class="dist-email-preview">
-                    <AuditPdfPreviewContent
-                        :review="review"
-                        mode="email"
-                        :summary-override="summaryEdit"
-                        :include-cas="includeCas"
-                        :include-open-cas-only="includeOpenCasOnly"
-                    />
+                    <!-- Backend-generated HTML — canonical, matches what is actually sent -->
+                    <div v-html="distributionPreview.bodyHtml" class="dist-email-html" />
                 </div>
             </div>
 
@@ -225,11 +258,11 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import Dialog from 'primevue/dialog';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
-import AuditPdfPreviewContent from './AuditPdfPreviewContent.vue';
 import type { AuditReviewDto, DistributionPreviewDto } from '@/apiclient/auditClient';
 
 type SentInfo = { type: 'api' | 'mailto'; recipients: string[]; items: string[] } | null;
@@ -248,6 +281,8 @@ const props = defineProps<{
     includeCas: boolean;
     includeOpenCasOnly: boolean;
     includeAttachments: boolean;
+    addingRecipient?: boolean;
+    removingRecipientId?: number | null;
 }>();
 
 const emit = defineEmits<{
@@ -262,7 +297,20 @@ const emit = defineEmits<{
     send: [];
     openMailto: [];
     close: [];
+    addRecipient: [email: string, name: string];
+    removeRecipient: [id: number];
 }>();
+
+const newRecipientEmail = ref('');
+const newRecipientName  = ref('');
+
+function submitInlineAdd() {
+    const email = newRecipientEmail.value.trim();
+    if (!email) return;
+    emit('addRecipient', email, newRecipientName.value.trim());
+    newRecipientEmail.value = '';
+    newRecipientName.value  = '';
+}
 
 function formatBytes(bytes?: number | null): string {
     if (!bytes) return '';
@@ -373,6 +421,11 @@ function toggleAttachment(id: number, checked: boolean) {
     min-height: 200px;
     max-height: 520px;
     padding: 0;
+}
+
+.dist-email-html {
+    font-family: sans-serif;
+    color: #111827;
 }
 
 .dist-sent-body {

@@ -386,6 +386,8 @@ public class AuditController : V1ControllerBase
             },
             ex => ex is KeyNotFoundException
                 ? Task.FromResult<IActionResult>(NotFound(ex.Message))
+                : ex is InvalidOperationException
+                ? Task.FromResult<IActionResult>(BadRequest(ex.Message))
                 : Error(ex)
         );
     }

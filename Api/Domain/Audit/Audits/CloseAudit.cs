@@ -35,8 +35,7 @@ public class CloseAuditHandler : IRequestHandler<CloseAudit, Unit>
             .FirstOrDefaultAsync(a => a.Id == request.AuditId, cancellationToken)
             ?? throw new ArgumentException($"Audit {request.AuditId} not found.");
 
-        var closableStatuses = new[] { "Submitted", "Reopened", "UnderReview", "Approved", "Distributed" };
-        if (!closableStatuses.Contains(audit.Status))
+        if (!AuditWorkflowPolicy.ClosableStatuses.Contains(audit.Status))
             throw new InvalidOperationException($"Audit {request.AuditId} cannot be closed from status '{audit.Status}'.");
 
         // Block closure if any non-terminal CAs remain

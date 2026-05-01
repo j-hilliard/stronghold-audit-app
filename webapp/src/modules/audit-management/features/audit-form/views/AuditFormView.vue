@@ -167,6 +167,7 @@
             :visible="!formIsLocked"
             :saving="store.saving"
             :can-submit="hasPermission('audit.submit')"
+            :is-reviewer-mode="isReviewerMode"
             :status-label="store.auditStatus ? `Status: ${store.auditStatus}` : 'Editing draft'"
             @save="store.saveDraft()"
             @submit="onSubmit"

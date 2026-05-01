@@ -661,9 +661,13 @@
         :distribution-step="distributionStep"
         :distribution-sent-info="distributionSentInfo"
         :distribution-sending="distributionSending"
+        :adding-recipient="addingRecipient"
+        :removing-recipient-id="removingRecipientId"
         @send="submitDistributionEmail"
         @open-mailto="openMailtoFallback"
         @close="closeDistributionDialog"
+        @add-recipient="(email, name) => quickAddRecipient(email, name)"
+        @remove-recipient="quickRemoveRecipient"
     />
 
     <!-- ══ Assign CA modal ══════════════════════════════════════════════════════ -->
@@ -781,7 +785,7 @@ const {
     dialogSelectedEmails, manualEmail, manualName,
     dialogDivisionOptions, filteredRoutingForDialog,
     nameFromEmail, openAddRecipientsDialog, closeAddRecipientsDialog,
-    submitAddRecipients, removeRecipient,
+    submitAddRecipients, removeRecipient, quickAddRecipient, quickRemoveRecipient,
     showDistributionDialog, distributionLoadingPreview, distributionSending,
     distributionPreview, distributionSummaryEdit, editableSubject, selectedAttachmentIds,
     includeAuditPdf, includeCas, includeOpenCasOnly, includeAttachments,

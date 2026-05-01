@@ -48,10 +48,7 @@
                     <div class="grid grid-cols-3 gap-3">
                         <div class="bg-slate-900/60 rounded-xl p-3">
                             <div class="text-xs text-slate-500 mb-1">Status</div>
-                            <span
-                                class="text-xs font-semibold"
-                                :class="statusColor(ca.status)"
-                            >{{ ca.status }}</span>
+                            <span class="text-xs font-semibold" :class="statusColor(ca.status)">{{ statusLabel(ca.status) }}</span>
                         </div>
                         <div class="bg-slate-900/60 rounded-xl p-3">
                             <div class="text-xs text-slate-500 mb-1">Priority</div>
@@ -74,27 +71,90 @@
                     </div>
                 </div>
 
-                <!-- Already InProgress notice -->
+                <!-- ── State: Closed or Voided ── -->
                 <div
-                    v-if="ca.status === 'InProgress'"
-                    class="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-sm text-blue-300 text-center"
+                    v-if="ca.status === 'Closed' || ca.status === 'Voided'"
+                    class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 text-sm text-emerald-300 text-center"
                 >
-                    This corrective action is already marked as In Progress.
-                    Contact your auditor to close it once work is complete.
+                    <i class="pi pi-check-circle text-emerald-400 text-xl mb-2 block" />
+                    This corrective action has been {{ ca.status === 'Voided' ? 'voided' : 'closed' }}.
+                    No further action is required.
                 </div>
 
-                <!-- Update Form -->
-                <div v-else class="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-4">
+                <!-- ── State: Submitted (pending admin review) ── -->
+                <div
+                    v-else-if="ca.status === 'Submitted'"
+                    class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-sm text-amber-300 text-center"
+                >
+                    <i class="pi pi-clock text-amber-400 text-xl mb-2 block" />
+                    Work submitted — pending admin review.
+                    The audit team has been notified and will approve or follow up.
+                </div>
+
+                <!-- ── State: InProgress — mark as submitted ── -->
+                <div v-else-if="ca.status === 'InProgress' && !submitted" class="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-4">
+                    <h2 class="text-base font-semibold text-white">Submit Completed Work</h2>
+                    <p class="text-xs text-slate-400">
+                        Mark this corrective action as complete. The audit team will review and officially close it.
+                    </p>
+
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Your Name <span class="text-slate-600">(optional)</span></label>
+                        <InputText v-model="updaterName" placeholder="Enter your name" size="small" class="w-full" />
+                    </div>
+
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Completion Notes <span class="text-slate-600">(optional)</span></label>
+                        <Textarea
+                            v-model="notes"
+                            placeholder="Describe what was done to resolve this corrective action..."
+                            :rows="3"
+                            class="w-full text-sm"
+                            auto-resize
+                        />
+                    </div>
+
+                    <!-- Photo Upload -->
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Proof Photo <span class="text-slate-600">(optional)</span></label>
+                        <div v-if="photoPreviewUrl" class="mb-2 relative">
+                            <img :src="photoPreviewUrl" alt="Preview" class="rounded-lg max-h-48 w-full object-cover" />
+                            <button
+                                class="absolute top-2 right-2 bg-slate-900/80 hover:bg-red-900/80 text-slate-300 hover:text-white rounded-full w-6 h-6 flex items-center justify-center transition-colors"
+                                title="Remove photo"
+                                @click="clearPhoto"
+                            >
+                                <i class="pi pi-times text-[10px]" />
+                            </button>
+                            <p class="text-xs text-slate-500 mt-1">{{ photoFile?.name }}</p>
+                        </div>
+                        <label v-else class="flex items-center gap-2 px-3 py-2 bg-slate-700/40 border border-slate-600/50 border-dashed rounded-lg cursor-pointer hover:bg-slate-700/60 transition-colors">
+                            <i class="pi pi-camera text-slate-400 text-sm" />
+                            <span class="text-sm text-slate-400">Attach a photo</span>
+                            <input type="file" accept="image/*" class="hidden" @change="onPhotoSelected" />
+                        </label>
+                    </div>
+
+                    <Button
+                        label="Submit Work Complete"
+                        icon="pi pi-check"
+                        class="w-full"
+                        :loading="saving"
+                        @click="submitWork"
+                    />
+
+                    <p class="text-xs text-slate-500 text-center">
+                        Submitting notifies the audit team to review and close this action.
+                    </p>
+                </div>
+
+                <!-- ── State: Open / Overdue — confirm work in progress ── -->
+                <div v-else-if="(ca.status === 'Open' || ca.status === 'Overdue') && !submitted" class="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-4">
                     <h2 class="text-base font-semibold text-white">Confirm Work In Progress</h2>
 
                     <div>
                         <label class="block text-xs text-slate-400 mb-1">Your Name <span class="text-slate-600">(optional)</span></label>
-                        <InputText
-                            v-model="updaterName"
-                            placeholder="Enter your name"
-                            size="small"
-                            class="w-full"
-                        />
+                        <InputText v-model="updaterName" placeholder="Enter your name" size="small" class="w-full" />
                     </div>
 
                     <div>
@@ -113,12 +173,11 @@
                         icon="pi pi-check"
                         class="w-full"
                         :loading="saving"
-                        @click="submit"
+                        @click="markInProgress"
                     />
 
                     <p class="text-xs text-slate-500 text-center">
-                        Marking this as In Progress notifies the auditor that work has begun.
-                        Only an auditor can officially close this action.
+                        Marking as In Progress notifies the auditor that work has begun.
                     </p>
                 </div>
 
@@ -127,7 +186,8 @@
                     v-if="submitted"
                     class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 text-sm text-emerald-300 text-center"
                 >
-                    Update submitted. The audit team has been notified.
+                    <i class="pi pi-check-circle text-emerald-400 text-xl mb-2 block" />
+                    {{ submittedMessage }}
                 </div>
 
             </div>
@@ -152,8 +212,11 @@ const submitted   = ref(false);
 const accessError = ref<string | null>(null);
 const ca          = ref<CaPublicAccessDto | null>(null);
 
-const updaterName = ref('');
-const notes       = ref('');
+const updaterName     = ref('');
+const notes           = ref('');
+const photoFile       = ref<File | null>(null);
+const photoPreviewUrl = ref<string | null>(null);
+const submittedMessage = ref('Update submitted. The audit team has been notified.');
 
 async function loadCa() {
     loading.value = true;
@@ -167,7 +230,7 @@ async function loadCa() {
     }
 }
 
-async function submit() {
+async function markInProgress() {
     saving.value = true;
     try {
         await client.updateCaByToken(token, {
@@ -176,21 +239,61 @@ async function submit() {
             updatedByName: updaterName.value || null,
         });
         submitted.value = true;
+        submittedMessage.value = 'Marked as In Progress. The audit team has been notified.';
         if (ca.value) ca.value.status = 'InProgress';
     } catch (err: any) {
-        const msg = err?.response?.data?.detail ?? err?.message ?? 'Failed to submit update.';
-        accessError.value = msg;
+        accessError.value = err?.response?.data?.detail ?? err?.message ?? 'Failed to submit update.';
     } finally {
         saving.value = false;
     }
 }
 
+async function submitWork() {
+    saving.value = true;
+    try {
+        await client.updateCaByToken(token, {
+            newStatus:     'Submitted',
+            notes:         notes.value || null,
+            updatedByName: updaterName.value || null,
+        });
+        if (photoFile.value) {
+            await client.uploadCaPhoto(token, photoFile.value);
+        }
+        submitted.value = true;
+        submittedMessage.value = 'Work submitted successfully. The audit team will review and close this action.';
+        if (ca.value) ca.value.status = 'Submitted';
+    } catch (err: any) {
+        accessError.value = err?.response?.data?.detail ?? err?.message ?? 'Failed to submit update.';
+    } finally {
+        saving.value = false;
+    }
+}
+
+function onPhotoSelected(e: Event) {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    photoFile.value = file;
+    photoPreviewUrl.value = URL.createObjectURL(file);
+}
+
+function clearPhoto() {
+    if (photoPreviewUrl.value) URL.revokeObjectURL(photoPreviewUrl.value);
+    photoFile.value = null;
+    photoPreviewUrl.value = null;
+}
+
 function statusColor(status: string): string {
     if (status === 'Open')       return 'text-blue-400';
     if (status === 'InProgress') return 'text-amber-400';
+    if (status === 'Submitted')  return 'text-amber-300';
     if (status === 'Overdue')    return 'text-red-400';
     if (status === 'Closed')     return 'text-emerald-400';
     return 'text-slate-400';
+}
+
+function statusLabel(status: string): string {
+    if (status === 'InProgress') return 'In Progress';
+    return status;
 }
 
 function formatDate(iso: string): string {
