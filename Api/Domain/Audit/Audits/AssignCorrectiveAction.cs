@@ -85,9 +85,37 @@ public class AssignCorrectiveActionHandler : IRequestHandler<AssignCorrectiveAct
             $"CA assigned to '{ca.AssignedTo}' for finding {finding.Id} on audit {finding.AuditId} by {request.AssignedBy}.",
             relatedObject: ca.Id.ToString());
 
+        // In-app notification — use assignedToEmail if supplied, fall back to assignedTo
+        var notifyEmail = request.Payload.AssignedToEmail?.Trim()
+            ?? request.Payload.AssignedTo?.Trim();
+        if (!string.IsNullOrWhiteSpace(notifyEmail))
+        {
+            try
+            {
+                _context.AppNotifications.Add(new AppNotification
+                {
+                    RecipientEmail = notifyEmail,
+                    Type           = "CaAssigned",
+                    Title          = "Corrective Action Assigned",
+                    Body           = $"A corrective action has been assigned to you: {ca.Description?[..Math.Min(80, ca.Description?.Length ?? 0)]}. Due: {ca.DueDate?.ToString("MM/dd/yyyy") ?? "TBD"}.",
+                    EntityType     = "CorrectiveAction",
+                    EntityId       = ca.Id,
+                    LinkUrl        = $"/audit-management/corrective-actions",
+                    CreatedAt      = DateTime.UtcNow,
+                });
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                await _log.LogAsync("AssignCA_NotificationFailed", "CorrectiveAction", "Warning",
+                    $"Failed to create in-app notification for CA {ca.Id}: {ex.Message}",
+                    relatedObject: ca.Id.ToString());
+            }
+        }
+
         // Email assignee — fire-and-forget so email failure never breaks CA creation
-        if (!string.IsNullOrWhiteSpace(ca.AssignedTo))
-            _ = SendAssignmentEmailAsync(ca, finding, assignedBy: request.AssignedBy, isReassign: false, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(notifyEmail))
+            _ = SendAssignmentEmailAsync(ca, finding, notifyEmail, assignedBy: request.AssignedBy, isReassign: false, cancellationToken);
 
         return ca.Id;
     }
@@ -95,6 +123,7 @@ public class AssignCorrectiveActionHandler : IRequestHandler<AssignCorrectiveAct
     private async Task SendAssignmentEmailAsync(
         CorrectiveAction ca,
         AuditFinding finding,
+        string recipientEmail,
         string assignedBy,
         bool isReassign,
         CancellationToken ct)
@@ -120,6 +149,7 @@ public class AssignCorrectiveActionHandler : IRequestHandler<AssignCorrectiveAct
                     <p style="color:#444;">A corrective action has been {action} by <strong>{assignedBy}</strong>.</p>
                     <table style="width:100%;border-collapse:collapse;">
                       <tr><td style="padding:6px 0;color:#666;width:140px;">Description</td><td style="padding:6px 0;font-weight:bold;">{ca.Description}</td></tr>
+                      <tr><td style="padding:6px 0;color:#666;">Assigned To</td><td style="padding:6px 0;">{ca.AssignedTo ?? recipientEmail}</td></tr>
                       <tr><td style="padding:6px 0;color:#666;">Due Date</td><td style="padding:6px 0;color:#d97706;font-weight:bold;">{dueDateStr}</td></tr>
                       <tr><td style="padding:6px 0;color:#666;">Division</td><td style="padding:6px 0;">{division}</td></tr>
                       <tr><td style="padding:6px 0;color:#666;">Job Number</td><td style="padding:6px 0;">{jobNumber}</td></tr>
@@ -137,7 +167,7 @@ public class AssignCorrectiveActionHandler : IRequestHandler<AssignCorrectiveAct
                 </div>
                 """;
 
-            await _email.SendAsync(subject, body, [ca.AssignedTo!], ct);
+            await _email.SendAsync(subject, body, [recipientEmail], ct);
         }
         catch (Exception ex)
         {

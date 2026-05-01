@@ -673,8 +673,21 @@ export const useAuditStore = defineStore('audit', () => {
         return getClient().getDistributionPreview(auditId, attachmentIds);
     }
 
-    async function sendDistributionEmail(auditId: number, attachmentIds: number[], subjectOverride?: string): Promise<void> {
-        await getClient().sendDistributionEmail(auditId, { attachmentIds, subjectOverride: subjectOverride || undefined });
+    async function sendDistributionEmail(
+        auditId: number,
+        attachmentIds: number[],
+        subjectOverride?: string,
+        includeCorrectiveActions?: boolean,
+        includeOpenCasOnly?: boolean,
+        message?: string | null,
+    ): Promise<void> {
+        await getClient().sendDistributionEmail(auditId, {
+            attachmentIds,
+            subjectOverride: subjectOverride || undefined,
+            includeCorrectiveActions,
+            includeOpenCasOnly,
+            message: message || undefined,
+        });
         await loadReview(auditId);
     }
 

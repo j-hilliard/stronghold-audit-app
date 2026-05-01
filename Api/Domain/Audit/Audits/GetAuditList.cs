@@ -4,6 +4,7 @@ using Stronghold.AppDashboard.Api.Authorization;
 using Stronghold.AppDashboard.Api.Models.Audit;
 using Stronghold.AppDashboard.Data;
 using Stronghold.AppDashboard.Shared.Enumerations;
+using AuthorizationRoles = Stronghold.AppDashboard.Shared.Enumerations.AuthorizationRoles;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
@@ -46,6 +47,13 @@ public class GetAuditListHandler : IRequestHandler<GetAuditList, List<AuditListI
         // Division scope: scoped users only see their assigned divisions
         if (!_userContext.IsGlobal && _userContext.AllowedDivisionIds is { Count: > 0 } allowed)
             query = query.Where(a => allowed.Contains(a.DivisionId));
+
+        // Auditor-only users: only see audits they created (own)
+        if (_userContext.IsAuditorOnly && !string.IsNullOrEmpty(_userContext.UserEmail))
+        {
+            var email = _userContext.UserEmail;
+            query = query.Where(a => a.CreatedBy == email);
+        }
 
         if (request.DivisionId.HasValue)
             query = query.Where(a => a.DivisionId == request.DivisionId.Value);

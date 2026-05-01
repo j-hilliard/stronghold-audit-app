@@ -248,10 +248,13 @@ const deleteSelection = computed(() =>
 );
 
 const STATUS_OPTIONS = [
-    { label: 'Draft', value: 'Draft' },
-    { label: 'Submitted', value: 'Submitted' },
-    { label: 'Reopened', value: 'Reopened' },
-    { label: 'Closed', value: 'Closed' },
+    { label: 'Draft',        value: 'Draft'       },
+    { label: 'Submitted',    value: 'Submitted'   },
+    { label: 'Reopened',     value: 'Reopened'    },
+    { label: 'Under Review', value: 'UnderReview' },
+    { label: 'Approved',     value: 'Approved'    },
+    { label: 'Distributed',  value: 'Distributed' },
+    { label: 'Closed',       value: 'Closed'      },
 ];
 
 function clearFilters() {
@@ -277,10 +280,8 @@ onMounted(loadData);
 
 function statusSeverity(status: string): string {
     const map: Record<string, string> = {
-        Draft: 'warning',
-        Submitted: 'info',
-        Reopened: 'warning',
-        Closed: 'success',
+        Draft: 'warning', Submitted: 'info', Reopened: 'warning',
+        UnderReview: 'contrast', Approved: 'success', Distributed: 'secondary', Closed: 'secondary',
     };
     return map[status] ?? 'secondary';
 }

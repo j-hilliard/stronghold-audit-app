@@ -1,18 +1,51 @@
-﻿<template>
+<template>
     <div>
         <BasePageHeader
             icon="pi pi-eye"
             :title="review ? `${review.divisionCode} Audit Review` : 'Audit Review'"
             :subtitle="review ? `${review.divisionName} — ${review.status}${review.trackingNumber ? ` · ${review.trackingNumber}` : ''}` : ''"
         >
-            <Tag v-if="review?.reviewedAt" value="Distributed" severity="success" class="text-xs" />
+            <!-- ── Step 1: Enter Review Mode — admin only, Submitted or UnderReview ── -->
             <Button
-                label="Back to Form"
-                icon="pi pi-arrow-left"
+                v-if="review && hasPermission('audit.review') && (review.status === 'Submitted' || (review.status === 'UnderReview' && !reviewEditMode))"
+                label="Enter Review Mode"
+                icon="pi pi-search"
+                severity="info"
+                :loading="auditActionSaving"
+                @click="enterReviewMode"
+            />
+
+            <!-- ── Step 2: Save Changes — visible when in active review edit mode ── -->
+            <Button
+                v-if="review && hasPermission('audit.review') && reviewEditMode"
+                label="Save Changes"
+                icon="pi pi-save"
+                severity="info"
+                outlined
+                :loading="summarySaving"
+                :disabled="reviewSummaryDraft === (review.reviewSummary ?? '')"
+                @click="submitSaveSummary"
+            />
+            <Button
+                v-if="reviewEditMode"
+                label="Exit Review Mode"
+                icon="pi pi-times"
+                severity="secondary"
+                text
+                @click="reviewEditMode = false"
+            />
+
+            <!-- ── Step 3: Preview PDF ── -->
+            <Button
+                v-if="review"
+                label="Preview PDF"
+                icon="pi pi-eye"
                 severity="secondary"
                 outlined
-                @click="router.push(`/audit-management/audits/${route.params.id}`)"
+                @click="showPdfPreviewModal = true"
             />
+
+            <!-- Print / PDF ── -->
             <Button
                 v-if="review"
                 label="Print / PDF"
@@ -20,38 +53,57 @@
                 severity="secondary"
                 @click="printPage"
             />
+
+            <!-- ── Step 4: Approve Audit — UnderReview only ── -->
             <Button
-                v-if="review && hasPermission('audit.review')"
-                label="Send Distribution"
+                v-if="review && hasPermission('audit.review') && review.status === 'UnderReview'"
+                label="Approve Audit"
+                icon="pi pi-check"
+                severity="success"
+                :loading="auditActionSaving"
+                @click="approveAudit"
+            />
+
+            <!-- ── Step 5: Send Distribution — visible only when Approved or already Distributed ── -->
+            <Button
+                v-if="review && hasPermission('audit.review') && (review.status === 'Approved' || review.status === 'Distributed')"
+                :label="review.status === 'Distributed' ? 'Resend Distribution' : 'Send Distribution'"
                 icon="pi pi-send"
                 :loading="distributionLoadingPreview"
                 @click="openDistributionDialog"
             />
+
+            <!-- ── Secondary: Reopen ── -->
             <Button
-                v-if="review && hasPermission('audit.reopen') && (review.status === 'Submitted' || review.status === 'Closed')"
+                v-if="review && hasPermission('audit.reopen') && ['Submitted','UnderReview','Approved','Distributed','Closed'].includes(review.status)"
                 label="Reopen"
                 icon="pi pi-refresh"
                 severity="warning"
                 outlined
                 @click="showReopenDialog = true"
             />
+
+            <!-- ── Submit for Review — auditor/non-admin only, when Reopened ── -->
             <Button
-                v-if="review && review.status === 'Reopened'"
+                v-if="review && review.status === 'Reopened' && !hasPermission('audit.review')"
                 label="Submit for Review"
                 icon="pi pi-send"
                 severity="info"
                 @click="router.push(`/audit-management/audits/${route.params.id}`)"
             />
+
+            <!-- ── Close Audit ── -->
             <Button
-                v-if="review && hasPermission('audit.close') && (review.status === 'Submitted' || review.status === 'Reopened')"
+                v-if="review && hasPermission('audit.close') && ['Submitted','Reopened','UnderReview','Approved','Distributed'].includes(review.status)"
                 label="Close Audit"
                 icon="pi pi-check-circle"
-                severity="success"
+                severity="secondary"
+                outlined
                 @click="showCloseAuditDialog = true"
             />
         </BasePageHeader>
 
-        <!-- Reopen Audit Dialog -->
+        <!-- ── Reopen Audit Dialog ──────────────────────────────────────────── -->
         <Dialog v-model:visible="showReopenDialog" modal header="Reopen Audit" :style="{ width: '420px' }">
             <div class="space-y-3 py-2">
                 <p class="text-sm text-slate-300">This will set the audit back to <strong>Reopened</strong> so responses can be edited.</p>
@@ -66,7 +118,7 @@
             </template>
         </Dialog>
 
-        <!-- Close Audit Dialog -->
+        <!-- ── Close Audit Dialog ───────────────────────────────────────────── -->
         <Dialog v-model:visible="showCloseAuditDialog" modal header="Close Audit" :style="{ width: '420px' }">
             <div class="space-y-3 py-2">
                 <p class="text-sm text-slate-300">Closing the audit marks it as <strong>Closed</strong>. All corrective actions should be resolved first.</p>
@@ -86,6 +138,15 @@
         </div>
 
         <div v-else-if="review" class="p-4 space-y-4 audit-review-content">
+
+            <!-- ── Review Mode Banner ─────────────────────────────────────────── -->
+            <div v-if="reviewEditMode || review.status === 'UnderReview'" class="review-mode-banner">
+                <i class="pi pi-pencil text-blue-400 text-sm shrink-0" />
+                <p class="text-sm flex-1">
+                    <span class="font-semibold text-blue-300">Review Mode</span>
+                    <span class="text-blue-400/80"> — You can edit this audit. Make updates, preview the PDF, then approve.</span>
+                </p>
+            </div>
 
             <!-- ── Life-Critical Failure Banner ───────────────────────────────── -->
             <div
@@ -141,7 +202,6 @@
                 </template>
                 <template #content>
                     <div class="flex flex-wrap gap-6 items-center">
-                        <!-- SVG score ring -->
                         <div class="relative flex-shrink-0" style="width:100px;height:100px;">
                             <svg width="100" height="100" viewBox="0 0 100 100">
                                 <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(100,116,139,0.25)" stroke-width="9" />
@@ -193,7 +253,7 @@
                 </template>
             </Card>
 
-            <!-- ── Findings Summary (AuditAdmin editable, others read-only) ──── -->
+            <!-- Findings Summary -->
             <Card v-if="hasPermission('audit.review') || review.reviewSummary">
                 <template #title>
                     <div class="flex items-center justify-between">
@@ -234,19 +294,16 @@
                 </template>
                 <template #content>
                     <div class="flex flex-wrap gap-3 items-stretch text-sm">
-                        <!-- Division avg -->
                         <div class="flex flex-col items-center bg-slate-700/60 border border-slate-600 rounded-lg px-4 py-2 min-w-20">
                             <span class="text-xl font-bold text-slate-200">
                                 {{ review.divisionAvgScore != null ? `${review.divisionAvgScore.toFixed(1)}%` : '—' }}
                             </span>
                             <span class="text-xs text-slate-400 mt-0.5">Div Avg (last 10)</span>
                         </div>
-                        <!-- Target -->
                         <div v-if="review.divisionScoreTarget != null" class="flex flex-col items-center bg-slate-700/60 border border-slate-600 rounded-lg px-4 py-2 min-w-20">
                             <span class="text-xl font-bold text-slate-200">{{ review.divisionScoreTarget }}%</span>
                             <span class="text-xs text-slate-400 mt-0.5">Target</span>
                         </div>
-                        <!-- This audit vs target -->
                         <div
                             v-if="review.scorePercent != null"
                             class="flex flex-col items-center border rounded-lg px-4 py-2 min-w-20"
@@ -281,14 +338,22 @@
                 </template>
             </Card>
 
-            <!-- Attachments (read-only view) -->
+            <!-- Attachments -->
             <Card>
+                <template #title>
+                    <div class="flex items-center justify-between">
+                        <span class="text-base font-semibold text-white">Attachments</span>
+                        <span v-if="reviewEditMode || review.status === 'UnderReview'" class="text-xs text-blue-400 font-medium">
+                            <i class="pi pi-info-circle mr-1 text-xs" />Edit via form
+                        </span>
+                    </div>
+                </template>
                 <template #content>
                     <AuditAttachments :audit-id="Number(route.params.id)" :readonly="true" />
                 </template>
             </Card>
 
-            <!-- Non-conforming findings with CA workflow -->
+            <!-- Non-conforming findings -->
             <Card v-if="review.nonConformingItems.length > 0">
                 <template #title>
                     <span class="text-base font-semibold text-red-300">
@@ -302,7 +367,6 @@
                             :key="item.id"
                             class="finding-card border border-red-800 rounded-lg p-3 bg-red-950/20"
                         >
-                            <!-- Finding header -->
                             <div class="flex items-start justify-between gap-2">
                                 <div class="flex-1 min-w-0">
                                     <p class="text-sm text-slate-200">
@@ -333,8 +397,6 @@
                                 </div>
                             </div>
                             <p v-if="item.comment" class="text-xs text-slate-400 mt-1 italic">"{{ item.comment }}"</p>
-
-                            <!-- Corrective Actions list -->
                             <div v-if="item.correctiveActions.length > 0" class="mt-3 space-y-2">
                                 <div
                                     v-for="ca in item.correctiveActions"
@@ -396,18 +458,27 @@
                 </template>
             </Card>
 
-            <!-- Full audit record (collapsible) -->
+            <!-- Full audit record -->
             <Card v-if="(review.sections?.length ?? 0) > 0">
                 <template #title>
                     <div class="flex items-center justify-between">
                         <span class="text-base font-semibold text-white">Full Audit Record</span>
-                        <button
-                            class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 no-print"
-                            @click="showFullRecord = !showFullRecord"
-                        >
-                            <i :class="showFullRecord ? 'pi pi-chevron-up' : 'pi pi-chevron-down'" />
-                            {{ showFullRecord ? 'Collapse' : 'Expand' }}
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <button
+                                v-if="reviewEditMode || review.status === 'UnderReview'"
+                                class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 no-print transition-colors"
+                                @click="router.push(`/audit-management/audits/${route.params.id}`)"
+                            >
+                                <i class="pi pi-pencil text-[10px]" />Edit in Form
+                            </button>
+                            <button
+                                class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 no-print"
+                                @click="showFullRecord = !showFullRecord"
+                            >
+                                <i :class="showFullRecord ? 'pi pi-chevron-up' : 'pi pi-chevron-down'" />
+                                {{ showFullRecord ? 'Collapse' : 'Expand' }}
+                            </button>
+                        </div>
                     </div>
                 </template>
                 <template #content>
@@ -437,14 +508,13 @@
                 </template>
             </Card>
 
-            <!-- ── Distribution Recipients ─────────────────────────────────── -->
+            <!-- Distribution Recipients -->
             <Card v-if="review.reviewEmailRouting.length > 0 || (review.distributionRecipients?.length ?? 0) > 0 || hasPermission('audit.review')" class="distribution-section">
                 <template #title>
                     <span class="text-base font-semibold text-white">Distribution Recipients</span>
                 </template>
                 <template #content>
                     <div class="space-y-4">
-                        <!-- Auto recipients -->
                         <div v-if="review.reviewEmailRouting.length > 0">
                             <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Auto (Division Routing)</p>
                             <ul class="space-y-1">
@@ -453,7 +523,6 @@
                                 </li>
                             </ul>
                         </div>
-                        <!-- Per-audit additions -->
                         <div v-if="(review.distributionRecipients?.length ?? 0) > 0 || hasPermission('audit.review')">
                             <div class="flex items-center justify-between mb-1">
                                 <p class="text-xs text-slate-500 uppercase tracking-wide">Additional Recipients</p>
@@ -493,10 +562,31 @@
         <div v-else class="p-4 text-center text-slate-400">Review not available.</div>
     </div>
 
-    <!-- Add Recipients dialog -->
+    <!-- ══ PART 2: PDF Preview Modal ════════════════════════════════════════════ -->
+    <Dialog
+        v-model:visible="showPdfPreviewModal"
+        modal
+        :header="`PDF Preview — ${review?.divisionCode ?? ''} Audit`"
+        :style="{ width: '95vw', maxWidth: '1100px', height: '92vh' }"
+        :contentStyle="{ padding: 0, overflow: 'auto', background: '#f1f5f9' }"
+    >
+        <div class="pdf-modal-body">
+            <AuditPdfPreviewContent :review="review" />
+        </div>
+        <template #footer>
+            <Button label="Close" severity="secondary" text @click="showPdfPreviewModal = false" />
+            <Button
+                label="Print / Download"
+                icon="pi pi-print"
+                severity="secondary"
+                @click="printPage"
+            />
+        </template>
+    </Dialog>
+
+    <!-- ══ Add Recipients dialog ════════════════════════════════════════════════ -->
     <Dialog v-model:visible="showAddRecipientsDialog" modal header="Add Distribution Recipients" :style="{ width: '540px' }">
         <div class="space-y-4 pt-1">
-            <!-- Search + Division filter -->
             <div class="flex gap-2">
                 <InputText
                     v-model="addRecipientsSearch"
@@ -512,8 +602,6 @@
                     <option v-for="div in dialogDivisionOptions" :key="div" :value="div">{{ div }}</option>
                 </select>
             </div>
-
-            <!-- Routing list -->
             <div class="max-h-64 overflow-y-auto space-y-1 border border-slate-700 rounded-lg p-2 bg-slate-900/50">
                 <p v-if="filteredRoutingForDialog.length === 0" class="text-sm text-slate-500 italic py-2 text-center">No matches found.</p>
                 <label
@@ -522,20 +610,13 @@
                     class="flex items-center gap-3 px-3 py-2 rounded cursor-pointer hover:bg-slate-700/50 transition-colors"
                     :class="{ 'bg-slate-700/30': dialogSelectedEmails.includes(entry.emailAddress) }"
                 >
-                    <input
-                        type="checkbox"
-                        :value="entry.emailAddress"
-                        v-model="dialogSelectedEmails"
-                        class="accent-blue-500 w-4 h-4 shrink-0"
-                    />
+                    <input type="checkbox" :value="entry.emailAddress" v-model="dialogSelectedEmails" class="accent-blue-500 w-4 h-4 shrink-0" />
                     <div class="flex-1 min-w-0">
                         <p class="text-sm text-slate-200 truncate">{{ nameFromEmail(entry.emailAddress) }}</p>
                         <p class="text-xs text-slate-500 truncate">{{ entry.emailAddress }} &middot; {{ entry.divisionCode }}</p>
                     </div>
                 </label>
             </div>
-
-            <!-- Manual entry for someone not in the list -->
             <div class="border-t border-slate-700 pt-3 space-y-2">
                 <p class="text-xs text-slate-400 font-semibold uppercase tracking-wide">Not in the list? Add manually:</p>
                 <div class="flex gap-2">
@@ -556,116 +637,281 @@
         </template>
     </Dialog>
 
-    <!-- Send Distribution Email dialog — preview-first -->
-    <Dialog v-model:visible="showDistributionDialog" modal header="Send Distribution Email" :style="{ width: '720px', maxHeight: '90vh' }">
-        <div class="flex flex-col gap-4 pt-2" v-if="review && distributionPreview">
-
-            <!-- Subject — editable -->
-            <div class="flex flex-col gap-1">
-                <label class="text-xs text-slate-400 font-medium uppercase tracking-wide">Email Subject</label>
-                <InputText v-model="editableSubject" class="w-full font-mono text-sm" />
+    <!-- ══ Distribution Modal ═══════════════════════════════════════════════════ -->
+    <Dialog
+        v-model:visible="showDistributionDialog"
+        modal
+        :header="distributionStep === 'sent'
+            ? (distributionSentInfo?.type === 'api' ? 'Distribution Sent' : 'Email Client Opened')
+            : 'Send Distribution'"
+        :style="{ width: '820px', maxHeight: '96vh' }"
+        :contentStyle="{ padding: 0 }"
+    >
+        <!-- ── Sent confirmation state ─────────────────────────────────────── -->
+        <div v-if="distributionStep === 'sent' && distributionSentInfo" class="dist-sent-body">
+            <div class="dist-sent-icon">
+                <i :class="distributionSentInfo.type === 'api'
+                    ? 'pi pi-check-circle text-emerald-400'
+                    : 'pi pi-envelope text-blue-400'" />
             </div>
-
-            <!-- Recipients -->
-            <div class="flex flex-col gap-1">
-                <label class="text-xs text-slate-400 font-medium uppercase tracking-wide">Recipients ({{ distributionPreview.recipients.length }})</label>
-                <div class="bg-slate-800/50 rounded p-3 text-xs text-slate-400 space-y-1 max-h-28 overflow-y-auto">
-                    <div v-for="email in distributionPreview.recipients" :key="email" class="flex items-center gap-2">
-                        <i class="pi pi-envelope text-xs" />{{ email }}
+            <p v-if="distributionSentInfo.type === 'api'" class="text-sm text-slate-300 mt-1">
+                Distribution email sent successfully.
+            </p>
+            <p v-else class="text-sm text-slate-300 mt-1">
+                Your email client has been opened. Complete sending in your email application.
+            </p>
+            <div class="dist-sent-grid">
+                <div class="dist-sent-col">
+                    <p class="dist-sent-col-label">Sent To</p>
+                    <div
+                        v-for="r in distributionSentInfo.recipients"
+                        :key="r"
+                        class="flex items-center gap-2 text-sm text-slate-200 py-0.5"
+                    >
+                        <i class="pi pi-envelope text-blue-400 text-[10px]" />{{ r }}
                     </div>
-                    <p v-if="distributionPreview.recipients.length === 0" class="text-amber-400 text-xs">
-                        No recipients configured. Add recipients in the Distribution Recipients section below before sending.
-                    </p>
+                    <p v-if="!distributionSentInfo.recipients.length" class="text-xs text-slate-500 italic">No recipients</p>
+                </div>
+                <div class="dist-sent-col">
+                    <p class="dist-sent-col-label">Included</p>
+                    <div
+                        v-for="item in distributionSentInfo.items"
+                        :key="item"
+                        class="flex items-center gap-2 text-sm text-slate-200 py-0.5"
+                    >
+                        <i class="pi pi-check text-emerald-400 text-[10px]" />{{ item }}
+                    </div>
+                    <p v-if="!distributionSentInfo.items.length" class="text-xs text-slate-500 italic">No items selected</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Compose state ───────────────────────────────────────────────── -->
+        <div v-else-if="review && distributionPreview" class="dist-modal-body">
+
+            <!-- Section 1 — Include in Distribution (FIRST — drives the decision) -->
+            <div class="dist-section">
+                <div class="dist-section-header">
+                    <i class="pi pi-list-check text-blue-400 text-sm" />
+                    <span>Include in Distribution</span>
+                </div>
+                <div class="space-y-1">
+                    <label class="include-option">
+                        <input type="checkbox" v-model="includeAuditPdf" class="accent-blue-500 w-4 h-4 shrink-0" />
+                        <i class="pi pi-file-pdf text-red-400 text-sm shrink-0" />
+                        <span class="text-sm text-slate-200 flex-1">Audit PDF</span>
+                        <span class="text-xs text-slate-500">Full audit report</span>
+                    </label>
+
+                    <label class="include-option" :class="{ 'opacity-40 pointer-events-none': (review.nonConformingCount ?? 0) === 0 }">
+                        <input type="checkbox" v-model="includeCas" :disabled="(review.nonConformingCount ?? 0) === 0" class="accent-blue-500 w-4 h-4 shrink-0" />
+                        <i class="pi pi-exclamation-triangle text-amber-400 text-sm shrink-0" />
+                        <span class="text-sm text-slate-200 flex-1">Corrective Actions</span>
+                        <span class="text-xs text-slate-500">{{ review.nonConformingCount }} finding{{ review.nonConformingCount !== 1 ? 's' : '' }}</span>
+                    </label>
+                    <div v-if="includeCas && (review.nonConformingCount ?? 0) > 0" class="ml-8 flex gap-5 py-1">
+                        <label class="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
+                            <input type="radio" :value="false" v-model="includeOpenCasOnly" class="accent-blue-500" /> All CAs
+                        </label>
+                        <label class="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
+                            <input type="radio" :value="true" v-model="includeOpenCasOnly" class="accent-blue-500" /> Open CAs only
+                        </label>
+                    </div>
+
+                    <label class="include-option" :class="{ 'opacity-40 pointer-events-none': !(review.attachments?.length) }">
+                        <input type="checkbox" v-model="includeAttachments" :disabled="!(review.attachments?.length)" class="accent-blue-500 w-4 h-4 shrink-0" />
+                        <i class="pi pi-paperclip text-slate-400 text-sm shrink-0" />
+                        <span class="text-sm text-slate-200 flex-1">Attachments</span>
+                        <span class="text-xs text-slate-500">{{ review.attachments?.length ?? 0 }} file{{ (review.attachments?.length ?? 0) !== 1 ? 's' : '' }}</span>
+                    </label>
+                    <div v-if="includeAttachments && review.attachments?.length" class="ml-8 space-y-0.5 bg-slate-800/50 rounded-lg p-2 mt-1">
+                        <label
+                            v-for="att in review.attachments"
+                            :key="att.id"
+                            class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer hover:text-white py-1 px-1 rounded transition-colors hover:bg-slate-700/40"
+                        >
+                            <input type="checkbox" :value="att.id" v-model="selectedAttachmentIds" :disabled="!att.hasFile" class="accent-sky-500 w-3.5 h-3.5 shrink-0" />
+                            <i class="pi pi-file text-slate-500 text-[10px] shrink-0" />
+                            <span class="flex-1 truncate" :class="{ 'text-slate-500': !att.hasFile }">{{ att.fileName }}</span>
+                            <span class="text-slate-600 shrink-0">{{ formatBytes(att.fileSizeBytes) }}</span>
+                            <span v-if="!att.hasFile" class="text-red-500 text-[10px] shrink-0">missing</span>
+                        </label>
+                    </div>
                 </div>
             </div>
 
-            <!-- Findings Summary — editable -->
-            <div class="flex flex-col gap-1">
-                <label class="text-xs text-slate-400 font-medium uppercase tracking-wide">Findings Summary <span class="text-slate-500 normal-case font-normal">(edit before sending)</span></label>
+            <!-- Section 2 — Recipients -->
+            <div class="dist-section">
+                <div class="dist-section-header">
+                    <i class="pi pi-users text-blue-400 text-sm" />
+                    <span>Recipients</span>
+                    <span class="dist-count">{{ distributionPreview.recipients.length }}</span>
+                </div>
+                <div v-if="distributionPreview.recipients.length > 0" class="dist-recipients-list">
+                    <div v-for="email in distributionPreview.recipients" :key="email" class="flex items-center gap-2 text-xs text-slate-300">
+                        <i class="pi pi-envelope text-slate-500 text-[10px]" />{{ email }}
+                    </div>
+                </div>
+                <p v-else class="text-xs text-amber-400 flex items-center gap-1.5 py-1">
+                    <i class="pi pi-exclamation-triangle text-[11px]" />
+                    No recipients configured. Add recipients in the Distribution Recipients section.
+                </p>
+            </div>
+
+            <!-- Section 3 — Subject -->
+            <div class="dist-section">
+                <div class="dist-section-header">
+                    <i class="pi pi-tag text-blue-400 text-sm" />
+                    <span>Subject</span>
+                </div>
+                <InputText v-model="editableSubject" class="w-full font-mono text-sm" />
+            </div>
+
+            <!-- Section 4 — Message -->
+            <div class="dist-section">
+                <div class="dist-section-header">
+                    <i class="pi pi-align-left text-blue-400 text-sm" />
+                    <span>Message</span>
+                    <span class="text-xs text-slate-500 font-normal ml-1">— edit before sending</span>
+                </div>
                 <Textarea
                     v-model="distributionSummaryEdit"
-                    rows="3"
+                    rows="4"
                     class="w-full text-sm"
-                    placeholder="Write a findings narrative to include in the distribution email…"
+                    placeholder="Write a findings narrative to include in the email…"
                     autoResize
                 />
             </div>
 
-            <!-- Attachment selection -->
-            <div v-if="review.attachments?.length" class="flex flex-col gap-1">
-                <label class="text-xs text-slate-400 font-medium uppercase tracking-wide">Attachments</label>
-                <div class="space-y-1 max-h-32 overflow-y-auto bg-slate-800/30 rounded p-2">
-                    <label
-                        v-for="att in review.attachments"
-                        :key="att.id"
-                        class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer hover:text-white"
-                    >
-                        <input
-                            type="checkbox"
-                            :value="att.id"
-                            v-model="selectedAttachmentIds"
-                            :disabled="!att.hasFile"
-                            class="accent-sky-500"
-                        />
-                        <span :class="{ 'text-slate-500': !att.hasFile }">
-                            {{ att.fileName }}
-                            <span class="text-xs text-slate-500 ml-1">({{ formatBytes(att.fileSizeBytes) }})</span>
-                            <span v-if="!att.hasFile" class="text-xs text-red-500 ml-1">file not found</span>
-                        </span>
-                    </label>
+            <!-- Section 5 — Email Preview -->
+            <div class="dist-section">
+                <div class="dist-section-header">
+                    <i class="pi pi-eye text-blue-400 text-sm" />
+                    <span>Email Preview</span>
+                </div>
+                <div class="dist-email-preview">
+                    <AuditPdfPreviewContent
+                        :review="review"
+                        mode="email"
+                        :summary-override="distributionSummaryEdit"
+                        :include-cas="includeCas"
+                        :include-open-cas-only="includeOpenCasOnly"
+                    />
                 </div>
             </div>
 
-            <!-- Email body preview — always visible -->
-            <div class="flex flex-col gap-1">
-                <label class="text-xs text-slate-400 font-medium uppercase tracking-wide">Email Preview</label>
-                <div
-                    class="border border-slate-700 rounded overflow-auto bg-white"
-                    style="max-height: 340px; min-height: 120px;"
-                    v-html="distributionPreview.bodyHtml"
-                />
+            <!-- Send summary footer bar -->
+            <div class="dist-send-summary">
+                <p class="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wide">Sending:</p>
+                <div class="flex flex-wrap gap-2">
+                    <span class="send-pill send-pill--blue">
+                        <i class="pi pi-users text-[10px]" />
+                        {{ distributionPreview.recipients.length }} recipient{{ distributionPreview.recipients.length !== 1 ? 's' : '' }}
+                    </span>
+                    <span v-if="includeAuditPdf" class="send-pill send-pill--red">
+                        <i class="pi pi-file-pdf text-[10px]" />Audit PDF
+                    </span>
+                    <span v-if="includeCas && (review.nonConformingCount ?? 0) > 0" class="send-pill send-pill--amber">
+                        <i class="pi pi-exclamation-triangle text-[10px]" />
+                        CAs{{ includeOpenCasOnly ? ' (open)' : '' }}
+                    </span>
+                    <span v-if="includeAttachments && selectedAttachmentIds.length > 0" class="send-pill send-pill--slate">
+                        <i class="pi pi-paperclip text-[10px]" />
+                        {{ selectedAttachmentIds.length }} file{{ selectedAttachmentIds.length !== 1 ? 's' : '' }}
+                    </span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
+                    <i class="pi pi-info-circle" />
+                    If SMTP is not configured, your email client will open with the email pre-filled.
+                </p>
             </div>
         </div>
+
         <template #footer>
-            <Button label="Cancel" severity="secondary" text @click="showDistributionDialog = false" />
-            <Button
-                label="Send Distribution Email"
-                icon="pi pi-send"
-                severity="success"
-                :loading="distributionSending"
-                :disabled="(distributionPreview?.recipients.length ?? 0) === 0"
-                @click="submitDistributionEmail"
-            />
+            <!-- Sent confirmation footer -->
+            <template v-if="distributionStep === 'sent'">
+                <Button label="Done" icon="pi pi-check" severity="success" @click="closeDistributionDialog" />
+            </template>
+            <!-- Compose footer -->
+            <template v-else>
+                <Button label="Cancel" severity="secondary" text @click="closeDistributionDialog" />
+                <Button
+                    label="Open in Email Client"
+                    icon="pi pi-envelope"
+                    severity="secondary"
+                    outlined
+                    :disabled="(distributionPreview?.recipients.length ?? 0) === 0"
+                    @click="openMailtoFallback"
+                />
+                <Button
+                    label="Send Distribution"
+                    icon="pi pi-send"
+                    severity="success"
+                    :loading="distributionSending"
+                    :disabled="(distributionPreview?.recipients.length ?? 0) === 0"
+                    @click="submitDistributionEmail"
+                />
+            </template>
         </template>
     </Dialog>
 
-    <!-- Assign CA modal -->
-    <Dialog v-model:visible="showAssign" header="Assign Corrective Action" modal style="width: 480px">
+    <!-- ══ Assign CA modal ══════════════════════════════════════════════════════ -->
+    <Dialog v-model:visible="showAssign" header="Assign Corrective Action" modal style="width: 500px">
         <div class="space-y-4 pt-2">
             <div>
                 <label class="text-xs text-slate-400 block mb-1">Finding</label>
                 <p class="text-sm text-slate-200">{{ assignTarget?.questionText }}</p>
             </div>
             <div>
-                <label class="text-xs text-slate-400 block mb-1">Description / Action Required *</label>
+                <label class="text-xs text-slate-400 block mb-1">Description / Action Required <span class="text-red-400">*</span></label>
                 <Textarea v-model="assignForm.description" rows="3" class="w-full text-sm" placeholder="Describe the corrective action required..." autoResize />
             </div>
-            <div>
-                <label class="text-xs text-slate-400 block mb-1">Assign To</label>
-                <InputText v-model="assignForm.assignedTo" class="w-full text-sm" placeholder="Name or email" />
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Assignee Name <span class="text-red-400">*</span></label>
+                    <InputText v-model="assignForm.assignedTo" class="w-full text-sm" placeholder="Full name" />
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Assignee Email <span class="text-red-400">*</span></label>
+                    <InputText v-model="assignForm.assignedToEmail" type="email" class="w-full text-sm" placeholder="email@example.com" />
+                </div>
             </div>
-            <div>
-                <label class="text-xs text-slate-400 block mb-1">Due Date</label>
-                <InputText v-model="assignForm.dueDate" type="date" class="w-full text-sm" />
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Due Date</label>
+                    <InputText v-model="assignForm.dueDate" type="date" class="w-full text-sm" />
+                    <p class="text-xs text-slate-500 mt-0.5">Leave blank to use division SLA default</p>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Priority</label>
+                    <div class="flex gap-2 mt-1">
+                        <button
+                            :class="['flex-1 py-1.5 rounded text-sm font-medium border transition-colors', assignForm.priority === 'Normal' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-transparent border-slate-600 text-slate-400 hover:border-slate-500']"
+                            @click="assignForm.priority = 'Normal'"
+                            type="button"
+                        >Normal</button>
+                        <button
+                            :class="['flex-1 py-1.5 rounded text-sm font-medium border transition-colors', assignForm.priority === 'Urgent' ? 'bg-red-600 border-red-600 text-white' : 'bg-transparent border-slate-600 text-slate-400 hover:border-slate-500']"
+                            @click="assignForm.priority = 'Urgent'"
+                            type="button"
+                        >Urgent</button>
+                    </div>
+                </div>
             </div>
         </div>
         <template #footer>
             <Button label="Cancel" severity="secondary" @click="showAssign = false" />
-            <Button label="Assign" icon="pi pi-check" :loading="saving" :disabled="!assignForm.description.trim()" @click="submitAssign" />
+            <Button
+                label="Assign"
+                icon="pi pi-check"
+                :loading="saving"
+                :disabled="!assignForm.description.trim() || !assignForm.assignedTo.trim() || !assignForm.assignedToEmail.trim()"
+                @click="submitAssign"
+            />
         </template>
     </Dialog>
 
-    <!-- Close CA modal -->
+    <!-- ══ Close CA modal ═══════════════════════════════════════════════════════ -->
     <Dialog v-model:visible="showClose" header="Close Corrective Action" modal style="width: 420px">
         <div class="space-y-4 pt-2">
             <div>
@@ -685,6 +931,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import ProgressSpinner from 'primevue/progressspinner';
 import Card from 'primevue/card';
@@ -695,6 +942,7 @@ import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import AuditAttachments from '@/modules/audit-management/features/audit-form/components/AuditAttachments.vue';
+import AuditPdfPreviewContent from '../components/AuditPdfPreviewContent.vue';
 import { usePermissions } from '@/modules/audit-management/composables/usePermissions';
 import { useAuditReviewData } from '../composables/useAuditReviewData';
 import { useAuditReviewActions } from '../composables/useAuditReviewActions';
@@ -709,9 +957,11 @@ const { review, reviewLoading, repeatFindingIdSet, allRoutingEntries } = useAudi
 
 const {
     saving, auditActionSaving,
+    reviewEditMode,
+    showPdfPreviewModal,
     reviewSummaryDraft, summarySaving, submitSaveSummary,
     showReopenDialog, showCloseAuditDialog, reopenReason, closeAuditNotes,
-    submitReopen, submitCloseAudit,
+    submitReopen, submitCloseAudit, enterReviewMode, approveAudit,
     showAssign, assignTarget, assignForm, openAssignModal, submitAssign,
     showClose, closeTarget, closeForm, openCloseModal, submitClose,
     addingRecipient, removingRecipientId,
@@ -722,7 +972,9 @@ const {
     submitAddRecipients, removeRecipient,
     showDistributionDialog, distributionLoadingPreview, distributionSending,
     distributionPreview, distributionSummaryEdit, editableSubject, selectedAttachmentIds,
-    openDistributionDialog, submitDistributionEmail,
+    includeAuditPdf, includeCas, includeOpenCasOnly, includeAttachments,
+    distributionStep, distributionSentInfo,
+    openDistributionDialog, closeDistributionDialog, submitDistributionEmail, openMailtoFallback,
 } = useAuditReviewActions({ review, allRoutingEntries });
 
 const {
@@ -732,4 +984,159 @@ const {
 } = useAuditReviewFormatting(review);
 
 const { showFullRecord, showAiSummary, printPage } = useAuditReviewNavigation(review);
+
+
 </script>
+
+<style scoped>
+/* ── Review mode banner ────────────────────────────────────────────────────── */
+.review-mode-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    background: rgba(59, 130, 246, 0.07);
+    padding: 10px 14px;
+}
+
+/* ── PDF preview modal body ────────────────────────────────────────────────── */
+.pdf-modal-body {
+    background: #f1f5f9;
+    min-height: 100%;
+    padding: 0;
+}
+
+/* ── Distribution modal body ───────────────────────────────────────────────── */
+.dist-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 4px 0;
+}
+
+.dist-section {
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+}
+.dist-section:last-child { border-bottom: none; }
+
+.dist-section-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    margin-bottom: 10px;
+}
+
+.dist-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    font-size: 0.65rem;
+    font-weight: 700;
+}
+
+.dist-recipients-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 100px;
+    overflow-y: auto;
+    padding: 6px 8px;
+    background: rgba(15, 23, 42, 0.4);
+    border-radius: 6px;
+    border: 1px solid rgba(51, 65, 85, 0.4);
+}
+
+/* ── Include option rows ───────────────────────────────────────────────────── */
+.include-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+.include-option:hover { background: rgba(51, 65, 85, 0.4); }
+
+/* ── Send summary footer ───────────────────────────────────────────────────── */
+.dist-send-summary {
+    padding: 12px 20px 4px;
+    border-top: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.send-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+.send-pill--blue  { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+.send-pill--red   { background: rgba(239, 68, 68, 0.12);  color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25); }
+.send-pill--amber { background: rgba(245, 158, 11, 0.12); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.25); }
+.send-pill--slate { background: rgba(100, 116, 139, 0.15); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.3); }
+
+/* ── Email preview box ─────────────────────────────────────────────────────── */
+.dist-email-preview {
+    border: 1px solid #334155;
+    border-radius: 8px;
+    overflow-y: auto;
+    background: #ffffff;
+    min-height: 200px;
+    max-height: 520px;
+    padding: 0;
+}
+
+/* ── Sent confirmation body ────────────────────────────────────────────────── */
+.dist-sent-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 24px 24px;
+    text-align: center;
+    gap: 4px;
+}
+
+.dist-sent-icon { font-size: 3rem; line-height: 1; }
+
+.dist-sent-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    width: 100%;
+    max-width: 520px;
+    margin-top: 24px;
+    text-align: left;
+}
+
+.dist-sent-col {
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+
+.dist-sent-col-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 8px;
+}
+</style>

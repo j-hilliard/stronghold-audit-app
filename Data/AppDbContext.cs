@@ -51,6 +51,7 @@ public class AppDbContext : DbContext
     public DbSet<AuditActionLog> AuditActionLogs { get; set; } = null!;
     public DbSet<AuditTrailLog> AuditTrailLogs { get; set; } = null!;
     public DbSet<CaPublicToken> CaPublicTokens { get; set; } = null!;
+    public DbSet<AppNotification> AppNotifications { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -231,7 +232,7 @@ public class AppDbContext : DbContext
             b.Property(e => e.TrackingNumber).HasMaxLength(30);
             b.ToTable("Audit", "audit", t =>
             {
-                t.HasCheckConstraint("CK_Audit_Status", "[Status] IN ('Draft', 'Submitted', 'Reopened', 'Closed')");
+                t.HasCheckConstraint("CK_Audit_Status", "[Status] IN ('Draft', 'Submitted', 'Reopened', 'UnderReview', 'Approved', 'Distributed', 'Closed')");
                 t.HasCheckConstraint("CK_Audit_AuditType", "[AuditType] IN ('JobSite', 'Facility')");
             });
             b.HasQueryFilter(e => !e.IsDeleted);
@@ -659,6 +660,23 @@ public class AppDbContext : DbContext
              .WithMany()
              .HasForeignKey(e => e.CorrectiveActionId)
              .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AppNotification>(b =>
+        {
+            b.ToTable("AppNotification", "audit");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.RecipientEmail).IsRequired().HasMaxLength(200);
+            b.Property(e => e.Type).IsRequired().HasMaxLength(50);
+            b.Property(e => e.Title).IsRequired().HasMaxLength(200);
+            b.Property(e => e.Body).IsRequired().HasMaxLength(1000);
+            b.Property(e => e.EntityType).HasMaxLength(50);
+            b.Property(e => e.LinkUrl).HasMaxLength(500);
+            b.HasIndex(e => e.RecipientEmail);
+            b.HasIndex(e => new { e.RecipientEmail, e.IsRead });
+            b.ToTable("AppNotification", "audit", t =>
+                t.HasCheckConstraint("CK_AppNotification_Type",
+                    "[Type] IN ('AuditSubmitted','AuditApproved','AuditDistributed','CaAssigned','CaCompleted')"));
         });
     }
 

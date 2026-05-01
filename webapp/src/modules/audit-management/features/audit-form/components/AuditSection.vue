@@ -1,11 +1,11 @@
 <template>
-    <div class="border border-slate-700 rounded-lg overflow-hidden mb-3 shadow-md">
+    <div class="border border-slate-700 rounded-lg overflow-hidden mb-2 shadow-md">
         <!-- Section header -->
         <div
             role="button"
             tabindex="0"
             :aria-expanded="isOpen"
-            class="w-full flex items-center justify-between px-4 py-3 bg-[#162032] hover:bg-[#1e2d45] transition-colors duration-150 cursor-pointer select-none"
+            class="w-full flex items-center justify-between px-4 py-2 bg-[#162032] hover:bg-[#1e2d45] transition-colors duration-150 cursor-pointer select-none"
             @click="isOpen = !isOpen"
             @keydown.enter.space.prevent="isOpen = !isOpen"
         >
@@ -74,7 +74,7 @@
         </div>
 
         <!-- Inline N/A reason input — appears between header and questions -->
-        <div v-if="showNaInput" class="px-4 py-3 bg-slate-900 border-b border-slate-700" @click.stop>
+        <div v-if="showNaInput" class="px-4 py-2 bg-slate-900 border-b border-slate-700" @click.stop>
             <p class="text-slate-300 text-sm font-medium mb-2">Why is this section not applicable?</p>
             <div class="flex items-center gap-2">
                 <input
@@ -118,7 +118,7 @@
         </div>
 
         <!-- N/A collapsed body (shown when section is N/A and user expands it) -->
-        <div v-if="isOpen && isNa" class="bg-slate-800/60 px-4 py-3 text-sm text-amber-400/70 italic">
+        <div v-if="isOpen && isNa" class="bg-slate-800/60 px-4 py-2 text-sm text-amber-400/70 italic">
             This section has been marked not applicable.
             <span v-if="naReason"> Reason: <span class="not-italic text-amber-300">{{ naReason }}</span></span>
         </div>

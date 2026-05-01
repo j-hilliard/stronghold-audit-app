@@ -2,12 +2,15 @@
     <div
         :class="[
             'relative rounded-card border p-4 transition-all duration-200',
-            interactive ? 'cursor-pointer hover:-translate-y-1' : '',
+            interactive ? 'cursor-pointer' : '',
+            interactive && !active ? 'hover:-translate-y-1' : '',
             variantClasses.bg,
-            variantClasses.border,
-            interactive ? variantClasses.hover : '',
+            active ? variantClasses.activeBorder : variantClasses.border,
+            interactive && !active ? variantClasses.hover : '',
+            active ? 'ring-1 ' + variantClasses.activeRing : '',
         ]"
         v-bind="interactive ? { role: 'button', tabindex: '0' } : {}"
+        @click="interactive && $emit('click', $event)"
         @keydown.enter="interactive && $emit('click', $event)"
     >
         <slot name="top-right" />
@@ -23,21 +26,22 @@
         </div>
 
         <!-- Label -->
-        <div class="text-xs text-slate-400 mt-1.5 font-medium">{{ label }}</div>
+        <div class="text-xs mt-1.5 font-medium" style="color: var(--text-secondary)">{{ label }}</div>
 
         <!-- Trend -->
         <div v-if="trend !== undefined && trend !== null" class="text-xs mt-1.5 font-medium"
-            :class="trendPositive ? 'text-emerald-400' : 'text-red-400'">
-            {{ trendPositive ? '↑' : '↓' }}
-            {{ trendLabel ?? Math.abs(trend) }}
+            :class="trendPositive ? 'text-[color:var(--color-success)]' : 'text-[color:var(--color-danger)]'">
+            <template v-if="trendLabel">{{ trendLabel }}</template>
+            <template v-else>{{ trendPositive ? '↑' : '↓' }} {{ Math.abs(trend) }}</template>
         </div>
 
         <!-- Sublabel -->
-        <div v-if="sublabel" class="text-xs text-slate-500 mt-1">{{ sublabel }}</div>
+        <div v-if="sublabel" class="text-xs mt-1" style="color: var(--text-muted)">{{ sublabel }}</div>
 
-        <!-- Drill hint -->
-        <div v-if="interactive" class="absolute bottom-2 right-2.5 text-[10px] text-slate-600 group-hover:text-blue-400 transition-colors pointer-events-none">
-            <i class="pi pi-arrow-up-right" />
+        <!-- Drill hint / active indicator -->
+        <div v-if="interactive" class="absolute bottom-2 right-2.5 text-[10px] pointer-events-none transition-colors"
+            :class="active ? variantClasses.iconColor : 'text-slate-600'">
+            <i :class="active ? 'pi pi-check-circle' : 'pi pi-arrow-up-right'" />
         </div>
     </div>
 </template>
@@ -55,9 +59,11 @@ const props = withDefaults(defineProps<{
     trendPositiveDirection?: 'up' | 'down';
     sublabel?: string;
     interactive?: boolean;
+    active?: boolean;
 }>(), {
     variant: 'default',
     interactive: false,
+    active: false,
     trendPositiveDirection: 'up',
 });
 
@@ -75,6 +81,8 @@ const variantClasses = computed(() => {
         default: {
             bg: 'bg-surface-2',
             border: 'border-slate-700/60',
+            activeBorder: 'border-blue-500/60',
+            activeRing: 'ring-blue-500/30',
             hover: 'hover:shadow-card-hover hover:border-blue-500/40',
             value: 'text-white',
             iconBg: 'bg-slate-700/60',
@@ -83,6 +91,8 @@ const variantClasses = computed(() => {
         success: {
             bg: 'bg-emerald-950/50',
             border: 'border-emerald-800/50',
+            activeBorder: 'border-emerald-500/70',
+            activeRing: 'ring-emerald-500/30',
             hover: 'hover:shadow-glow-success hover:border-emerald-500/50',
             value: 'text-emerald-400',
             iconBg: 'bg-emerald-900/60',
@@ -91,6 +101,8 @@ const variantClasses = computed(() => {
         warning: {
             bg: 'bg-amber-950/40',
             border: 'border-amber-800/50',
+            activeBorder: 'border-amber-500/70',
+            activeRing: 'ring-amber-500/30',
             hover: 'hover:shadow-card-hover-warn hover:border-amber-500/50',
             value: 'text-amber-400',
             iconBg: 'bg-amber-900/60',
@@ -99,6 +111,8 @@ const variantClasses = computed(() => {
         danger: {
             bg: 'bg-red-950/40',
             border: 'border-red-800/50',
+            activeBorder: 'border-red-500/70',
+            activeRing: 'ring-red-500/30',
             hover: 'hover:shadow-card-hover-danger hover:border-red-500/50',
             value: 'text-red-400',
             iconBg: 'bg-red-900/60',
@@ -107,6 +121,8 @@ const variantClasses = computed(() => {
         info: {
             bg: 'bg-blue-950/40',
             border: 'border-blue-800/50',
+            activeBorder: 'border-blue-500/70',
+            activeRing: 'ring-blue-500/30',
             hover: 'hover:shadow-glow-focus hover:border-blue-500/50',
             value: 'text-blue-400',
             iconBg: 'bg-blue-900/60',

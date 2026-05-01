@@ -89,29 +89,20 @@
                 />
             </div>
 
-            <!-- Overdue toggle -->
-            <Button
-                :label="filterOverdueOnly ? 'Overdue Only ✕' : 'Overdue Only'"
-                :severity="filterOverdueOnly ? 'danger' : 'secondary'"
-                size="small"
-                :outlined="!filterOverdueOnly"
-                class="self-end"
-                @click="filterOverdueOnly = !filterOverdueOnly; loadFiltered()"
-            />
         </div>
 
-        <!-- ── KPI Cards ──────────────────────────────────────────────────────── -->
+        <!-- ── KPI Cards (click to filter) ──────────────────────────────────── -->
         <div class="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3">
-            <MetricCard label="Total"       :value="displayTotal"      variant="default" />
-            <MetricCard label="Open"        :value="displayOpen"       variant="info" />
-            <MetricCard label="In Progress" :value="displayInProgress" variant="warning" />
-            <MetricCard label="Overdue"     :value="displayOverdue"    variant="danger" />
-            <MetricCard label="Closed"      :value="displayClosed"     variant="success" />
+            <MetricCard label="Total"       :value="displayTotal"      variant="default"  interactive :active="activeKpiFilter === 'Total'"       @click="onKpiTotalClick" />
+            <MetricCard label="Open"        :value="displayOpen"       variant="info"     interactive :active="activeKpiFilter === 'Open'"        @click="() => onKpiClick('Open')" />
+            <MetricCard label="In Progress" :value="displayInProgress" variant="warning"  interactive :active="activeKpiFilter === 'InProgress'"  @click="() => onKpiClick('InProgress')" />
+            <MetricCard label="Overdue"     :value="displayOverdue"    variant="danger"   interactive :active="activeKpiFilter === 'Overdue'"     @click="() => onKpiClick('Overdue')" />
+            <MetricCard label="Closed"      :value="displayClosed"     variant="success"  interactive :active="activeKpiFilter === 'Closed'"     @click="() => onKpiClick('Closed')" />
         </div>
 
         <!-- ── Bulk Action Toolbar (visible when rows selected) ───────────────── -->
         <Transition name="bulk-bar">
-            <div v-if="selectedItems.length > 0" class="flex items-center gap-3 px-4 py-2.5 bg-blue-900/40 border border-blue-700/50 rounded-lg">
+            <div v-if="selectedItems.length > 0" class="flex items-center gap-3 px-4 py-2.5 rounded-lg" style="background:rgba(59,130,246,0.12); border:1px solid rgba(59,130,246,0.3)">
                 <span class="text-sm font-medium text-blue-300">
                     {{ selectedItems.length }} action{{ selectedItems.length === 1 ? '' : 's' }} selected
                 </span>
@@ -432,64 +423,37 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, watch, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import type { CorrectiveActionListItemDto, UserAuditRoleDto } from '@/apiclient/auditClient';
 import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import { MetricCard } from '@/design-system';
+import {
+    useCorrectiveActions,
+    STATUS_OPTIONS as statusOptions,
+    SOURCE_OPTIONS as sourceOptions,
+    PRIORITY_OPTIONS as priorityOptions,
+} from '../composables/useCorrectiveActions';
 
-const router   = useRouter();
-const toast    = useToast();
-const service  = useAuditService();
+const toast   = useToast();
+const service = useAuditService();
 
-// ── Filter state ──────────────────────────────────────────────────────────────
-const loading          = ref(false);
-const exportingXlsx    = ref(false);
-const items            = ref<CorrectiveActionListItemDto[]>([]);
-const filterSearch     = ref('');
-const filterDivisionId = ref<number | null>(null);
-const filterStatus     = ref<string | null>(null);
-const filterSource     = ref<string | null>(null);
-const filterPriority   = ref<string | null>(null);
-const filterOverdueOnly = ref(false);
-
-// ── Pagination state ──────────────────────────────────────────────────────────
-const currentPage = ref(1);
-const pageSize    = ref(25);
-const totalCount  = ref(0);
-const totalPages  = computed(() => Math.ceil(totalCount.value / pageSize.value));
-
-// ── KPI counts (from server, reflects full filtered set) ─────────────────────
-const kpiTotal       = computed(() => totalCount.value);
-const kpiOpen        = ref(0);
-const kpiInProgress  = ref(0);
-const kpiOverdue     = ref(0);
-const kpiClosed      = ref(0);
-
-const divisionOptions = ref<{ label: string; value: number }[]>([]);
-const divisionsLoaded = ref(false);
-
-const statusOptions = [
-    { label: 'Open',        value: 'Open' },
-    { label: 'In Progress', value: 'InProgress' },
-    { label: 'Closed',      value: 'Closed' },
-    { label: 'Voided',      value: 'Voided' },
-];
-
-const sourceOptions = [
-    { label: 'Manual',         value: 'Manual' },
-    { label: 'Auto-Generated', value: 'AutoGenerated' },
-];
-
-const priorityOptions = [
-    { label: 'Normal',  value: 'Normal' },
-    { label: 'Urgent',  value: 'Urgent' },
-];
+const {
+    loading, exportingXlsx, items,
+    filterSearch, filterDivisionId, filterStatus, filterSource, filterPriority, filterOverdueOnly,
+    currentPage, pageSize, totalCount,
+    divisionOptions,
+    displayTotal, displayOpen, displayInProgress, displayOverdue, displayClosed,
+    load, onPageChange, loadFiltered,
+    activeKpiFilter, onKpiClick, onKpiTotalClick,
+    rowClass, statusSeverity, statusLabel, goToAudit,
+    exportExcel,
+} = useCorrectiveActions();
 
 // ── Selection ─────────────────────────────────────────────────────────────────
 const selectedItems = ref<CorrectiveActionListItemDto[]>([]);
+watch(items, () => { selectedItems.value = []; });
 
 // ── Close dialog ──────────────────────────────────────────────────────────────
 const showCloseDialog    = ref(false);
@@ -525,8 +489,8 @@ const bulkNewAssignee       = ref('');
 const bulkNewAssigneeUserId = ref<number | null>(null);
 
 // ── Assignee autocomplete ─────────────────────────────────────────────────────
-const auditUsers     = ref<UserAuditRoleDto[]>([]);
-const filteredUsers  = ref<UserAuditRoleDto[]>([]);
+const auditUsers    = ref<UserAuditRoleDto[]>([]);
+const filteredUsers = ref<UserAuditRoleDto[]>([]);
 
 function userDisplayName(u: UserAuditRoleDto): string {
     const name = [u.firstName, u.lastName].filter(Boolean).join(' ');
@@ -548,99 +512,6 @@ async function loadAuditUsers() {
     } catch {
         // Non-admin roles may not have access; autocomplete degrades to free-text
     }
-}
-
-function useCountUp(source: () => number, duration = 700) {
-    const display = ref(0);
-    watch(source, (rawTo) => {
-        // Guard: if the API returns null/undefined, treat as 0 to prevent NaN
-        const to = Number.isFinite(rawTo) ? rawTo : 0;
-        const from  = display.value;
-        const start = performance.now();
-        function tick(now: number) {
-            const t    = Math.min((now - start) / duration, 1);
-            const ease = 1 - Math.pow(1 - t, 3);
-            display.value = Math.round(from + (to - from) * ease);
-            if (t < 1) requestAnimationFrame(tick);
-        }
-        requestAnimationFrame(tick);
-    }, { immediate: true });
-    return display;
-}
-
-const displayTotal      = useCountUp(() => kpiTotal.value);
-const displayOpen       = useCountUp(() => kpiOpen.value);
-const displayInProgress = useCountUp(() => kpiInProgress.value);
-const displayOverdue    = useCountUp(() => kpiOverdue.value);
-const displayClosed     = useCountUp(() => kpiClosed.value);
-
-// ── Load ──────────────────────────────────────────────────────────────────────
-async function load(resetPage = false) {
-    if (resetPage) currentPage.value = 1;
-    loading.value = true;
-    try {
-        const [result, divisions] = await Promise.all([
-            service.getCorrectiveActions({
-                divisionId:  filterDivisionId.value,
-                status:      filterStatus.value,
-                searchText:  filterSearch.value || null,
-                source:      filterSource.value,
-                priority:    filterPriority.value,
-                overdueOnly: filterOverdueOnly.value,
-                pageNumber:  currentPage.value,
-                pageSize:    pageSize.value,
-            }),
-            divisionsLoaded.value ? Promise.resolve(null) : service.getDivisions(),
-        ]);
-        items.value          = result.items ?? [];
-        totalCount.value     = result.totalCount ?? 0;
-        kpiOpen.value        = result.openCount ?? 0;
-        kpiInProgress.value  = result.inProgressCount ?? 0;
-        kpiOverdue.value     = result.overdueCount ?? 0;
-        kpiClosed.value      = result.closedCount ?? 0;
-        if (divisions) {
-            divisionOptions.value = divisions.map(d => ({ label: `${d.code} — ${d.name}`, value: d.id }));
-            divisionsLoaded.value = true;
-        }
-        selectedItems.value = [];
-    } catch {
-        toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load corrective actions.', life: 4000 });
-    } finally {
-        loading.value = false;
-    }
-}
-
-function onPageChange(event: { page: number; rows: number }) {
-    currentPage.value = event.page + 1;  // PrimeVue Paginator is 0-based
-    pageSize.value    = event.rows;
-    load();
-}
-
-// Reset to page 1 when filters change
-function loadFiltered() { load(true); }
-
-// ── Table helpers ─────────────────────────────────────────────────────────────
-function rowClass(data: CorrectiveActionListItemDto) {
-    if (data.isOverdue)             return 'row--ca-overdue';
-    if (data.status === 'Closed')   return 'row--ca-closed';
-    if (data.status === 'Voided')   return 'row--ca-voided';
-    return '';
-}
-
-function statusSeverity(data: CorrectiveActionListItemDto) {
-    if (data.isOverdue)               return 'danger';
-    if (data.status === 'Closed')     return 'success';
-    if (data.status === 'InProgress') return 'warning';
-    if (data.status === 'Voided')     return 'secondary';
-    return 'info';
-}
-
-function statusLabel(status: string) {
-    return status === 'InProgress' ? 'In Progress' : status;
-}
-
-function goToAudit(auditId: number) {
-    router.push({ name: 'audit-management-review', params: { id: String(auditId) } });
 }
 
 // ── Close dialog ──────────────────────────────────────────────────────────────
@@ -813,31 +684,6 @@ async function submitBulkReassign() {
         toast.add({ severity: 'error', summary: 'Error', detail: 'Bulk reassign failed.', life: 4000 });
     } finally {
         bulkSaving.value = false;
-    }
-}
-
-// ── Excel export ──────────────────────────────────────────────────────────────
-async function exportExcel() {
-    exportingXlsx.value = true;
-    try {
-        const params: Record<string, string> = {};
-        if (filterDivisionId.value)  params.divisionId  = String(filterDivisionId.value);
-        if (filterStatus.value)      params.status      = filterStatus.value;
-        if (filterSource.value)      params.source      = filterSource.value;
-        if (filterPriority.value)    params.priority    = filterPriority.value;
-        if (filterOverdueOnly.value) params.overdueOnly = 'true';
-        if (filterSearch.value)      params.searchText  = filterSearch.value;
-        const blob = await service.downloadBlob('/v1/corrective-actions/export', params);
-        const blobUrl = URL.createObjectURL(new Blob([blob], {
-            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        }));
-        const link    = document.createElement('a');
-        link.href     = blobUrl;
-        link.download = `corrective-actions-${new Date().toISOString().split('T')[0]}.xlsx`;
-        link.click();
-        URL.revokeObjectURL(blobUrl);
-    } finally {
-        exportingXlsx.value = false;
     }
 }
 

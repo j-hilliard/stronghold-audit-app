@@ -108,6 +108,14 @@ export function useReportKpis(report: Ref<AuditReportDto | null>) {
         return 'text-red-400';
     });
 
+    const scoreVariant = computed<'success' | 'warning' | 'danger' | 'default'>(() => {
+        const pct = report.value?.avgScorePercent;
+        if (pct == null) return 'default';
+        if (pct >= 90)   return 'success';
+        if (pct >= 75)   return 'warning';
+        return 'danger';
+    });
+
     function rowScoreColor(pct: number | null | undefined): string {
         if (pct == null) return 'text-slate-400';
         if (pct >= 90)   return 'text-emerald-400 font-semibold';
@@ -116,12 +124,18 @@ export function useReportKpis(report: Ref<AuditReportDto | null>) {
     }
 
     function statusSeverity(status: string): string {
-        const map: Record<string, string> = { Draft: 'warning', Submitted: 'info', Reopened: 'warning', Closed: 'success' };
+        const map: Record<string, string> = {
+            Draft: 'warning', Submitted: 'info', Reopened: 'warning',
+            UnderReview: 'contrast', Approved: 'success', Distributed: 'secondary', Closed: 'secondary',
+        };
         return map[status] ?? 'secondary';
     }
 
     function auditStatusSeverity(status: string): string {
-        const map: Record<string, string> = { Draft: 'warning', Submitted: 'info', Reopened: 'warning', Closed: 'success' };
+        const map: Record<string, string> = {
+            Draft: 'warning', Submitted: 'info', Reopened: 'warning',
+            UnderReview: 'contrast', Approved: 'success', Distributed: 'secondary', Closed: 'secondary',
+        };
         return map[status] ?? 'secondary';
     }
 
@@ -160,7 +174,7 @@ export function useReportKpis(report: Ref<AuditReportDto | null>) {
         KPI_CARDS, hidden, hideSection, toggleCard, showAll, hideAll,
         customizePanelRef, toggleCustomize,
         trendDeltas, correctedOnSitePct, caAgingStats,
-        scoreColor, rowScoreColor, statusSeverity, auditStatusSeverity,
+        scoreColor, scoreVariant, rowScoreColor, statusSeverity, auditStatusSeverity,
         sectionRateColor, sectionRateBorder,
         SECTION_SHORT, sectionKpiCards,
     };

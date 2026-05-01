@@ -23,9 +23,13 @@ export function useAuditReportData() {
     const filterSection      = ref<string | null>((route.query.section as string) || null);
 
     const STATUS_OPTIONS = [
-        { label: 'Submitted', value: 'Submitted' },
-        { label: 'Closed',    value: 'Closed'    },
-        { label: 'Draft',     value: 'Draft'      },
+        { label: 'Draft',        value: 'Draft'        },
+        { label: 'Submitted',    value: 'Submitted'    },
+        { label: 'Reopened',     value: 'Reopened'     },
+        { label: 'Under Review', value: 'UnderReview'  },
+        { label: 'Approved',     value: 'Approved'     },
+        { label: 'Distributed',  value: 'Distributed'  },
+        { label: 'Closed',       value: 'Closed'       },
     ];
 
     // ── API calls ─────────────────────────────────────────────────────────────

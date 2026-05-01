@@ -22,8 +22,9 @@
         </div>
 
         <div v-else>
-            <div v-if="highlights.length === 0" class="text-sm text-slate-600 italic py-4 text-center">
-                No highlights written yet. Click this section to add highlights.
+            <div v-if="highlights.length === 0" class="flex flex-col items-center gap-2 py-6 text-center">
+                <i class="pi pi-star text-slate-700 text-xl" />
+                <p class="text-xs text-slate-600">No highlights yet — click <strong class="text-slate-500 font-semibold">Edit</strong> (top-right) to add key takeaways.</p>
             </div>
             <ul v-else class="space-y-2">
                 <li

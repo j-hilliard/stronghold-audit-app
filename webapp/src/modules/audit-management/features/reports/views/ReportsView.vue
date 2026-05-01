@@ -134,75 +134,70 @@
 
             <!-- ── KPI Row 1: 4 headline numbers (first thing you see) ────────── -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div
+                <MetricCard
                     v-if="!hidden.kpiTotalAudits"
-                    class="kpi-card group relative"
-                    @click="router.push('/audit-management/audits')"
+                    label="Total Audits"
+                    :value="displayTotalAudits"
+                    variant="default"
+                    interactive
+                    :trend="trendDeltas.auditCountDelta"
+                    :trend-label="trendDeltas.auditCountDelta !== null ? (trendDeltas.auditCountDelta >= 0 ? '↑' : '↓') + ' ' + Math.abs(trendDeltas.auditCountDelta) + ' vs prior' : undefined"
                     data-testid="report-kpi-total-audits"
-                    title="View all audits"
+                    @click="router.push('/audit-management/audits')"
                 >
-                    <button @click.stop="hideSection('kpiTotalAudits')" class="kpi-hide-btn" title="Hide"><i class="pi pi-times" /></button>
-                    <div class="text-3xl font-bold text-white">{{ displayTotalAudits }}</div>
-                    <div class="text-xs text-slate-400 mt-1">Total Audits</div>
-                    <div v-if="trendDeltas.auditCountDelta !== null" class="text-xs mt-1"
-                        :class="trendDeltas.auditCountDelta >= 0 ? 'text-emerald-400' : 'text-red-400'">
-                        {{ trendDeltas.auditCountDelta >= 0 ? '↑' : '↓' }}
-                        {{ Math.abs(trendDeltas.auditCountDelta) }} vs prior period
-                    </div>
-                    <div class="kpi-tap-hint"><i class="pi pi-arrow-up-right" /></div>
-                </div>
-                <div
+                    <template #top-right>
+                        <button class="kpi-hide-btn" title="Hide" @click.stop="hideSection('kpiTotalAudits')"><i class="pi pi-times" /></button>
+                    </template>
+                </MetricCard>
+
+                <MetricCard
                     v-if="!hidden.kpiAvgConformance"
-                    class="kpi-card group relative"
+                    label="Avg Conformance"
+                    :value="report.avgScorePercent != null ? `${displayAvgScore}%` : '—'"
+                    :variant="scoreVariant"
+                    interactive
+                    :trend="trendDeltas.scoreDelta"
+                    :trend-label="trendDeltas.scoreDelta !== null ? (trendDeltas.scoreDelta >= 0 ? '↑' : '↓') + ' ' + Math.abs(trendDeltas.scoreDelta) + '% vs prior' : undefined"
                     @click="drillAllAudits"
-                    title="View all audits ranked by score"
                 >
-                    <button @click.stop="hideSection('kpiAvgConformance')" class="kpi-hide-btn" title="Hide"><i class="pi pi-times" /></button>
-                    <div :class="['text-3xl font-bold', scoreColor]">
-                        {{ report.avgScorePercent != null ? `${displayAvgScore}%` : '—' }}
-                    </div>
-                    <div class="text-xs text-slate-400 mt-1">Avg Conformance</div>
-                    <div v-if="trendDeltas.scoreDelta !== null" class="text-xs mt-1"
-                        :class="trendDeltas.scoreDelta >= 0 ? 'text-emerald-400' : 'text-red-400'">
-                        {{ trendDeltas.scoreDelta >= 0 ? '↑' : '↓' }}
-                        {{ Math.abs(trendDeltas.scoreDelta) }}% vs prior period
-                    </div>
-                    <div class="kpi-tap-hint"><i class="pi pi-arrow-up-right" /></div>
-                </div>
-                <div
+                    <template #top-right>
+                        <button class="kpi-hide-btn" title="Hide" @click.stop="hideSection('kpiAvgConformance')"><i class="pi pi-times" /></button>
+                    </template>
+                </MetricCard>
+
+                <MetricCard
                     v-if="!hidden.kpiNonConformances"
-                    class="kpi-card kpi-card--danger group relative"
-                    @click="drillByNcOnly"
+                    label="Non-Conformances"
+                    :value="displayNonConforming"
+                    variant="danger"
+                    interactive
+                    :trend="trendDeltas.ncDelta"
+                    trend-positive-direction="down"
+                    :trend-label="trendDeltas.ncDelta !== null ? (trendDeltas.ncDelta <= 0 ? '↓' : '↑') + ' ' + Math.abs(trendDeltas.ncDelta) + ' vs prior' : undefined"
                     data-testid="report-kpi-nc-count"
-                    title="Filter to audits with non-conformances"
+                    @click="drillByNcOnly"
                 >
-                    <button @click.stop="hideSection('kpiNonConformances')" class="kpi-hide-btn" title="Hide"><i class="pi pi-times" /></button>
-                    <div class="text-3xl font-bold text-red-400">{{ displayNonConforming }}</div>
-                    <div class="text-xs text-slate-400 mt-1">Non-Conformances</div>
-                    <div v-if="trendDeltas.ncDelta !== null" class="text-xs mt-1"
-                        :class="trendDeltas.ncDelta <= 0 ? 'text-emerald-400' : 'text-red-400'">
-                        {{ trendDeltas.ncDelta <= 0 ? '↓' : '↑' }}
-                        {{ Math.abs(trendDeltas.ncDelta) }} vs prior period
-                    </div>
-                    <div class="kpi-tap-hint"><i class="pi pi-arrow-up-right" /></div>
-                </div>
-                <div
+                    <template #top-right>
+                        <button class="kpi-hide-btn" title="Hide" @click.stop="hideSection('kpiNonConformances')"><i class="pi pi-times" /></button>
+                    </template>
+                </MetricCard>
+
+                <MetricCard
                     v-if="!hidden.kpiWarnings"
-                    class="kpi-card kpi-card--warn group relative"
-                    @click="drillByWarnOnly"
+                    label="Warnings"
+                    :value="displayWarnings"
+                    variant="warning"
+                    interactive
+                    :trend="trendDeltas.warnDelta"
+                    trend-positive-direction="down"
+                    :trend-label="trendDeltas.warnDelta !== null ? (trendDeltas.warnDelta <= 0 ? '↓' : '↑') + ' ' + Math.abs(trendDeltas.warnDelta) + ' vs prior' : undefined"
                     data-testid="report-kpi-warning-count"
-                    title="Filter to audits with warnings"
+                    @click="drillByWarnOnly"
                 >
-                    <button @click.stop="hideSection('kpiWarnings')" class="kpi-hide-btn" title="Hide"><i class="pi pi-times" /></button>
-                    <div class="text-3xl font-bold text-amber-400">{{ displayWarnings }}</div>
-                    <div class="text-xs text-slate-400 mt-1">Warnings</div>
-                    <div v-if="trendDeltas.warnDelta !== null" class="text-xs mt-1"
-                        :class="trendDeltas.warnDelta <= 0 ? 'text-emerald-400' : 'text-amber-400'">
-                        {{ trendDeltas.warnDelta <= 0 ? '↓' : '↑' }}
-                        {{ Math.abs(trendDeltas.warnDelta) }} vs prior period
-                    </div>
-                    <div class="kpi-tap-hint"><i class="pi pi-arrow-up-right" /></div>
-                </div>
+                    <template #top-right>
+                        <button class="kpi-hide-btn" title="Hide" @click.stop="hideSection('kpiWarnings')"><i class="pi pi-times" /></button>
+                    </template>
+                </MetricCard>
             </div>
 
             <!-- ── KPI Row 2: Wide summary cards ──────────────────────────────── -->
@@ -256,7 +251,7 @@
             <!-- ── Overdue CA Alert Banner ────────────────────────────────────── -->
             <div
                 v-if="overdueAlertCas.length > 0"
-                class="flex items-start gap-3 rounded-lg border border-red-700/50 bg-red-900/20 px-4 py-3 cursor-pointer hover:bg-red-900/30 transition-colors"
+                class="overdue-alert-banner"
                 @click="router.push('/audit-management/corrective-actions?overdueOnly=true')"
             >
                 <i class="pi pi-exclamation-circle text-red-400 text-lg mt-0.5 shrink-0" />
@@ -296,139 +291,6 @@
             <!-- ── Tab: Overview ─────────────────────────────────────────────── -->
             <template v-if="activeTab === 'overview'">
 
-                <!-- Division Health: collapsed by default -->
-                <div v-if="divisionHealthCards.length > 0" class="space-y-2">
-                    <button
-                        class="w-full flex items-center justify-between px-1 py-1.5 hover:bg-slate-800/40 rounded-lg transition-colors"
-                        @click="divisionHealthCollapsed = !divisionHealthCollapsed"
-                    >
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Division Health</span>
-                            <span class="text-xs text-slate-500">{{ divisionHealthCards.length }} division{{ divisionHealthCards.length === 1 ? '' : 's' }}</span>
-                            <span v-if="divisionHealthCollapsed" class="text-xs text-blue-400/60">· tap to expand</span>
-                        </div>
-                        <i :class="['text-slate-400 text-xs transition-transform duration-200', divisionHealthCollapsed ? 'pi pi-chevron-down' : 'pi pi-chevron-up']" />
-                    </button>
-                    <div v-show="!divisionHealthCollapsed"
-                        class="grid gap-3"
-                        :class="divisionHealthCards.length <= 2 ? 'grid-cols-1 sm:grid-cols-2' : divisionHealthCards.length <= 4 ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 md:grid-cols-3 xl:grid-cols-5'">
-                        <div
-                            v-for="div in divisionHealthCards"
-                            :key="div.divisionCode"
-                            class="division-health-card rounded-xl border bg-slate-800 p-4 flex flex-col gap-3 cursor-pointer hover:shadow-lg transition-all"
-                            :class="{
-                                'border-emerald-700/50 hover:border-emerald-600': div.complianceStatus === 'OnTrack',
-                                'border-amber-700/50 hover:border-amber-600': div.complianceStatus === 'DueSoon',
-                                'border-red-700/60 hover:border-red-600': div.complianceStatus === 'Overdue',
-                                'border-slate-700 hover:border-slate-600': div.complianceStatus === 'NoSchedule' || div.complianceStatus === 'NeverAudited',
-                            }"
-                            @click="filterByDivisionCode(div.divisionCode)"
-                        >
-                            <div class="flex items-start justify-between gap-2">
-                                <div>
-                                    <div class="text-base font-bold text-white">{{ div.divisionCode }}</div>
-                                    <div class="text-xs text-slate-400 mt-0.5 line-clamp-1">{{ div.divisionName }}</div>
-                                </div>
-                                <span
-                                    v-if="div.complianceStatus !== 'NoSchedule'"
-                                    class="shrink-0 text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide"
-                                    :class="{
-                                        'bg-emerald-900/50 text-emerald-300 border border-emerald-700/40': div.complianceStatus === 'OnTrack',
-                                        'bg-amber-900/50 text-amber-300 border border-amber-700/40': div.complianceStatus === 'DueSoon',
-                                        'bg-red-900/50 text-red-300 border border-red-700/40': div.complianceStatus === 'Overdue',
-                                        'bg-slate-700/50 text-slate-400 border border-slate-600/40': div.complianceStatus === 'NeverAudited',
-                                    }"
-                                >
-                                    <i class="mr-0.5" :class="{
-                                        'pi pi-check-circle': div.complianceStatus === 'OnTrack',
-                                        'pi pi-clock': div.complianceStatus === 'DueSoon',
-                                        'pi pi-exclamation-triangle': div.complianceStatus === 'Overdue',
-                                        'pi pi-minus-circle': div.complianceStatus === 'NeverAudited',
-                                    }" />
-                                    {{ { OnTrack: 'On Track', DueSoon: 'Due Soon', Overdue: 'Overdue', NeverAudited: 'Never Audited' }[div.complianceStatus] ?? div.complianceStatus }}
-                                </span>
-                            </div>
-                            <div class="flex items-center gap-3">
-                                <div
-                                    class="text-2xl font-bold leading-none"
-                                    :class="div.avgScore == null ? 'text-slate-500' : div.avgScore >= 90 ? 'text-emerald-400' : div.avgScore >= 75 ? 'text-amber-400' : 'text-red-400'"
-                                >
-                                    {{ div.avgScore != null ? `${div.avgScore}%` : '—' }}
-                                </div>
-                                <div class="flex-1 h-1.5 rounded-full bg-slate-700 overflow-hidden">
-                                    <div
-                                        v-if="div.avgScore != null"
-                                        class="h-full rounded-full transition-all"
-                                        :style="`width: ${div.avgScore}%`"
-                                        :class="div.avgScore >= 90 ? 'bg-emerald-500' : div.avgScore >= 75 ? 'bg-amber-500' : 'bg-red-500'"
-                                    />
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-3 gap-1 border-t border-slate-700/60 pt-2.5">
-                                <div class="text-center">
-                                    <div class="text-sm font-semibold text-white">{{ div.auditCount }}</div>
-                                    <div class="text-[10px] text-slate-500">Audits</div>
-                                </div>
-                                <div class="text-center">
-                                    <div class="text-sm font-semibold" :class="div.totalNcs > 0 ? 'text-red-400' : 'text-slate-400'">{{ div.totalNcs }}</div>
-                                    <div class="text-[10px] text-slate-500">NCs</div>
-                                </div>
-                                <div class="text-center">
-                                    <div class="text-sm font-semibold" :class="div.openCaCount > 0 ? 'text-amber-400' : 'text-slate-400'">{{ div.openCaCount }}</div>
-                                    <div class="text-[10px] text-slate-500">Open CAs</div>
-                                </div>
-                            </div>
-                            <div class="text-[11px] text-slate-500 -mt-1">
-                                Last audit: {{ div.lastAuditDate ?? 'Never' }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Recent Audits -->
-                <div v-if="recentAuditFeed.length > 0" class="space-y-2">
-                    <div class="flex items-center justify-between px-1">
-                        <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Recent Audits</span>
-                        <button @click="router.push('/audit-management/audits')" class="text-xs text-blue-400 hover:text-blue-300 transition-colors">View all →</button>
-                    </div>
-                    <div class="rounded-xl border border-slate-700 bg-slate-800 overflow-hidden">
-                        <div
-                            v-for="(audit, i) in recentAuditFeed"
-                            :key="audit.id"
-                            class="flex items-center gap-3 px-4 py-3 hover:bg-slate-750 cursor-pointer transition-colors group"
-                            :class="i > 0 ? 'border-t border-slate-700/50' : ''"
-                            @click="router.push(audit.status === 'Draft' ? `/audit-management/audits/${audit.id}` : `/audit-management/audits/${audit.id}/review`)"
-                        >
-                            <div
-                                class="w-11 h-11 rounded-lg flex items-center justify-center text-sm font-bold shrink-0"
-                                :class="audit.scorePercent == null ? 'bg-slate-700 text-slate-400'
-                                    : audit.scorePercent >= 90 ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700/40'
-                                    : audit.scorePercent >= 75 ? 'bg-amber-900/60 text-amber-300 border border-amber-700/40'
-                                    : 'bg-red-900/60 text-red-300 border border-red-700/40'"
-                            >
-                                {{ audit.scorePercent != null ? `${audit.scorePercent}%` : '—' }}
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-2 flex-wrap">
-                                    <span class="text-sm font-medium text-white">{{ audit.divisionCode }}</span>
-                                    <Tag :value="audit.status" :severity="auditStatusSeverity(audit.status)" class="text-[11px]" />
-                                    <span v-if="audit.nonConformingCount > 0" class="text-[11px] text-red-400">
-                                        {{ audit.nonConformingCount }} NC{{ audit.nonConformingCount === 1 ? '' : 's' }}
-                                    </span>
-                                </div>
-                                <div class="text-xs text-slate-400 mt-0.5">
-                                    {{ audit.auditor ?? 'No auditor' }}
-                                    <span v-if="audit.jobNumber"> · {{ audit.jobNumber }}</span>
-                                </div>
-                            </div>
-                            <div class="text-right shrink-0">
-                                <div class="text-xs text-slate-400">{{ audit.auditDate ?? '—' }}</div>
-                                <i class="pi pi-arrow-right text-xs text-slate-600 group-hover:text-slate-400 transition-colors mt-1" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Empty state -->
                 <div v-if="divisionHealthCards.length === 0 && recentAuditFeed.length === 0"
                     class="text-center py-12 text-slate-400">
@@ -436,6 +298,169 @@
                     <p class="text-sm">No audit data yet.</p>
                     <p class="text-xs mt-1 opacity-70">Create an audit to see data here.</p>
                 </div>
+
+                <!-- Two-column layout: Division Health (left) + Recent Audits (right) -->
+                <div v-else class="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+
+                    <!-- Left: Division Health (2/3 width on xl+) -->
+                    <div class="xl:col-span-2 space-y-2">
+                        <div v-if="divisionHealthCards.length > 0">
+                            <button
+                                class="w-full flex items-center justify-between px-1 py-1.5 hover:bg-slate-800/40 rounded-lg transition-colors"
+                                @click="divisionHealthCollapsed = !divisionHealthCollapsed"
+                            >
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Division Health</span>
+                                    <span class="text-xs text-slate-500">{{ divisionHealthCards.length }} division{{ divisionHealthCards.length === 1 ? '' : 's' }}</span>
+                                    <span v-if="divisionHealthCollapsed" class="text-xs text-blue-400/60">· tap to expand</span>
+                                </div>
+                                <i :class="['text-slate-400 text-xs transition-transform duration-200', divisionHealthCollapsed ? 'pi pi-chevron-down' : 'pi pi-chevron-up']" />
+                            </button>
+                            <div v-show="!divisionHealthCollapsed"
+                                class="grid gap-3 mt-2"
+                                :class="divisionHealthCards.length <= 2 ? 'grid-cols-1 sm:grid-cols-2' : divisionHealthCards.length <= 4 ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3'">
+                                <div
+                                    v-for="div in divisionHealthCards"
+                                    :key="div.divisionCode"
+                                    class="division-health-card rounded-xl border bg-slate-800 p-4 flex flex-col gap-3 cursor-pointer hover:shadow-lg transition-all"
+                                    :class="{
+                                        'border-emerald-700/50 hover:border-emerald-600': div.complianceStatus === 'OnTrack',
+                                        'border-amber-700/50 hover:border-amber-600': div.complianceStatus === 'DueSoon',
+                                        'border-red-700/60 hover:border-red-600': div.complianceStatus === 'Overdue',
+                                        'border-slate-700 hover:border-slate-600': div.complianceStatus === 'NoSchedule' || div.complianceStatus === 'NeverAudited',
+                                    }"
+                                    @click="filterByDivisionCode(div.divisionCode)"
+                                >
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div>
+                                            <div class="text-base font-bold text-white">{{ div.divisionCode }}</div>
+                                            <div class="text-xs text-slate-400 mt-0.5 line-clamp-1">{{ div.divisionName }}</div>
+                                        </div>
+                                        <span
+                                            v-if="div.complianceStatus !== 'NoSchedule'"
+                                            class="shrink-0 text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide"
+                                            :class="{
+                                                'bg-emerald-900/50 text-emerald-300 border border-emerald-700/40': div.complianceStatus === 'OnTrack',
+                                                'bg-amber-900/50 text-amber-300 border border-amber-700/40': div.complianceStatus === 'DueSoon',
+                                                'bg-red-900/50 text-red-300 border border-red-700/40': div.complianceStatus === 'Overdue',
+                                                'bg-slate-700/50 text-slate-400 border border-slate-600/40': div.complianceStatus === 'NeverAudited',
+                                            }"
+                                        >
+                                            <i class="mr-0.5" :class="{
+                                                'pi pi-check-circle': div.complianceStatus === 'OnTrack',
+                                                'pi pi-clock': div.complianceStatus === 'DueSoon',
+                                                'pi pi-exclamation-triangle': div.complianceStatus === 'Overdue',
+                                                'pi pi-minus-circle': div.complianceStatus === 'NeverAudited',
+                                            }" />
+                                            {{ { OnTrack: 'On Track', DueSoon: 'Due Soon', Overdue: 'Overdue', NeverAudited: 'Never Audited' }[div.complianceStatus] ?? div.complianceStatus }}
+                                        </span>
+                                    </div>
+                                    <!-- Score row: large number + prominent bar -->
+                                    <div class="flex items-center gap-3">
+                                        <div
+                                            class="text-2xl font-bold leading-none tabular-nums shrink-0"
+                                            :class="div.avgScore == null ? 'text-slate-500' : div.avgScore >= 90 ? 'text-emerald-400' : div.avgScore >= 75 ? 'text-amber-400' : 'text-red-400'"
+                                        >
+                                            {{ div.avgScore != null ? `${div.avgScore}%` : '—' }}
+                                        </div>
+                                        <!-- Score gauge — h-3 so it reads as a real bar, not a hairline -->
+                                        <div class="relative flex-1 h-3 rounded-full bg-slate-700 overflow-hidden">
+                                            <div
+                                                v-if="div.avgScore != null"
+                                                class="h-full rounded-full transition-all duration-500"
+                                                :style="`width: ${div.avgScore}%`"
+                                                :class="div.avgScore >= 90 ? 'bg-emerald-500' : div.avgScore >= 75 ? 'bg-amber-500' : 'bg-red-500'"
+                                            />
+                                            <!-- Threshold markers at 75% and 90% -->
+                                            <div class="absolute top-0 bottom-0 w-px bg-white/20" style="left: 75%;" />
+                                            <div class="absolute top-0 bottom-0 w-px bg-white/20" style="left: 90%;" />
+                                        </div>
+                                    </div>
+                                    <!-- Audit frequency dots — visual density indicator -->
+                                    <div class="flex items-center gap-1" title="Audit frequency (each dot = 1 audit)">
+                                        <div
+                                            v-for="n in Math.min(div.auditCount, 10)"
+                                            :key="n"
+                                            class="h-1.5 flex-1 rounded-sm"
+                                            :class="div.avgScore == null ? 'bg-slate-600' : div.avgScore >= 90 ? 'bg-emerald-500/60' : div.avgScore >= 75 ? 'bg-amber-500/60' : 'bg-red-500/60'"
+                                        />
+                                        <div
+                                            v-for="n in Math.max(0, 10 - div.auditCount)"
+                                            :key="'e' + n"
+                                            class="h-1.5 flex-1 rounded-sm bg-slate-700/50"
+                                        />
+                                    </div>
+                                    <div class="grid grid-cols-3 gap-1 border-t border-slate-700/60 pt-2.5">
+                                        <div class="text-center">
+                                            <div class="text-sm font-semibold text-white">{{ div.auditCount }}</div>
+                                            <div class="text-[10px] text-slate-500">Audits</div>
+                                        </div>
+                                        <div class="text-center">
+                                            <div class="text-sm font-semibold" :class="div.totalNcs > 0 ? 'text-red-400' : 'text-slate-400'">{{ div.totalNcs }}</div>
+                                            <div class="text-[10px] text-slate-500">NCs</div>
+                                        </div>
+                                        <div class="text-center">
+                                            <div class="text-sm font-semibold" :class="div.openCaCount > 0 ? 'text-amber-400' : 'text-slate-400'">{{ div.openCaCount }}</div>
+                                            <div class="text-[10px] text-slate-500">Open CAs</div>
+                                        </div>
+                                    </div>
+                                    <div class="text-[11px] text-slate-500 -mt-1">
+                                        Last audit: {{ div.lastAuditDate ?? 'Never' }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Recent Audits (1/3 width on xl+) -->
+                    <div class="space-y-2">
+                        <div v-if="recentAuditFeed.length > 0">
+                            <div class="flex items-center justify-between px-1 mb-2">
+                                <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Recent Audits</span>
+                                <button @click="router.push('/audit-management/audits')" class="text-xs text-blue-400 hover:text-blue-300 transition-colors">View all →</button>
+                            </div>
+                            <div class="recent-audits-list rounded-xl border border-slate-700/60 overflow-hidden">
+                                <div
+                                    v-for="(audit, i) in recentAuditFeed"
+                                    :key="audit.id"
+                                    class="recent-audit-row flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors group"
+                                    :class="i > 0 ? 'border-t border-slate-700/40' : ''"
+                                    @click="router.push(audit.status === 'Draft' || audit.status === 'Reopened' ? `/audit-management/audits/${audit.id}` : `/audit-management/audits/${audit.id}/review`)"
+                                >
+                                    <!-- Score badge -->
+                                    <div
+                                        class="w-10 h-10 rounded-lg flex flex-col items-center justify-center shrink-0 border"
+                                        :class="audit.scorePercent == null
+                                            ? 'bg-slate-800 border-slate-600/50 text-slate-500'
+                                            : audit.scorePercent >= 90 ? 'bg-emerald-900/50 border-emerald-700/50 text-emerald-300'
+                                            : audit.scorePercent >= 75 ? 'bg-amber-900/50 border-amber-700/50 text-amber-300'
+                                            : 'bg-red-900/50 border-red-700/50 text-red-300'"
+                                    >
+                                        <span class="text-xs font-bold leading-none">{{ audit.scorePercent != null ? `${audit.scorePercent}%` : '—' }}</span>
+                                    </div>
+
+                                    <!-- Main content -->
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="text-sm font-semibold text-slate-100">{{ audit.divisionCode }}</span>
+                                            <Tag :value="auditStatusLabel(audit.status)" :severity="auditStatusSeverity(audit.status)" class="!text-[10px] !px-1.5 !py-0.5" />
+                                            <span v-if="audit.nonConformingCount > 0"
+                                                class="inline-flex items-center gap-0.5 text-[11px] font-semibold text-red-400 bg-red-950/40 border border-red-800/30 rounded px-1.5 py-0.5">
+                                                <i class="pi pi-exclamation-triangle text-[9px]" />
+                                                {{ audit.nonConformingCount }} NC
+                                            </span>
+                                        </div>
+                                        <div class="text-[11px] text-slate-500 mt-0.5 tabular-nums">{{ audit.auditDate ?? '—' }}</div>
+                                    </div>
+
+                                    <!-- Arrow -->
+                                    <i class="pi pi-chevron-right text-[10px] text-slate-600 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div><!-- /two-column -->
 
             </template><!-- /overview -->
 
@@ -632,7 +657,7 @@
                     </template>
                     <template #content>
                         <div v-show="!collapsed.openCAs">
-                        <DataTable :value="report.openCorrectiveActions" :rows="10" paginator sortField="dueDate" :sortOrder="1" class="stronghold-table text-sm">
+                        <DataTable :value="report.openCorrectiveActions" :rows="10" paginator sortField="dueDate" :sortOrder="1" class="stronghold-table text-sm" :row-class="(r: any) => r.isOverdue ? 'row--overdue' : ''">
                             <Column field="id" header="CA #" style="width:60px" sortable />
                             <Column field="auditId" header="Audit #" style="width:80px" sortable />
                             <Column field="description" header="Description">
@@ -643,7 +668,7 @@
                             </Column>
                             <Column field="dueDate" header="Due Date" sortable>
                                 <template #body="{ data }">
-                                    <span :class="data.isOverdue ? 'text-red-400 font-semibold' : ''">{{ data.dueDate ?? '—' }}</span>
+                                    <span :class="data.isOverdue ? 'text-[color:var(--color-danger)] font-semibold' : ''">{{ data.dueDate ?? '—' }}</span>
                                 </template>
                             </Column>
                             <Column field="daysOpen" header="Age" sortable style="width:80px">
@@ -818,6 +843,7 @@ import SplitButton from 'primevue/splitbutton';
 import Menu from 'primevue/menu';
 import OverlayPanel from 'primevue/overlaypanel';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
+import MetricCard from '@/components/ui/MetricCard.vue';
 import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
 import { useAuditReportData } from '../composables/useAuditReportData';
 import { useReportKpis } from '../composables/useReportKpis';
@@ -844,7 +870,7 @@ const {
     KPI_CARDS, hidden, hideSection, toggleCard, showAll, hideAll,
     customizePanelRef, toggleCustomize,
     trendDeltas, correctedOnSitePct, caAgingStats,
-    scoreColor, rowScoreColor, statusSeverity, auditStatusSeverity,
+    scoreColor, scoreVariant, rowScoreColor, statusSeverity, auditStatusSeverity,
     sectionRateColor, sectionRateBorder, SECTION_SHORT, sectionKpiCards,
 } = useReportKpis(report);
 
@@ -869,25 +895,49 @@ const {
 
 // Wire location chart click → drilldown
 locationDrillCallback.value = drillByLocation;
+
+function auditStatusLabel(status: string): string {
+    const labels: Record<string, string> = {
+        Draft: 'Draft', Submitted: 'Submitted', Reopened: 'Reopened',
+        UnderReview: 'In Review', Approved: 'Approved', Distributed: 'Distributed', Closed: 'Closed',
+    };
+    return labels[status] ?? status;
+}
 </script>
 
 <style scoped>
-/* ── Interactive KPI cards ───────────────────────────────────────────────────── */
+/* ── Overdue CA alert banner ─────────────────────────────────────────────────── */
+.overdue-alert-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    border-radius: var(--radius-card);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    background: rgba(239, 68, 68, 0.08);
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: background var(--transition-base);
+}
+.overdue-alert-banner:hover {
+    background: rgba(239, 68, 68, 0.13);
+}
+
+/* ── Wide summary KPI cards (Row 2 only — headline Row 1 uses MetricCard) ────── */
 .kpi-card {
-    background: rgb(30, 41, 59);
-    border: 1px solid rgb(51, 65, 85);
-    border-radius: 0.5rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
     padding: 1rem;
     text-align: center;
     cursor: pointer;
-    transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    transition: box-shadow var(--transition-slow), transform var(--transition-slow), border-color var(--transition-slow);
 }
 .kpi-card:hover {
     box-shadow: 0 0 0 1px rgba(99, 179, 237, 0.4), 0 8px 28px rgba(0, 0, 0, 0.55);
     transform: translateY(-3px);
     border-color: rgba(99, 179, 237, 0.45);
 }
-.kpi-card--danger { border-color: rgba(127, 29, 29, 0.5); }
+.kpi-card--danger { border-color: rgba(var(--color-danger), 0.3); }
 .kpi-card--danger:hover {
     box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.45), 0 8px 28px rgba(0, 0, 0, 0.55);
     border-color: rgba(239, 68, 68, 0.5);
@@ -1005,8 +1055,21 @@ locationDrillCallback.value = drillByLocation;
     transform: translateY(-2px);
 }
 
-/* ── Recent activity hover ────────────────────────────────────────────────────── */
-.bg-slate-750 {
-    background-color: rgba(51, 65, 85, 0.6);
+/* ── Recent Audits list ───────────────────────────────────────────────────────── */
+.recent-audits-list {
+    background: var(--surface-2, #1e293b);
+}
+.recent-audit-row {
+    background: transparent;
+    transition: background 0.12s ease;
+}
+.recent-audit-row:hover {
+    background: rgba(99, 179, 237, 0.06);
+}
+.recent-audit-row:first-child:hover {
+    border-radius: 0.75rem 0.75rem 0 0;
+}
+.recent-audit-row:last-child:hover {
+    border-radius: 0 0 0.75rem 0.75rem;
 }
 </style>

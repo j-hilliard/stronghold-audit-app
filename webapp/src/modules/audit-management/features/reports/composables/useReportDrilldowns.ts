@@ -105,11 +105,12 @@ export function useReportDrilldowns({ report, openQSummary }: DrilldownOptions) 
     const reportsMenuRef = ref<any>(null);
 
     const reportsMenuItems = [
+        { label: 'Newsletter',        icon: 'pi pi-envelope',  command: () => router.push('/audit-management/newsletter')          },
+        { label: 'Quarterly Summary', icon: 'pi pi-print',     command: openQSummary },
+        { separator: true },
         { label: 'Report Composer',   icon: 'pi pi-file-edit', command: () => router.push('/audit-management/reports/composer')    },
         { label: 'Generate PDF',      icon: 'pi pi-file-pdf',  command: () => router.push('/audit-management/reports/gallery')     },
-        { separator: true },
         { label: 'By Employee',       icon: 'pi pi-users',     command: () => router.push('/audit-management/reports/by-employee') },
-        { label: 'Quarterly Summary', icon: 'pi pi-print',     command: openQSummary },
     ];
 
     function toggleReportsMenu(event: Event) { reportsMenuRef.value?.toggle(event); }

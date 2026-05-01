@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Stronghold.AppDashboard.Api.Authorization;
 using Stronghold.AppDashboard.Api.Services;
 using Stronghold.AppDashboard.Data;
+using Stronghold.AppDashboard.Data.Models.Audit;
 using Stronghold.AppDashboard.Shared.Enumerations;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
@@ -17,6 +18,9 @@ public class SendDistributionEmail : IRequest<Unit>
     public string SentBy { get; set; } = null!;
     public List<int> AttachmentIds { get; set; } = new();
     public string? SubjectOverride { get; set; }
+    public bool IncludeCorrectiveActions { get; set; }
+    public bool IncludeOpenCasOnly { get; set; }
+    public string? Message { get; set; }
 }
 
 public class SendDistributionEmailHandler : IRequestHandler<SendDistributionEmail, Unit>
@@ -49,6 +53,11 @@ public class SendDistributionEmailHandler : IRequestHandler<SendDistributionEmai
             .FirstOrDefaultAsync(a => a.Id == request.AuditId, cancellationToken)
             ?? throw new KeyNotFoundException($"Audit {request.AuditId} not found.");
 
+        // Audit must be Approved (or already Distributed for resends) before distribution can be sent
+        if (audit.Status != "Approved" && audit.Status != "Distributed")
+            throw new InvalidOperationException(
+                $"Audit must be Approved before sending distribution. Current status: '{audit.Status}'.");
+
         // ── Collect recipients ────────────────────────────────────────────────
         var divisionRecipients = await _context.EmailRoutingRules
             .Where(r => r.DivisionId == audit.DivisionId && r.IsActive)
@@ -68,13 +77,43 @@ public class SendDistributionEmailHandler : IRequestHandler<SendDistributionEmai
         }
         else
         {
-            await SendEmailAsync(audit, allRecipients, request.AttachmentIds, request.SubjectOverride, cancellationToken);
+            await SendEmailAsync(audit, allRecipients, request.AttachmentIds, request.SubjectOverride,
+                request.IncludeCorrectiveActions, request.IncludeOpenCasOnly, request.Message, cancellationToken);
         }
 
-        // ── Mark reviewed ─────────────────────────────────────────────────────
-        audit.ReviewedAt = DateTime.UtcNow;
+        // ── Mark distributed ──────────────────────────────────────────────────
+        var now = DateTime.UtcNow;
+        audit.ReviewedAt = now;
         audit.ReviewedBy = request.SentBy;
+        if (audit.Status == "Approved")
+            audit.Status = "Distributed";
+        audit.UpdatedAt = now;
+        audit.UpdatedBy = request.SentBy;
         await _context.SaveChangesAsync(cancellationToken);
+
+        // ── In-app notification to the auditor ────────────────────────────────
+        if (!string.IsNullOrWhiteSpace(audit.CreatedBy))
+        {
+            try
+            {
+                _context.AppNotifications.Add(new AppNotification
+                {
+                    RecipientEmail = audit.CreatedBy,
+                    Type           = "AuditDistributed",
+                    Title          = "Audit Distributed",
+                    Body           = $"Audit {audit.TrackingNumber ?? $"#{audit.Id}"} has been distributed to stakeholders.",
+                    EntityType     = "Audit",
+                    EntityId       = audit.Id,
+                    LinkUrl        = $"/audit-management/audits/{audit.Id}/review",
+                    CreatedAt      = now,
+                });
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning("SendDistributionEmail: failed to create in-app notification for audit {AuditId}: {Error}", request.AuditId, ex.Message);
+            }
+        }
 
         return Unit.Value;
     }
@@ -84,6 +123,9 @@ public class SendDistributionEmailHandler : IRequestHandler<SendDistributionEmai
         List<string> recipients,
         List<int> attachmentIds,
         string? subjectOverride,
+        bool includeCorrectiveActions,
+        bool includeOpenCasOnly,
+        string? message,
         CancellationToken ct)
     {
         try
@@ -110,12 +152,13 @@ public class SendDistributionEmailHandler : IRequestHandler<SendDistributionEmai
                 ? subjectOverride
                 : $"[{divCode}] Compliance Audit Distribution — {auditDate}";
 
-            // ── Review summary block ──────────────────────────────────────────
-            var summaryBlock = !string.IsNullOrWhiteSpace(audit.ReviewSummary)
+            // ── Review summary block (message param takes priority over saved summary) ─
+            var effectiveSummary = !string.IsNullOrWhiteSpace(message) ? message : audit.ReviewSummary;
+            var summaryBlock = !string.IsNullOrWhiteSpace(effectiveSummary)
                 ? $"""
                   <div style="margin:20px 0;padding:14px 16px;background:#f8fafc;border-left:4px solid #1e3a5f;border-radius:0 4px 4px 0;">
                     <p style="margin:0 0 6px 0;font-size:12px;font-weight:bold;color:#1e3a5f;text-transform:uppercase;letter-spacing:0.5px;">Findings Summary</p>
-                    <p style="margin:0;color:#1e293b;font-size:14px;line-height:1.7;white-space:pre-wrap;">{System.Net.WebUtility.HtmlEncode(audit.ReviewSummary)}</p>
+                    <p style="margin:0;color:#1e293b;font-size:14px;line-height:1.7;white-space:pre-wrap;">{System.Net.WebUtility.HtmlEncode(effectiveSummary)}</p>
                   </div>
                   """
                 : string.Empty;
@@ -131,15 +174,26 @@ public class SendDistributionEmailHandler : IRequestHandler<SendDistributionEmai
             {
                 var rows = string.Join("", findings.Select((f, i) =>
                 {
-                    var cas = f.CorrectiveActions.Where(ca => !ca.IsDeleted).OrderBy(ca => ca.CreatedAt).ToList();
-                    var caRows = cas.Count == 0
-                        ? "<tr><td colspan=\"3\" style=\"padding:4px 8px;color:#94a3b8;font-size:12px;\">No corrective actions assigned</td></tr>"
-                        : string.Join("", cas.Select(ca =>
-                            $"<tr>" +
-                            $"<td style=\"padding:4px 8px 4px 24px;font-size:12px;color:#475569;\">{System.Net.WebUtility.HtmlEncode(ca.Description ?? "—")}</td>" +
-                            $"<td style=\"padding:4px 8px;font-size:12px;color:#475569;\">{System.Net.WebUtility.HtmlEncode(ca.AssignedTo ?? "Unassigned")}</td>" +
-                            $"<td style=\"padding:4px 8px;font-size:12px;color:#475569;\">{ca.DueDate?.ToString("MM/dd/yyyy") ?? "—"}</td>" +
-                            $"</tr>"));
+                    string caRows;
+                    if (!includeCorrectiveActions)
+                    {
+                        caRows = string.Empty;
+                    }
+                    else
+                    {
+                        var cas = f.CorrectiveActions
+                            .Where(ca => !ca.IsDeleted && (!includeOpenCasOnly || ca.Status != "Resolved"))
+                            .OrderBy(ca => ca.CreatedAt)
+                            .ToList();
+                        caRows = cas.Count == 0
+                            ? "<tr><td colspan=\"3\" style=\"padding:4px 8px;color:#94a3b8;font-size:12px;\">No corrective actions assigned</td></tr>"
+                            : string.Join("", cas.Select(ca =>
+                                $"<tr>" +
+                                $"<td style=\"padding:4px 8px 4px 24px;font-size:12px;color:#475569;\">{System.Net.WebUtility.HtmlEncode(ca.Description ?? "—")}</td>" +
+                                $"<td style=\"padding:4px 8px;font-size:12px;color:#475569;\">{System.Net.WebUtility.HtmlEncode(ca.AssignedTo ?? "Unassigned")}</td>" +
+                                $"<td style=\"padding:4px 8px;font-size:12px;color:#475569;\">{ca.DueDate?.ToString("MM/dd/yyyy") ?? "—"}</td>" +
+                                $"</tr>"));
+                    }
 
                     return $"""
                         <tr style="background:{((i % 2 == 0) ? "#fff" : "#f8fafc")}">
@@ -152,13 +206,19 @@ public class SendDistributionEmailHandler : IRequestHandler<SendDistributionEmai
                         """;
                 }));
 
+                var caHeaders = includeCorrectiveActions
+                    ? """
+                      <th style="padding:8px;color:#fff;text-align:left;font-size:12px;">Assigned To</th>
+                      <th style="padding:8px;color:#fff;text-align:left;font-size:12px;">Due Date</th>
+                      """
+                    : string.Empty;
+
                 findingsBlock = $"""
                     <table style="width:100%;border-collapse:collapse;font-size:13px;">
                       <thead>
                         <tr style="background:#1e3a5f;">
-                          <th style="padding:8px;color:#fff;text-align:left;font-size:12px;">Finding / Corrective Action</th>
-                          <th style="padding:8px;color:#fff;text-align:left;font-size:12px;">Assigned To</th>
-                          <th style="padding:8px;color:#fff;text-align:left;font-size:12px;">Due Date</th>
+                          <th style="padding:8px;color:#fff;text-align:left;font-size:12px;">Finding</th>
+                          {caHeaders}
                         </tr>
                       </thead>
                       <tbody>{rows}</tbody>

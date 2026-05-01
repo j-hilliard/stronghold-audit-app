@@ -10,7 +10,7 @@ using Stronghold.AppDashboard.Shared.Enumerations;
 namespace Stronghold.AppDashboard.Api.Authorization;
 
 /// <summary>Cached entry stored per user — avoids DB round trips on every request.</summary>
-internal sealed record UserAuthCacheEntry(int UserId, List<string> Roles, List<int> DivisionIds);
+internal sealed record UserAuthCacheEntry(int UserId, string UserEmail, List<string> Roles, List<int> DivisionIds);
 
 /// <summary>
 /// Roles that bypass the division-scope filter — these users see all divisions.
@@ -82,7 +82,7 @@ public class AuthorizationBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
             var localUser = await _appDbContext.Users.FirstOrDefaultAsync(
                 u => u.AzureAdObjectId == Guid.Empty, cancellationToken);
             var localIsGlobal = overrideRoles.Any(r => GlobalAuditRoles.Names.Contains(r));
-            _auditUserContext.Initialize(localUser?.UserId ?? 0, localIsGlobal, []);
+            _auditUserContext.Initialize(localUser?.UserId ?? 0, localUser?.Email ?? string.Empty, localIsGlobal, false, []);
 
             var devAttribute = Attribute.GetCustomAttribute(request.GetType(), typeof(AllowedAuthorizationRole))
                 as AllowedAuthorizationRole;
@@ -172,7 +172,7 @@ public class AuthorizationBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
 
             var currentUser = await _appDbContext.Users
                 .Where(u => u.AzureAdObjectId == guidAzureAdObjectId)
-                .Select(u => new { u.UserId })
+                .Select(u => new { u.UserId, u.Email })
                 .FirstOrDefaultAsync(cancellationToken);
             if (currentUser == null)
                 throw new UnauthorizedAccessException("User not found in the database");
@@ -191,13 +191,21 @@ public class AuthorizationBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
                 .Select(ud => ud.DivisionId)
                 .ToListAsync(cancellationToken);
 
-            authEntry = new UserAuthCacheEntry(currentUser.UserId, roles, divisionIds);
+            authEntry = new UserAuthCacheEntry(currentUser.UserId, currentUser.Email ?? string.Empty, roles, divisionIds);
             _cache.Set(cacheKey, authEntry, new MemoryCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromMinutes(60)));
         }
 
         // Populate the scoped IAuditUserContext for this request
         var isGlobal = authEntry.Roles.Any(r => GlobalAuditRoles.Names.Contains(r));
-        _auditUserContext.Initialize(authEntry.UserId, isGlobal, authEntry.DivisionIds);
+        var adminRoles = new[] {
+            AuthorizationRoles.AuditAdmin, AuthorizationRoles.Administrator,
+            AuthorizationRoles.AuditReviewer, AuthorizationRoles.AuditManager,
+            AuthorizationRoles.TemplateAdmin, AuthorizationRoles.Executive,
+            AuthorizationRoles.ExecutiveViewer,
+        };
+        var isAuditorOnly = authEntry.Roles.Contains(AuthorizationRoles.Auditor)
+            && !authEntry.Roles.Any(r => adminRoles.Contains(r));
+        _auditUserContext.Initialize(authEntry.UserId, authEntry.UserEmail, isGlobal, isAuditorOnly, authEntry.DivisionIds);
 
         if (request == null)
             throw new ArgumentNullException(nameof(request), "Request cannot be null");

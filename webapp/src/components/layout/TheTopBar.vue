@@ -14,6 +14,9 @@
                 </a>
                 <Breadcrumb :model="breadcrumbItems" class="ml-4" />
                 <ul class="layout-topbar-actions">
+                    <li class="topbar-item">
+                        <NotificationBell />
+                    </li>
                     <li class="topbar-item theme-toggle-item">
                         <button
                             class="theme-toggle-btn"
@@ -81,6 +84,7 @@ import { useRoute } from 'vue-router';
 import logo from '@/assets/images/header-logo.svg';
 import { useUserStore } from '@/stores/userStore.ts';
 import { useTheme } from '@/composables/useTheme';
+import NotificationBell from '@/components/notifications/NotificationBell.vue';
 
 const { isDark, toggle } = useTheme();
 

@@ -248,6 +248,12 @@ public class SendDistributionEmailRequest
     public List<int> AttachmentIds { get; set; } = new();
     /// <summary>Optional override for the email subject line.</summary>
     public string? SubjectOverride { get; set; }
+    /// <summary>When true, include the corrective actions table in the email body.</summary>
+    public bool IncludeCorrectiveActions { get; set; }
+    /// <summary>When true (and IncludeCorrectiveActions is true), only include open (unresolved) CAs.</summary>
+    public bool IncludeOpenCasOnly { get; set; }
+    /// <summary>Optional findings narrative to prepend before the findings table.</summary>
+    public string? Message { get; set; }
 }
 
 public class AuditFindingDto
@@ -305,7 +311,10 @@ public class AssignCorrectiveActionRequest
 {
     public int FindingId { get; set; }
     public string Description { get; set; } = null!;
+    /// <summary>Display name of the assignee.</summary>
     public string? AssignedTo { get; set; }
+    /// <summary>Email address to send the assignment notification to. Required for in-app and email notifications.</summary>
+    public string? AssignedToEmail { get; set; }
     public string? DueDate { get; set; }
     /// <summary>"Normal" (default) or "Urgent". Drives SLA-based due date when DueDate is not supplied.</summary>
     public string Priority { get; set; } = "Normal";

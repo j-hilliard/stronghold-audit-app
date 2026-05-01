@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Stronghold.AppDashboard.Api.Authorization;
 using Stronghold.AppDashboard.Api.Services;
 using Stronghold.AppDashboard.Data;
+using Stronghold.AppDashboard.Data.Models.Audit;
 using Stronghold.AppDashboard.Shared.Enumerations;
 using AuditFindingEntity = Stronghold.AppDashboard.Data.Models.Audit.AuditFinding;
 using CorrectiveActionEntity = Stronghold.AppDashboard.Data.Models.Audit.CorrectiveAction;
@@ -219,6 +220,9 @@ public class SubmitAuditHandler : IRequestHandler<SubmitAudit, SubmitAuditResult
             $"Audit {audit.Id} submitted by {request.SubmittedBy}. {nonConforming.Count} finding(s) generated.",
             relatedObject: audit.Id.ToString());
 
+        // ── In-app notifications for all AuditAdmin / AuditReviewer users ────
+        await CreateSubmissionNotificationsAsync(audit, now, cancellationToken);
+
         // ── Send submission notification email ────────────────────────────────
         var emailResult = await SendSubmissionEmailAsync(audit, nonConforming.Count, now, defaultDueDate, aiSummaryText, cancellationToken);
 
@@ -409,6 +413,48 @@ public class SubmitAuditHandler : IRequestHandler<SubmitAudit, SubmitAuditResult
                 Score      = scoreText,
                 NcCount    = ncCount,
             };
+        }
+    }
+
+    private async Task CreateSubmissionNotificationsAsync(
+        Data.Models.Audit.Audit audit,
+        DateTime now,
+        CancellationToken ct)
+    {
+        try
+        {
+            var adminEmails = await _context.Users
+                .Where(u => u.Active
+                    && u.UserRoles.Any(ur =>
+                        ur.Role.Name == AuthorizationRoles.AuditAdmin
+                        || ur.Role.Name == AuthorizationRoles.AuditReviewer
+                        || ur.Role.Name == AuthorizationRoles.Administrator))
+                .Select(u => u.Email)
+                .Where(e => e != null)
+                .Distinct()
+                .ToListAsync(ct);
+
+            var appBaseUrl = _config.GetValue<string>("App:BaseUrl") ?? "http://localhost:5221";
+            var notifications = adminEmails.Select(email => new AppNotification
+            {
+                RecipientEmail = email!,
+                Type           = "AuditSubmitted",
+                Title          = "New Audit Submitted",
+                Body           = $"Audit {audit.TrackingNumber ?? $"#{audit.Id}"} ({audit.Division?.Code ?? "—"}) has been submitted and is awaiting review.",
+                EntityType     = "Audit",
+                EntityId       = audit.Id,
+                LinkUrl        = $"/audit-management/audits/{audit.Id}/review",
+                CreatedAt      = now,
+            });
+
+            _context.AppNotifications.AddRange(notifications);
+            await _context.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            await _log.LogAsync("SubmitAudit", "Notifications", "Warning",
+                $"Failed to create in-app notifications for audit {audit.Id}: {ex.Message}",
+                relatedObject: audit.Id.ToString());
         }
     }
 }

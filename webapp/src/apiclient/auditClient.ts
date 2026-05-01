@@ -515,7 +515,10 @@ export interface AssignCorrectiveActionRequest {
     findingId: number;
     description: string;
     assignedTo?: string | null;
+    assignedToEmail?: string | null;
     dueDate?: string | null;
+    priority?: string | null;
+    rootCause?: string | null;
 }
 
 export interface CloseCorrectiveActionRequest {
@@ -795,6 +798,9 @@ export interface AddDistributionRecipientRequest {
 export interface SendDistributionEmailRequest {
     attachmentIds: number[];
     subjectOverride?: string | null;
+    includeCorrectiveActions?: boolean;
+    includeOpenCasOnly?: boolean;
+    message?: string | null;
 }
 
 export interface DistributionPreviewDto {
@@ -1275,6 +1281,38 @@ export class AuditClient {
             .then(() => undefined);
     }
 
+    startAuditReview(id: number, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .post(`${this.baseUrl}/v1/audits/${id}/review`, {}, { cancelToken })
+            .then(() => undefined);
+    }
+
+    approveAudit(id: number, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .post(`${this.baseUrl}/v1/audits/${id}/approve`, {}, { cancelToken })
+            .then(() => undefined);
+    }
+
+    // ── Notifications ─────────────────────────────────────────────────────────
+
+    getNotifications(unreadOnly = false, pageSize = 20, cancelToken?: CancelToken): Promise<NotificationsResult> {
+        return this.instance
+            .get<NotificationsResult>(`${this.baseUrl}/v1/notifications`, { params: { unreadOnly, pageSize }, cancelToken })
+            .then(r => r.data);
+    }
+
+    markAllNotificationsRead(cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .patch(`${this.baseUrl}/v1/notifications/read`, {}, { cancelToken })
+            .then(() => undefined);
+    }
+
+    markNotificationRead(id: number, cancelToken?: CancelToken): Promise<void> {
+        return this.instance
+            .patch(`${this.baseUrl}/v1/notifications/${id}/read`, {}, { cancelToken })
+            .then(() => undefined);
+    }
+
     // ── Newsletter Templates ──────────────────────────────────────────────────
 
     getNewsletterTemplate(divisionId: number, cancelToken?: CancelToken): Promise<NewsletterTemplateDto | null> {
@@ -1661,4 +1699,21 @@ export interface AuditTrailLogDto {
     newValues:      string | null;
     changedColumns: string | null;
     ipAddress:      string | null;
+}
+
+export interface NotificationDto {
+    id:         number;
+    type:       'AuditSubmitted' | 'AuditApproved' | 'AuditDistributed' | 'CaAssigned' | 'CaCompleted';
+    title:      string;
+    body:       string;
+    entityType: string | null;
+    entityId:   number | null;
+    linkUrl:    string | null;
+    isRead:     boolean;
+    createdAt:  string;
+}
+
+export interface NotificationsResult {
+    items:       NotificationDto[];
+    unreadCount: number;
 }

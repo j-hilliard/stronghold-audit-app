@@ -8,8 +8,9 @@
             </span>
         </div>
 
-        <div v-if="sectionNames.length === 0" class="py-6 text-center text-slate-500 text-sm">
-            Generate data first to populate category findings.
+        <div v-if="sectionNames.length === 0" class="flex flex-col items-center gap-2 py-6 text-center">
+            <i class="pi pi-list text-slate-700 text-xl" />
+            <p class="text-xs text-slate-600">No categories loaded — click <strong class="text-slate-500 font-semibold">Generate</strong> above to populate findings.</p>
         </div>
 
         <div v-else-if="isEditable" class="space-y-4">

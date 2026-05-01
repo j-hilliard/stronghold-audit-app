@@ -7,11 +7,11 @@
         ]"
     >
         <!-- Question: badge + text + repeat badge + camera icon -->
-        <div class="flex items-start gap-3 px-4 pt-3 pb-2">
+        <div class="flex items-start gap-3 px-4 pt-2 pb-1">
             <!-- Circular numbered badge -->
             <div
                 :class="[
-                    'shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors duration-200',
+                    'shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors duration-200',
                     badgeClass,
                 ]"
             >
@@ -85,7 +85,7 @@
         </div>
 
         <!-- Status buttons row -->
-        <div class="px-4 pb-3">
+        <div class="px-4 pb-2">
             <StatusButtons
                 :model-value="response.status"
                 :allow-n-a="response.allowNA"

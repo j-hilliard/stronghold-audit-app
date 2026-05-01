@@ -8,7 +8,7 @@
             <button
                 @click="saveDraft"
                 :disabled="saving"
-                class="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-700 hover:bg-blue-600 text-white rounded-lg disabled:opacity-50 transition-colors"
+                class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-600 hover:border-slate-500 text-slate-300 hover:text-white bg-transparent hover:bg-slate-700/50 rounded-lg disabled:opacity-50 transition-colors"
             >
                 <i class="pi pi-save text-xs" />
                 {{ saving ? 'Saving…' : 'Save Draft' }}
@@ -16,7 +16,7 @@
             <button
                 @click="printReport"
                 :disabled="!builder.hasData.value || pdfGenerating"
-                class="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg disabled:opacity-50 transition-colors"
+                class="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg disabled:opacity-50 transition-colors"
             >
                 <i :class="pdfGenerating ? 'pi pi-spin pi-spinner' : 'pi pi-file-pdf'" class="text-xs" />
                 {{ pdfGenerating ? 'Generating…' : 'Export PDF' }}
@@ -159,57 +159,101 @@
                 </div>
             </div>
 
-            <!-- Preview area -->
-            <div class="flex-1 overflow-y-auto bg-slate-950 p-6" id="report-preview">
+            <!-- Preview / Block canvas area -->
+            <div class="flex-1 flex flex-col min-h-0 bg-slate-950" id="report-preview">
+
+                <!-- Mode tab bar -->
+                <div class="flex items-center gap-1 px-4 pt-3 pb-0 border-b border-slate-700/60 flex-shrink-0 bg-surface-2">
+                    <button
+                        class="composer-tab"
+                        :class="composerMode === 'structured' ? 'composer-tab--active' : ''"
+                        @click="composerMode = 'structured'"
+                    >
+                        <i class="pi pi-list text-[10px]" /> Structured
+                    </button>
+                    <button
+                        class="composer-tab"
+                        :class="composerMode === 'blocks' ? 'composer-tab--active' : ''"
+                        @click="composerMode = 'blocks'"
+                    >
+                        <i class="pi pi-th-large text-[10px]" /> Block Builder
+                    </button>
+                </div>
+
+                <!-- ── STRUCTURED mode ──────────────────────────────────────── -->
                 <div
-                    v-if="!builder.hasData.value"
-                    class="flex flex-col items-center justify-center h-full gap-4 text-slate-600 text-center"
+                    v-show="composerMode === 'structured'"
+                    class="flex-1 overflow-y-auto p-6"
                 >
-                    <i class="pi pi-file-edit text-5xl" />
-                    <p class="text-sm max-w-xs">
-                        Select a division and date range, then click
-                        <strong class="text-slate-400">Generate</strong>
-                        to build the report.
-                    </p>
-                </div>
-
-                <div v-else class="max-w-4xl mx-auto flex flex-col gap-5">
-                    <template v-for="sec in enabledSections" :key="sec.type">
-                        <div
-                            class="report-section-card relative"
-                            :class="editingSection === sec.type ? 'ring-2 ring-amber-400/60' : ''"
-                        >
-                            <!-- Edit toggle — only for editable sections -->
-                            <button
-                                v-if="EDITABLE_SECTIONS.includes(sec.type)"
-                                @click="toggleEdit(sec.type)"
-                                class="absolute top-3 right-3 z-10 flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-colors border"
-                                :class="editingSection === sec.type
-                                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-                                    : 'bg-slate-700/60 text-slate-400 hover:bg-slate-700 border-slate-600'"
-                            >
-                                <i :class="editingSection === sec.type ? 'pi pi-check' : 'pi pi-pencil'" class="text-[10px]" />
-                                {{ editingSection === sec.type ? 'Done' : 'Edit' }}
-                            </button>
-
-                            <!-- Editable section (summary-text, highlights, findings-examples) -->
-                            <component
-                                v-if="EDITABLE_SECTIONS.includes(sec.type)"
-                                :is="sectionComponent(sec.type)"
-                                v-bind="sectionProps(sec)"
-                                :is-editable="editingSection === sec.type"
-                                @update="updateSection"
-                            />
-
-                            <!-- Non-editable section -->
-                            <component
-                                v-else
-                                :is="sectionComponent(sec.type)"
-                                v-bind="sectionProps(sec)"
-                            />
+                    <div
+                        v-if="!builder.hasData.value"
+                        class="flex flex-col items-center justify-center h-full gap-6 text-center px-6"
+                    >
+                        <div class="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center shadow-elevation-1">
+                            <i class="pi pi-file-edit text-3xl text-slate-500" />
                         </div>
-                    </template>
+                        <div class="max-w-xs">
+                            <p class="text-base font-semibold text-slate-300 mb-1.5">Ready to build</p>
+                            <p class="text-sm text-slate-500 leading-relaxed">Select a division and date range above, then generate to load audit data into your report.</p>
+                        </div>
+                        <button
+                            @click="generate"
+                            :disabled="!selectedDivisionId || builder.loading.value"
+                            class="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-lg transition-colors shadow-lg"
+                        >
+                            <i :class="builder.loading.value ? 'pi pi-spin pi-spinner' : 'pi pi-play'" />
+                            {{ builder.loading.value ? 'Generating…' : 'Generate Report' }}
+                        </button>
+                    </div>
+
+                    <div v-else class="max-w-4xl mx-auto flex flex-col gap-5">
+                        <template v-for="sec in enabledSections" :key="sec.type">
+                            <div
+                                class="report-section-card relative"
+                                :class="editingSection === sec.type ? 'ring-2 ring-amber-400/60' : ''"
+                            >
+                                <button
+                                    v-if="EDITABLE_SECTIONS.includes(sec.type)"
+                                    @click="toggleEdit(sec.type)"
+                                    class="absolute top-3 right-3 z-10 flex items-center gap-1 px-2 py-1 text-[11px] rounded transition-colors border"
+                                    :class="editingSection === sec.type
+                                        ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                                        : 'bg-slate-700/60 text-slate-400 hover:bg-slate-700 border-slate-600'"
+                                >
+                                    <i :class="editingSection === sec.type ? 'pi pi-check' : 'pi pi-pencil'" class="text-[10px]" />
+                                    {{ editingSection === sec.type ? 'Done' : 'Edit' }}
+                                </button>
+                                <component
+                                    v-if="EDITABLE_SECTIONS.includes(sec.type)"
+                                    :is="sectionComponent(sec.type)"
+                                    v-bind="sectionProps(sec)"
+                                    :is-editable="editingSection === sec.type"
+                                    @update="updateSection"
+                                />
+                                <component
+                                    v-else
+                                    :is="sectionComponent(sec.type)"
+                                    v-bind="sectionProps(sec)"
+                                />
+                            </div>
+                        </template>
+                    </div>
                 </div>
+
+                <!-- ── BLOCK BUILDER mode ───────────────────────────────────── -->
+                <FlowCanvas
+                    v-show="composerMode === 'blocks'"
+                    :blocks="blockComposer.blocks.value"
+                    :edit-mode="blockComposer.editMode.value"
+                    class="flex-1 min-h-0"
+                    @reorder="blockComposer.reorderBlocks"
+                    @add="(t) => blockComposer.addBlock(t)"
+                    @remove="blockComposer.removeBlock"
+                    @duplicate="blockComposer.duplicateBlock"
+                    @update-content="blockComposer.updateBlockConfig"
+                    @update-is-edited="blockComposer.markEdited"
+                    @toggle-edit-mode="blockComposer.toggleEditMode"
+                />
             </div>
         </div>
     </div>
@@ -221,6 +265,8 @@ import { useAuditService } from '@/modules/audit-management/services/useAuditSer
 import type { DivisionDto, ReportDraftListItemDto } from '@/apiclient/auditClient';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import { useReportBuilder } from '../composables/useReportBuilder';
+import { useBlockComposer } from '../composables/useBlockComposer';
+import FlowCanvas from '../components/FlowCanvas.vue';
 import {
     REPORT_TEMPLATES,
     SECTION_LABELS,
@@ -244,8 +290,11 @@ import ReportSectionCaTable from '../components/sections/ReportSectionCaTable.vu
 import ReportSectionSummaryText from '../components/sections/ReportSectionSummaryText.vue';
 import ReportSectionHighlights from '../components/sections/ReportSectionHighlights.vue';
 
-const service = useAuditService();
-const builder = useReportBuilder();
+const service       = useAuditService();
+const builder       = useReportBuilder();
+const blockComposer = useBlockComposer();
+
+const composerMode = ref<'structured' | 'blocks'>('structured');
 
 // ── Filter state ──────────────────────────────────────────────────────────────
 
@@ -525,6 +574,27 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.composer-tab {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 14px 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #64748b;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color 0.12s, border-color 0.12s;
+    margin-bottom: -1px;
+}
+.composer-tab:hover { color: #94a3b8; }
+.composer-tab--active {
+    color: #93c5fd;
+    border-bottom-color: #3b82f6;
+}
+
 .composer-select,
 .composer-input {
     background: var(--surface-3);

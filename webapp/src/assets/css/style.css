@@ -95,10 +95,11 @@ body {
    Kept global (not scoped) so child components can use them without :deep(). */
 
 .report-section-card {
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid rgba(51, 65, 85, 0.6);
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(51, 65, 85, 0.8);
     border-radius: var(--radius-xl);
-    padding: 1.25rem;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
 .section-heading {
@@ -106,13 +107,13 @@ body {
     align-items: center;
     gap: 0.5rem;
     font-size: 0.8125rem;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.875rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border-subtle);
+    letter-spacing: 0.07em;
+    margin-bottom: 1rem;
+    padding-bottom: 0.625rem;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.7);
 }
 
 @media print {
@@ -133,9 +134,9 @@ body {
    Keeping them here ensures they load regardless of which routes are visited.
 ─────────────────────────────────────────────────────────────────────────────── */
 .stronghold-table .p-datatable-thead > tr > th {
-    background: rgb(15, 23, 42) !important;
-    border-color: rgba(51, 65, 85, 0.6) !important;
-    color: #94a3b8 !important;
+    background: var(--surface-1) !important;
+    border-color: var(--border-strong) !important;
+    color: var(--text-secondary) !important;
     font-size: 0.72rem !important;
     font-weight: 600 !important;
     text-transform: uppercase;
@@ -144,8 +145,8 @@ body {
 }
 .stronghold-table .p-datatable-tbody > tr {
     background: transparent !important;
-    transition: background 0.12s ease;
-    border-color: rgba(51, 65, 85, 0.4) !important;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
+    border-color: var(--border-subtle) !important;
 }
 .stronghold-table .p-datatable-tbody > tr:nth-child(even) {
     background: rgba(15, 23, 42, 0.35) !important;
@@ -156,7 +157,7 @@ body {
 }
 .stronghold-table .p-datatable-tbody > tr > td {
     padding: 0.65rem 1rem !important;
-    border-color: rgba(51, 65, 85, 0.35) !important;
+    border-color: var(--border-subtle) !important;
     font-size: 0.85rem;
     white-space: nowrap;
     overflow: hidden;
@@ -165,35 +166,65 @@ body {
 }
 .stronghold-table .p-datatable-emptymessage td {
     text-align: center !important;
-    color: #475569 !important;
+    color: var(--text-muted) !important;
     padding: 3rem 1rem !important;
 }
 .stronghold-table .p-datatable-tbody > tr > td .p-button {
     padding-block: 0.15rem !important;
 }
 
-/* ── CA row state — global, full PrimeVue chain for correct specificity ──────────
-   Uses .p-datatable .p-datatable-tbody > tr.row--ca-overdue (specificity 0,3,1)
-   which beats the nth-child(even) rule at (0,3,0) without needing !important.
-   !important is added only where PrimeVue hover injects box-shadow.
+/* ── Universal table row states ───────────────────────────────────────────────────
+   Apply via rowClass prop on any DataTable. Uses full PrimeVue chain for
+   specificity (0,3,1) to beat nth-child(even) at (0,3,0) without !important.
+   row--overdue  — danger left border only, no background block (matches spec)
+   row--warning  — warning left border only
+   row--closed   — dimmed opacity
+   row--voided   — heavily dimmed opacity
+   row--selected — info left border + subtle tint
+   Aliases: row--ca-overdue, row--ca-closed, row--ca-voided kept for compat.
 ─────────────────────────────────────────────────────────────────────────────── */
+
+/* Overdue / danger */
+.p-datatable .p-datatable-tbody > tr.row--overdue,
 .p-datatable .p-datatable-tbody > tr.row--ca-overdue {
     background: transparent !important;
 }
+.p-datatable .p-datatable-tbody > tr.row--overdue > td,
 .p-datatable .p-datatable-tbody > tr.row--ca-overdue > td {
     background-color: rgba(239, 68, 68, 0.03);
 }
+.p-datatable .p-datatable-tbody > tr.row--overdue > td:first-child,
 .p-datatable .p-datatable-tbody > tr.row--ca-overdue > td:first-child {
     border-left: 3px solid var(--color-danger);
 }
+.p-datatable .p-datatable-tbody > tr.row--overdue:hover,
 .p-datatable .p-datatable-tbody > tr.row--ca-overdue:hover {
     background: transparent !important;
     box-shadow: none !important;
 }
+.p-datatable .p-datatable-tbody > tr.row--overdue:hover > td,
 .p-datatable .p-datatable-tbody > tr.row--ca-overdue:hover > td {
     background-color: rgba(239, 68, 68, 0.06) !important;
 }
+
+/* Warning */
+.p-datatable .p-datatable-tbody > tr.row--warning {
+    background: transparent !important;
+}
+.p-datatable .p-datatable-tbody > tr.row--warning > td {
+    background-color: rgba(245, 158, 11, 0.03);
+}
+.p-datatable .p-datatable-tbody > tr.row--warning > td:first-child {
+    border-left: 3px solid var(--color-warning);
+}
+.p-datatable .p-datatable-tbody > tr.row--warning:hover > td {
+    background-color: rgba(245, 158, 11, 0.06) !important;
+}
+
+/* Closed / voided opacity */
+.p-datatable .p-datatable-tbody > tr.row--closed > td,
 .p-datatable .p-datatable-tbody > tr.row--ca-closed > td { opacity: 0.55; }
+.p-datatable .p-datatable-tbody > tr.row--voided > td,
 .p-datatable .p-datatable-tbody > tr.row--ca-voided > td { opacity: 0.4; }
 
 /* ── Overdue pulse ring ───────────────────────────────────────────────────────── */
@@ -387,96 +418,640 @@ body {
     -webkit-backdrop-filter: blur(14px) saturate(1.4) !important;
 }
 
-/* ── Light theme overrides (toggled via html.theme-light class) ─────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════════
+   LIGHT THEME — complete system (toggled via html.theme-light)
+   DO NOT modify dark mode defaults above. All changes here are scoped to
+   html.theme-light so they only activate when the user switches to light mode.
+   Philosophy: white canvas, elevated cards, strong shadows, layered hierarchy.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Token overrides ───────────────────────────────────────────────────────── */
+html.theme-light {
+    --surface-1: #f4f6f8;   /* soft grey page — not pure white, eyes don't get nuked */
+    --surface-2: #ffffff;   /* cards float above the page */
+    --surface-3: #eef2f6;   /* section backgrounds / sunken areas */
+    --surface-4: #e2e8f0;   /* hover / active rows */
+    --border-subtle: rgba(15, 23, 42, 0.05);
+    --border:        rgba(15, 23, 42, 0.08);  /* soft, not screaming */
+    --border-strong: rgba(15, 23, 42, 0.14);
+    --text-primary:   #0f172a;
+    --text-secondary: #334155;
+    --text-muted:     #64748b;
+    --color-success: #059669;
+    --color-warning: #d97706;
+    --color-danger:  #dc2626;
+    --color-info:    #2563eb;
+    --chart-grid: rgba(15, 23, 42, 0.06);
+    --chart-axis: #334155;
+}
+
+/* ── 2. Body & layout canvas — soft grey foundation ──────────────────────────── */
 html.theme-light body {
-    background-color: #f1f5f9 !important;
-    color: #1e293b !important;
+    background: #f4f6f8 !important;
+    color: #0f172a !important;
+    /* slight brightness pull-back so it never feels like a torch in a dark room */
+    filter: contrast(0.98) brightness(0.99);
 }
 html.theme-light .layout-main {
-    background: linear-gradient(to bottom, #f1f5f9, #e2e8f0) !important;
+    background: #f4f6f8 !important;
 }
+
+/* ── 3. Sidebar — white panel with right border + accent active item ──────────── */
 html.theme-light .layout-menu-container,
 html.theme-light .menu-wrapper {
     background: #ffffff !important;
+    border-right: 1px solid rgba(15, 23, 42, 0.09) !important;
+    box-shadow: 2px 0 8px rgba(15, 23, 42, 0.04) !important;
 }
-html.theme-light .layout-topbar {
+html.theme-light .layout-menuitem-text { color: #334155 !important; }
+html.theme-light .layout-menuitem-icon { color: #64748b !important; }
+html.theme-light .layout-menuitem-root-text {
+    color: #94a3b8 !important;
+    font-size: 0.65rem !important;
+    letter-spacing: 0.06em !important;
+}
+html.theme-light .menu-wrapper .layout-menu-container .layout-menu li > a {
+    color: #334155 !important;
+}
+html.theme-light .menu-wrapper .layout-menu-container .layout-menu li > a:hover {
+    background: #eff6ff !important;
+    border-left-color: rgba(37, 99, 235, 0.55) !important;
+    color: #1d4ed8 !important;
+}
+html.theme-light .menu-wrapper .layout-menu-container .layout-menu li > a:hover .layout-menuitem-icon,
+html.theme-light .menu-wrapper .layout-menu-container .layout-menu li > a:hover .layout-menuitem-text {
+    color: #1d4ed8 !important;
+}
+html.theme-light .menu-wrapper .layout-menu-container .layout-menu li > a.active-route {
+    background: #eff6ff !important;
+    border-left-color: #2563eb !important;
+    border-left-width: 3px !important;
+    color: #1d4ed8 !important;
+}
+html.theme-light .menu-wrapper .layout-menu-container .layout-menu li > a.active-route .layout-menuitem-icon,
+html.theme-light .menu-wrapper .layout-menu-container .layout-menu li > a.active-route .layout-menuitem-text {
+    color: #1d4ed8 !important;
+    font-weight: 600 !important;
+}
+
+/* ── 4. Topbar — white + real shadow so it reads as "above" the page ──────────── */
+html.theme-light .layout-topbar,
+html.theme-light .layout-topbar.bg-slate-900 {
     background: #ffffff !important;
-    border-bottom: 1px solid #e2e8f0 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.10) !important;
+    box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06), 0 4px 8px rgba(15, 23, 42, 0.05) !important;
 }
+
+/* ── 5. PrimeVue cards — white surface floating above grey page ───────────────── */
 html.theme-light .p-card {
     background: #ffffff !important;
-    border-color: #e2e8f0 !important;
-    color: #1e293b !important;
+    border: 1px solid rgba(15, 23, 42, 0.08) !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 6px 18px rgba(0,0,0,0.06) !important;
+    color: #0f172a !important;
 }
 html.theme-light .p-card:hover {
-    box-shadow: 0 0 0 1px rgba(59,130,246,0.25), 0 8px 24px rgba(0,0,0,0.12) !important;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08), 0 12px 24px rgba(0,0,0,0.08) !important;
+    border-color: rgba(37, 99, 235, 0.20) !important;
 }
+html.theme-light .p-card .p-card-title,
+html.theme-light .p-card .p-card-subtitle,
+html.theme-light .p-card .p-card-content { color: #0f172a !important; }
+
+/* ── 6. DataTable — modern, scannable, not a spreadsheet ─────────────────────── */
 html.theme-light .p-datatable .p-datatable-thead > tr > th {
-    background: #f8fafc !important;
-    color: #475569 !important;
-    border-color: #e2e8f0 !important;
+    background: #eef2f6 !important;
+    color: #0f172a !important;
+    font-weight: 600 !important;
+    border-color: #e5e7eb !important;
+    border-bottom: 2px solid #d1d5db !important;
 }
 html.theme-light .p-datatable .p-datatable-tbody > tr {
     background: #ffffff !important;
-    color: #1e293b !important;
-    border-color: #e2e8f0 !important;
+    color: #0f172a !important;
+    border-color: #e5e7eb !important;
+}
+html.theme-light .p-datatable .p-datatable-tbody > tr > td {
+    border-bottom: 1px solid #e5e7eb !important;
+    color: #0f172a !important;
 }
 html.theme-light .p-datatable .p-datatable-tbody > tr:nth-child(even) {
-    background: #f8fafc !important;
+    background: #f9fafb !important;
 }
 html.theme-light .p-datatable .p-datatable-tbody > tr:hover {
-    background: rgba(59, 130, 246, 0.06) !important;
-    box-shadow: inset 3px 0 0 rgba(59, 130, 246, 0.55) !important;
+    background: #eef2f7 !important;
+    box-shadow: inset 3px 0 0 rgba(37, 99, 235, 0.55) !important;
 }
+html.theme-light .stronghold-table .p-datatable-thead > tr > th {
+    background: #eef2f6 !important;
+    border-color: #e5e7eb !important;
+    border-bottom: 2px solid #d1d5db !important;
+    color: #0f172a !important;
+}
+html.theme-light .stronghold-table .p-datatable-tbody > tr:nth-child(even) {
+    background: #f9fafb !important;
+}
+html.theme-light .stronghold-table .p-datatable-tbody > tr > td {
+    color: #0f172a !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+/* ── 7. Form controls ─────────────────────────────────────────────────────────── */
 html.theme-light .p-dropdown,
 html.theme-light .p-inputtext,
-html.theme-light .p-textarea {
+html.theme-light .p-textarea,
+html.theme-light .p-multiselect,
+html.theme-light .p-calendar .p-inputtext {
+    background: #ffffff !important;
+    border-color: rgba(15, 23, 42, 0.18) !important;
+    color: #0f172a !important;
+}
+html.theme-light .p-dropdown:hover { border-color: rgba(37, 99, 235, 0.5) !important; }
+html.theme-light .p-inputtext:focus { border-color: #2563eb !important; box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15) !important; }
+html.theme-light .p-dropdown-panel,
+html.theme-light .p-multiselect-panel {
+    background: #ffffff !important;
+    border-color: rgba(15, 23, 42, 0.12) !important;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12) !important;
+}
+html.theme-light .p-dropdown-item,
+html.theme-light .p-multiselect-item { color: #0f172a !important; background: #ffffff !important; }
+html.theme-light .p-dropdown-item:hover,
+html.theme-light .p-multiselect-item:hover { background: #f1f5f9 !important; }
+html.theme-light .p-dropdown-item.p-highlight { background: #eff6ff !important; color: #1d4ed8 !important; }
+
+/* ── 7b. PrimeVue v4 Select + DatePicker (renamed from Dropdown / Calendar) ───── */
+html.theme-light .p-select,
+html.theme-light .p-datepicker {
+    background: #ffffff !important;
+    border-color: rgba(15, 23, 42, 0.18) !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+}
+html.theme-light .p-select:hover { border-color: rgba(37, 99, 235, 0.5) !important; }
+html.theme-light .p-select-label,
+html.theme-light .p-datepicker-input { color: #0f172a !important; background: transparent !important; }
+html.theme-light .p-select-label.p-placeholder,
+html.theme-light .p-datepicker-input::placeholder { color: #94a3b8 !important; }
+html.theme-light .p-select-dropdown { color: #475569 !important; background: transparent !important; }
+/* Overlay panel */
+html.theme-light .p-select-overlay,
+html.theme-light .p-datepicker-panel {
+    background: #ffffff !important;
+    border-color: rgba(15, 23, 42, 0.12) !important;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12) !important;
+    color: #0f172a !important;
+}
+html.theme-light .p-select-option { color: #0f172a !important; background: #ffffff !important; }
+html.theme-light .p-select-option:hover { background: #f1f5f9 !important; }
+html.theme-light .p-select-option.p-select-option-selected,
+html.theme-light .p-select-option.p-selected { background: #eff6ff !important; color: #1d4ed8 !important; }
+/* Clear button inside Select */
+html.theme-light .p-select-clear-icon { color: #64748b !important; }
+/* DatePicker calendar header / days */
+html.theme-light .p-datepicker-calendar th,
+html.theme-light .p-datepicker-calendar td { color: #0f172a !important; background: transparent !important; }
+html.theme-light .p-datepicker-day:hover { background: #f1f5f9 !important; }
+html.theme-light .p-datepicker-day.p-datepicker-day-selected { background: #2563eb !important; color: #ffffff !important; }
+html.theme-light .p-datepicker-header { background: #ffffff !important; border-bottom-color: rgba(15,23,42,0.08) !important; }
+html.theme-light .p-datepicker-title { color: #0f172a !important; }
+
+/* ── 8. Dialogs ───────────────────────────────────────────────────────────────── */
+html.theme-light .p-dialog {
+    background: #ffffff !important;
+    border: 1px solid rgba(15, 23, 42, 0.10) !important;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.18) !important;
+}
+html.theme-light .p-dialog-header {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border-bottom-color: rgba(15, 23, 42, 0.09) !important;
+}
+html.theme-light .p-dialog-content { background: #ffffff !important; color: #0f172a !important; }
+html.theme-light .p-dialog-footer {
+    background: #f8fafc !important;
+    border-top-color: rgba(15, 23, 42, 0.09) !important;
+}
+
+/* ── 9. Buttons — clean neutral base + variant overrides ─────────────────────── */
+/* Default/outlined/secondary buttons */
+html.theme-light .p-button:not(.p-button-text):not(.p-button-link) {
+    border: 1px solid #d1d5db !important;
+}
+html.theme-light .p-button.p-button-secondary:not(.p-button-text):not(.p-button-outlined) {
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+    border-color: #d1d5db !important;
+}
+html.theme-light .p-button.p-button-secondary:not(.p-button-text):not(.p-button-outlined):hover {
+    background: #e2e8f0 !important;
+}
+html.theme-light .p-button.p-button-outlined {
+    background: transparent !important;
+    border-color: #d1d5db !important;
+    color: #334155 !important;
+}
+html.theme-light .p-button.p-button-outlined:hover {
+    background: #f3f4f6 !important;
+    border-color: #9ca3af !important;
+}
+html.theme-light .p-button.p-button-text { color: #334155 !important; }
+html.theme-light .p-button.p-button-text:hover { background: rgba(15, 23, 42, 0.05) !important; }
+/* Splitbutton */
+html.theme-light .p-splitbutton .p-button { border-color: #d1d5db !important; }
+/* Tags */
+html.theme-light .p-tag { border: 1px solid currentColor; }
+
+/* ── 10. Text hierarchy — 4 clear levels ─────────────────────────────────────── */
+html.theme-light .text-white { color: #0f172a !important; }
+html.theme-light .text-slate-100,
+html.theme-light .text-slate-200 { color: #1e293b !important; }
+html.theme-light .text-slate-300 { color: #334155 !important; }
+html.theme-light .text-slate-400 { color: #475569 !important; }
+html.theme-light .text-slate-500 { color: #64748b !important; }
+html.theme-light .text-slate-600 { color: #94a3b8 !important; }
+
+/* ── 11. Surface backgrounds — every dark slate shade neutralised ─────────────── */
+/* Solid shades */
+html.theme-light .bg-slate-950 { background: #f8fafc !important; }
+html.theme-light .bg-slate-900 { background: #ffffff !important; }
+html.theme-light .bg-slate-800 { background: #ffffff !important; }
+html.theme-light .bg-slate-700 { background: #eef2f6 !important; }
+html.theme-light .bg-slate-600 { background: #f1f5f9 !important; }
+html.theme-light .bg-slate-500 { background: #e2e8f0 !important; }
+html.theme-light .bg-slate-400 { background: #cbd5e1 !important; }
+
+/* Opacity modifier variants — cover every variant seen in the codebase */
+html.theme-light .bg-slate-950\/50,
+html.theme-light .bg-slate-900\/95,
+html.theme-light .bg-slate-900\/60,
+html.theme-light .bg-slate-900\/50,
+html.theme-light .bg-slate-900\/30 { background: rgba(255, 255, 255, 0.95) !important; }
+html.theme-light .bg-slate-800\/60,
+html.theme-light .bg-slate-800\/50,
+html.theme-light .bg-slate-800\/40,
+html.theme-light .bg-slate-800\/30 { background: rgba(238, 242, 246, 0.8) !important; }
+html.theme-light .bg-slate-700\/60,
+html.theme-light .bg-slate-700\/50,
+html.theme-light .bg-slate-700\/40,
+html.theme-light .bg-slate-700\/30 { background: rgba(238, 242, 246, 0.6) !important; }
+html.theme-light .bg-slate-600\/30 { background: rgba(241, 245, 249, 0.6) !important; }
+html.theme-light .bg-slate-500\/30 { background: rgba(226, 232, 240, 0.5) !important; }
+
+/* Dark blue/indigo/violet overlays — turn into light tints */
+html.theme-light .bg-blue-950\/70,
+html.theme-light .bg-blue-950\/60,
+html.theme-light .bg-blue-950\/50,
+html.theme-light .bg-blue-950\/40,
+html.theme-light .bg-blue-950\/20 { background: #eff6ff !important; }
+html.theme-light .bg-blue-900\/60,
+html.theme-light .bg-blue-900\/50,
+html.theme-light .bg-blue-900\/40,
+html.theme-light .bg-blue-900\/20 { background: #dbeafe !important; }
+html.theme-light .bg-indigo-900\/40  { background: #e0e7ff !important; }
+html.theme-light .bg-red-900 { background: #fee2e2 !important; }
+
+/* Gradient backgrounds — the layout gradient must not go dark */
+html.theme-light .from-slate-900,
+html.theme-light .bg-gradient-to-b.from-slate-900 { background: #f4f6f8 !important; }
+html.theme-light .to-slate-800 { --tw-gradient-to: #f4f6f8 !important; }
+
+/* ── 12. Border overrides — complete, soft ────────────────────────────────────── */
+html.theme-light .border-slate-700,
+html.theme-light .border-slate-700\/40,
+html.theme-light .border-slate-700\/50,
+html.theme-light .border-slate-700\/60 { border-color: #e5e7eb !important; }
+html.theme-light .border-slate-600,
+html.theme-light .border-slate-600\/40,
+html.theme-light .border-slate-600\/50 { border-color: #d1d5db !important; }
+html.theme-light .border-slate-500 { border-color: #cbd5e1 !important; }
+html.theme-light .border-b.border-slate-700 { border-bottom-color: #e5e7eb !important; }
+
+/* ── 13. Status color tints — light equivalents of dark saturated colors ──────── */
+/* Success */
+html.theme-light .bg-emerald-950\/50 { background: #f0fdf4 !important; }
+html.theme-light .bg-emerald-900\/50 { background: #d1fae5 !important; }
+html.theme-light .bg-emerald-900\/60 { background: #d1fae5 !important; }
+html.theme-light .border-emerald-700\/50 { border-color: #6ee7b7 !important; }
+html.theme-light .border-emerald-800\/50 { border-color: #a7f3d0 !important; }
+html.theme-light .border-emerald-700\/40 { border-color: #6ee7b7 !important; }
+html.theme-light .text-emerald-400 { color: #059669 !important; }
+html.theme-light .text-emerald-300 { color: #059669 !important; }
+/* Warning */
+html.theme-light .bg-amber-950\/40 { background: #fffbeb !important; }
+html.theme-light .bg-amber-900\/50 { background: #fef3c7 !important; }
+html.theme-light .bg-amber-900\/60 { background: #fef3c7 !important; }
+html.theme-light .border-amber-700\/50 { border-color: #fcd34d !important; }
+html.theme-light .border-amber-800\/50 { border-color: #fde68a !important; }
+html.theme-light .border-amber-700\/40 { border-color: #fcd34d !important; }
+html.theme-light .text-amber-400 { color: #d97706 !important; }
+html.theme-light .text-amber-300 { color: #d97706 !important; }
+/* Danger */
+html.theme-light .bg-red-950\/40 { background: #fff1f2 !important; }
+html.theme-light .bg-red-950\/50 { background: #fff1f2 !important; }
+html.theme-light .bg-red-900\/50 { background: #fee2e2 !important; }
+html.theme-light .bg-red-900\/60 { background: #fee2e2 !important; }
+html.theme-light .border-red-700\/50 { border-color: #fca5a5 !important; }
+html.theme-light .border-red-800\/50 { border-color: #fecaca !important; }
+html.theme-light .border-red-800\/30 { border-color: #fca5a5 !important; }
+html.theme-light .border-red-700\/40 { border-color: #fca5a5 !important; }
+html.theme-light .text-red-400 { color: #dc2626 !important; }
+html.theme-light .text-red-300 { color: #dc2626 !important; }
+/* Info / Blue */
+html.theme-light .bg-blue-950\/40 { background: #eff6ff !important; }
+html.theme-light .bg-blue-900\/50 { background: #dbeafe !important; }
+html.theme-light .bg-blue-900\/60 { background: #dbeafe !important; }
+html.theme-light .border-blue-700\/50 { border-color: #93c5fd !important; }
+html.theme-light .border-blue-800\/50 { border-color: #bfdbfe !important; }
+html.theme-light .border-blue-500\/40 { border-color: #93c5fd !important; }
+html.theme-light .text-blue-400 { color: #2563eb !important; }
+html.theme-light .text-blue-300 { color: #3b82f6 !important; }
+/* NC badges (dark red bg) */
+html.theme-light .bg-red-950\/40.border { background: #fff1f2 !important; border-color: #fca5a5 !important; }
+
+/* ── 14. MetricCard (rounded-card) — elevation + top accent bar per variant ───── */
+html.theme-light .rounded-card {
+    position: relative !important;
+    overflow: hidden !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05), 0 4px 10px rgba(0,0,0,0.06) !important;
+}
+html.theme-light .rounded-card:hover {
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08), 0 10px 20px rgba(0,0,0,0.07) !important;
+}
+/* Accent bar — only on colored variants, not the neutral default */
+html.theme-light .rounded-card::before {
+    content: none; /* off by default */
+}
+html.theme-light .bg-emerald-950\/50.rounded-card::before,
+html.theme-light .bg-emerald-900\/50.rounded-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: #059669;
+    border-radius: 0.625rem 0.625rem 0 0;
+}
+html.theme-light .bg-amber-950\/40.rounded-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: #d97706;
+    border-radius: 0.625rem 0.625rem 0 0;
+}
+html.theme-light .bg-red-950\/40.rounded-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: #dc2626;
+    border-radius: 0.625rem 0.625rem 0 0;
+}
+html.theme-light .bg-blue-950\/40.rounded-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: #2563eb;
+    border-radius: 0.625rem 0.625rem 0 0;
+}
+
+/* ── 15. Dashboard: KPI cards, tab strip, division health, recent audits ──────── */
+/* kpi-card is scoped in ReportsView — !important overrides the scoped hash */
+html.theme-light .kpi-card {
+    position: relative !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+    border-color: #e5e7eb !important;
+    color: #0f172a !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 6px 18px rgba(0,0,0,0.06) !important;
+}
+html.theme-light .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: #2563eb;
+    border-radius: 0.625rem 0.625rem 0 0;
+}
+html.theme-light .kpi-card--danger::before { background: #dc2626; }
+html.theme-light .kpi-card--warn::before { background: #d97706; }
+html.theme-light .kpi-card:hover {
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08), 0 10px 20px rgba(0,0,0,0.07) !important;
+    border-color: rgba(37, 99, 235, 0.25) !important;
+    transform: translateY(-2px);
+}
+html.theme-light .kpi-card .text-white { color: #0f172a !important; }
+html.theme-light .kpi-card .text-slate-400 { color: #475569 !important; }
+html.theme-light .kpi-card--danger {
+    border-color: rgba(220, 38, 38, 0.22) !important;
+    background: #fff1f2 !important;
+}
+html.theme-light .kpi-card--danger:hover {
+    box-shadow: 0 4px 10px rgba(220, 38, 38, 0.12), 0 10px 20px rgba(220, 38, 38, 0.07) !important;
+    border-color: rgba(220, 38, 38, 0.35) !important;
+}
+html.theme-light .kpi-card--warn {
+    border-color: rgba(217, 119, 6, 0.22) !important;
+    background: #fffbeb !important;
+}
+html.theme-light .kpi-card--warn:hover {
+    box-shadow: 0 4px 10px rgba(217, 119, 6, 0.12), 0 10px 20px rgba(217, 119, 6, 0.07) !important;
+    border-color: rgba(217, 119, 6, 0.35) !important;
+}
+html.theme-light .kpi-hide-btn { color: rgba(71, 85, 105, 0.4) !important; }
+html.theme-light .kpi-tap-hint { color: rgba(71, 85, 105, 0.25) !important; }
+html.theme-light .kpi-card:hover .kpi-tap-hint { color: rgba(37, 99, 235, 0.5) !important; }
+/* Tab strip */
+html.theme-light .tab-btn { color: #64748b !important; }
+html.theme-light .tab-btn:hover { color: #0f172a !important; }
+html.theme-light .tab-btn--active { color: #2563eb !important; border-bottom-color: #2563eb !important; }
+/* Division health cards — white cards elevated off soft grey section bg */
+html.theme-light .division-health-card {
+    position: relative !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 6px 18px rgba(0,0,0,0.06) !important;
+    border-color: #e5e7eb !important;
+}
+html.theme-light .division-health-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 12px 24px rgba(0,0,0,0.07) !important;
+}
+html.theme-light .division-health-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: #94a3b8;
+    border-radius: 0.75rem 0.75rem 0 0;
+}
+html.theme-light .division-health-card.border-emerald-700\/50::before { background: #059669; }
+html.theme-light .division-health-card.border-amber-700\/50::before   { background: #d97706; }
+html.theme-light .division-health-card.border-red-700\/60::before     { background: #dc2626; }
+/* Recent audits list */
+html.theme-light .recent-audits-list {
+    background: #ffffff !important;
+    border-color: #e5e7eb !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 6px 18px rgba(0,0,0,0.06) !important;
+}
+html.theme-light .recent-audit-row {
+    border-bottom-color: #e5e7eb !important;
+}
+html.theme-light .recent-audit-row:hover {
+    background: #eef2f7 !important;
+    box-shadow: inset 3px 0 0 #2563eb !important;
+}
+/* Overdue CA alert banner */
+html.theme-light .overdue-alert-banner {
+    background: #fff1f2 !important;
+    border-color: rgba(220, 38, 38, 0.22) !important;
+}
+html.theme-light .overdue-alert-banner:hover {
+    background: #ffe4e6 !important;
+}
+/* Section collapse button */
+html.theme-light .section-collapse-btn {
+    border-color: rgba(15, 23, 42, 0.14) !important;
+    color: #64748b !important;
+}
+html.theme-light .section-collapse-btn:hover {
+    background: #eff6ff !important;
+    color: #2563eb !important;
+    border-color: rgba(37, 99, 235, 0.3) !important;
+}
+/* Auditor link */
+html.theme-light .auditor-link { color: #2563eb !important; text-decoration-color: rgba(37, 99, 235, 0.4) !important; }
+html.theme-light .auditor-link:hover { color: #1d4ed8 !important; }
+
+/* ── 16. BasePageHeader border ────────────────────────────────────────────────── */
+html.theme-light .border-b.border-slate-700\/50,
+html.theme-light [class*="border-slate-700"] { border-color: rgba(15, 23, 42, 0.10) !important; }
+
+/* ── 17. Review mode banner (audit review) ────────────────────────────────────── */
+html.theme-light .review-mode-banner {
+    background: rgba(37, 99, 235, 0.06) !important;
+    border-color: rgba(37, 99, 235, 0.25) !important;
+}
+
+/* ── 18. Report section cards ─────────────────────────────────────────────────── */
+html.theme-light .report-section-card {
+    background: #ffffff !important;
+    border-color: rgba(15, 23, 42, 0.10) !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+}
+html.theme-light .section-heading {
+    color: #475569 !important;
+    border-bottom-color: rgba(15, 23, 42, 0.10) !important;
+}
+
+/* ── 19. BaseDataTable wrapper gets light elevation ───────────────────────────── */
+html.theme-light .rounded-card.border.bg-surface-2 {
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 6px 18px rgba(0,0,0,0.06) !important;
+}
+
+/* ── 20. Section wrapper — anchors floating content to a grey container ───────── */
+/* Use class="lt-section" on any wrapping div to get a sunken section feel */
+html.theme-light .lt-section {
+    background: #eef2f6 !important;
+    border-radius: 0.75rem;
+    border: 1px solid #e5e7eb;
+    padding: 1rem;
+}
+/* Dashboard section blocks on the overview tab already have space-y-2 wrappers;
+   we give them the section feel via a universal selector so no template edits needed */
+html.theme-light .p-4.space-y-4 > .space-y-2 > div:first-child {
+    background: transparent !important; /* let children handle their own bg */
+}
+
+/* ── 21. Filter bar — white, not dark ────────────────────────────────────────── */
+/* The dashboard filter bar and audit list filter bar use dark Tailwind backgrounds */
+html.theme-light .px-4.pt-3.pb-2.border-b,
+html.theme-light .flex.flex-wrap.gap-3.items-end.border-b {
+    background: #ffffff !important;
+    border-bottom-color: rgba(15, 23, 42, 0.10) !important;
+}
+
+/* ── 22. Status badges — strong tints, high-contrast text ────────────────────── */
+/* PrimeVue Tag severities in light mode */
+html.theme-light .p-tag.p-tag-success { background: #dcfce7 !important; color: #166534 !important; border-color: #86efac !important; }
+html.theme-light .p-tag.p-tag-warning { background: #fef3c7 !important; color: #92400e !important; border-color: #fde68a !important; }
+html.theme-light .p-tag.p-tag-danger  { background: #fee2e2 !important; color: #991b1b !important; border-color: #fca5a5 !important; }
+html.theme-light .p-tag.p-tag-info    { background: #dbeafe !important; color: #1e40af !important; border-color: #93c5fd !important; }
+html.theme-light .p-tag.p-tag-secondary { background: #f1f5f9 !important; color: #475569 !important; border-color: #cbd5e1 !important; }
+html.theme-light .p-tag.p-tag-contrast  { background: #e0e7ff !important; color: #3730a3 !important; border-color: #a5b4fc !important; }
+/* Status-specific labels (Draft, Submitted, Approved, etc.) */
+html.theme-light .p-tag[data-severity="warning"] { background: #fef3c7 !important; color: #92400e !important; }
+html.theme-light .p-tag[data-severity="info"]    { background: #dbeafe !important; color: #1e40af !important; }
+html.theme-light .p-tag[data-severity="success"] { background: #dcfce7 !important; color: #166534 !important; }
+
+/* ── 23. Section dividers — subtle horizontal rhythm ─────────────────────────── */
+html.theme-light .border-b { border-bottom-color: rgba(15, 23, 42, 0.10) !important; }
+html.theme-light .border-t { border-top-color: rgba(15, 23, 42, 0.10) !important; }
+html.theme-light .divide-y > * + * { border-top-color: rgba(15, 23, 42, 0.08) !important; }
+
+/* ── 24. KPI card typography hierarchy ───────────────────────────────────────── */
+/* Value text gets full primary weight; label is muted */
+html.theme-light .kpi-card .text-3xl { color: #0f172a !important; font-weight: 700 !important; }
+html.theme-light .kpi-card .text-sm  { color: #334155 !important; }
+html.theme-light .kpi-card .text-xs  { color: #64748b !important; }
+html.theme-light .kpi-card--danger .text-3xl { color: #dc2626 !important; }
+html.theme-light .kpi-card--danger .text-sm  { color: #7f1d1d !important; }
+html.theme-light .kpi-card--warn .text-3xl   { color: #d97706 !important; }
+html.theme-light .kpi-card--warn .text-sm    { color: #78350f !important; }
+
+/* ── 25. BasePageHeader bottom divider ───────────────────────────────────────── */
+html.theme-light .px-4.pt-4.pb-3.mb-2.border-b {
+    border-bottom-color: rgba(15, 23, 42, 0.10) !important;
+    background: transparent !important;
+}
+
+/* ── 26. bg-surface-* — hardcoded in tailwind.config, NOT CSS vars ───────────── */
+/* Must be overridden by class name since Tailwind bakes the dark hex in directly */
+html.theme-light .bg-surface-1 { background: #f4f6f8 !important; }
+html.theme-light .bg-surface-2 { background: #ffffff !important; }
+html.theme-light .bg-surface-3 { background: #eef2f6 !important; }
+
+/* Default MetricCard uses bg-surface-2 + text-white for value — fix both */
+html.theme-light .rounded-card.bg-surface-2 {
+    border-color: rgba(15, 23, 42, 0.10) !important;
+    box-shadow: 0 1px 3px rgba(15,23,42,0.06), 0 4px 14px rgba(15,23,42,0.07) !important;
+}
+/* Restore hover lift for interactive MetricCards (Tailwind hover: blocked by !important above) */
+html.theme-light .rounded-card.bg-surface-2[role="button"]:hover {
+    border-color: rgba(37, 99, 235, 0.35) !important;
+    box-shadow: 0 0 0 2px rgba(37,99,235,0.15), 0 6px 18px rgba(15,23,42,0.10) !important;
+}
+html.theme-light .rounded-card.bg-surface-2 .text-3xl  { color: #0f172a !important; }
+html.theme-light .rounded-card.bg-surface-2 .text-white { color: #0f172a !important; }
+html.theme-light .rounded-card.bg-surface-2 .text-slate-300 { color: #475569 !important; }
+html.theme-light .rounded-card.bg-surface-2 .text-xs  { color: #64748b !important; }
+/* Icon bg inside default MetricCard */
+html.theme-light .rounded-card.bg-surface-2 .bg-slate-700\/60 { background: #e2e8f0 !important; }
+html.theme-light .bg-slate-700\/60 { background: #e2e8f0 !important; }
+
+/* ── 27. PrimeVue checkboxes — white box, blue when checked ─────────────────── */
+html.theme-light .p-checkbox .p-checkbox-box {
     background: #ffffff !important;
     border-color: #cbd5e1 !important;
-    color: #1e293b !important;
+    box-shadow: none !important;
+    color: #0f172a !important;
 }
-html.theme-light .p-dropdown-panel { background: #ffffff !important; border-color: #cbd5e1 !important; }
-html.theme-light .p-dropdown-item { color: #1e293b !important; }
-html.theme-light .p-dropdown-item:hover { background: #f1f5f9 !important; }
-html.theme-light .p-dialog { background: #ffffff !important; border-color: #e2e8f0 !important; }
-html.theme-light .p-dialog-header { color: #1e293b !important; border-bottom-color: #e2e8f0 !important; }
-html.theme-light .p-dialog-footer { border-top-color: #e2e8f0 !important; }
-html.theme-light .text-slate-100,
-html.theme-light .text-slate-200,
-html.theme-light .text-slate-300 { color: #334155 !important; }
-html.theme-light .text-slate-400,
-html.theme-light .text-slate-500 { color: #64748b !important; }
-html.theme-light .text-white { color: #1e293b !important; }
-html.theme-light .bg-slate-800,
-html.theme-light .bg-slate-900 { background: #ffffff !important; }
-html.theme-light .bg-slate-700 { background: #f1f5f9 !important; }
-html.theme-light .border-slate-700 { border-color: #e2e8f0 !important; }
-html.theme-light .layout-menuitem-text { color: #334155 !important; }
-html.theme-light .layout-menuitem-icon { color: #64748b !important; }
-html.theme-light .menu-wrapper .layout-menu-container .layout-menu li > a:hover {
-    background: rgba(59, 130, 246, 0.08) !important;
-    border-left-color: rgba(59, 130, 246, 0.55) !important;
+html.theme-light .p-checkbox .p-checkbox-box.p-highlight,
+html.theme-light .p-checkbox-checked .p-checkbox-box {
+    background: #2563eb !important;
+    border-color: #2563eb !important;
 }
-html.theme-light .menu-wrapper .layout-menu-container .layout-menu li > a.active-route {
-    background: rgba(59, 130, 246, 0.12) !important;
-    border-left-color: #3b82f6 !important;
-    color: #1d4ed8 !important;
+html.theme-light .p-checkbox .p-checkbox-box:hover,
+html.theme-light .p-checkbox:not(.p-disabled):hover .p-checkbox-box {
+    border-color: #2563eb !important;
 }
-html.theme-light .layout-menuitem-root-text { color: #94a3b8 !important; }
-html.theme-light .p-button.p-button-text { color: #334155 !important; }
-html.theme-light .p-tag { border: 1px solid currentColor; }
-/* Light theme — kpi cards and filter bars */
-html.theme-light .kpi-card {
-    background: #ffffff !important;
-    border-color: #e2e8f0 !important;
-    color: #1e293b !important;
-}
-html.theme-light .kpi-card:hover {
-    box-shadow: 0 0 0 1px rgba(59,130,246,0.3), 0 8px 24px rgba(0,0,0,0.1) !important;
-    border-color: rgba(59,130,246,0.4) !important;
-}
-html.theme-light .kpi-card .text-white { color: #1e293b !important; }
-html.theme-light .kpi-card .text-slate-400 { color: #64748b !important; }
+html.theme-light .p-checkbox-icon { color: #ffffff !important; }
+/* PrimeVue v4 uses p-checkbox-input + p-checkbox-box pattern */
+html.theme-light .p-datatable .p-checkbox .p-checkbox-box { background: #ffffff !important; border-color: #cbd5e1 !important; }
+html.theme-light .p-datatable .p-checkbox .p-checkbox-box.p-highlight { background: #2563eb !important; border-color: #2563eb !important; }
+/* Header select-all checkbox */
+html.theme-light .p-datatable thead .p-checkbox .p-checkbox-box { background: #ffffff !important; border-color: #cbd5e1 !important; }
 
 /* ── Views that lock the layout to viewport height (only inner panel scrolls) ── */
 /* Screen-only: must NOT apply during print or it clips the print content. */

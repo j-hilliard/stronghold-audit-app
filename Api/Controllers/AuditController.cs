@@ -16,6 +16,7 @@ namespace Stronghold.AppDashboard.Api.Controllers;
 
 public record ReopenAuditRequest(string? Reason);
 public record CloseAuditRequest(string? Notes);
+public record ApproveAuditRequest(string? Notes);
 public record SetScoreTargetRequest(decimal? ScoreTarget);
 public record SetAuditFrequencyRequest(int? AuditFrequencyDays);
 public record SetRequireClosurePhotoRequest(bool RequireClosurePhoto);
@@ -300,6 +301,50 @@ public class AuditController : V1ControllerBase
     }
 
     [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPost("audits/{id:int}/review")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> StartAuditReview([FromRoute] int id)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                var user = await GetUser();
+                await Mediator.Send(new StartReview { AuditId = id, ReviewStartedBy = user.Email! });
+                return NoContent();
+            },
+            ex => ex is KeyNotFoundException
+                ? Task.FromResult<IActionResult>(NotFound(ex.Message))
+                : ex is InvalidOperationException
+                    ? Task.FromResult<IActionResult>(BadRequest(ex.Message))
+                    : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
+    [HttpPost("audits/{id:int}/approve")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ApproveAuditAction([FromRoute] int id, [FromBody] ApproveAuditRequest body)
+    {
+        return await TryExecuteAsync<IActionResult>(
+            async () =>
+            {
+                var user = await GetUser();
+                await Mediator.Send(new ApproveAudit { AuditId = id, ApprovedBy = user.Email! });
+                return NoContent();
+            },
+            ex => ex is KeyNotFoundException
+                ? Task.FromResult<IActionResult>(NotFound(ex.Message))
+                : ex is InvalidOperationException
+                    ? Task.FromResult<IActionResult>(BadRequest(ex.Message))
+                    : Error(ex)
+        );
+    }
+
+    [MapToApiVersion(Constants.ApiVersions.V1)]
     [HttpDelete("audits/{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -414,10 +459,13 @@ public class AuditController : V1ControllerBase
                 var user = await GetUser();
                 await Mediator.Send(new SendDistributionEmail
                 {
-                    AuditId         = id,
-                    AttachmentIds   = body.AttachmentIds,
-                    SubjectOverride = body.SubjectOverride,
-                    SentBy          = user.Email!,
+                    AuditId                  = id,
+                    AttachmentIds            = body.AttachmentIds,
+                    SubjectOverride          = body.SubjectOverride,
+                    IncludeCorrectiveActions = body.IncludeCorrectiveActions,
+                    IncludeOpenCasOnly       = body.IncludeOpenCasOnly,
+                    Message                  = body.Message,
+                    SentBy                   = user.Email!,
                 });
                 return NoContent();
             },
