@@ -254,6 +254,8 @@ public class SendDistributionEmailRequest
     public bool IncludeOpenCasOnly { get; set; }
     /// <summary>Optional findings narrative to prepend before the findings table.</summary>
     public string? Message { get; set; }
+    /// <summary>When true, generate and attach a PDF copy of the audit report to the email.</summary>
+    public bool IncludePdf { get; set; }
 }
 
 public class AuditFindingDto

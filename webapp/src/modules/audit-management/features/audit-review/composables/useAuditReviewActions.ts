@@ -534,7 +534,7 @@ export function useAuditReviewActions({ review, allRoutingEntries }: ActionOptio
         }
 
         if (includeAuditPdf.value) {
-            body += `[Audit PDF attached]\n\n`;
+            body += `[Audit PDF will be attached when sent via Stronghold]\n\n`;
         }
 
         body += `${'─'.repeat(40)}\nSent via Stronghold Audit System\n`;
@@ -557,7 +557,11 @@ export function useAuditReviewActions({ review, allRoutingEntries }: ActionOptio
         const id = Number(route.params.id);
         distributionSending.value = true;
         try {
-            await store.saveReviewSummary(id, distributionSummaryEdit.value || null);
+            // Only save the review summary when the status allows it (not on resend from Distributed)
+            const status = review.value?.status;
+            if (status === 'UnderReview' || status === 'Approved') {
+                await store.saveReviewSummary(id, distributionSummaryEdit.value || null);
+            }
 
             const sentRecipients = distributionPreview.value?.recipients ?? [];
             const sentItems      = buildSentItemsList();
@@ -570,6 +574,7 @@ export function useAuditReviewActions({ review, allRoutingEntries }: ActionOptio
                     includeCas.value,
                     includeOpenCasOnly.value,
                     distributionSummaryEdit.value || null,
+                    includeAuditPdf.value,
                 );
                 selectedAttachmentIds.value = [];
                 distributionSentInfo.value  = { type: 'api', recipients: sentRecipients, items: sentItems };

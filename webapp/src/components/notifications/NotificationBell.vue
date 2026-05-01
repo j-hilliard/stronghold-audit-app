@@ -114,6 +114,7 @@ function handleClick(n: NotificationDto) {
 function iconName(type: NotificationDto['type']) {
     switch (type) {
         case 'AuditSubmitted':   return 'pi pi-file-edit';
+        case 'ReviewStarted':    return 'pi pi-eye';
         case 'AuditApproved':    return 'pi pi-check-circle';
         case 'AuditDistributed': return 'pi pi-send';
         case 'CaAssigned':       return 'pi pi-user-edit';
@@ -125,6 +126,7 @@ function iconName(type: NotificationDto['type']) {
 function iconClass(type: NotificationDto['type']) {
     switch (type) {
         case 'AuditSubmitted':   return 'notif-icon--blue';
+        case 'ReviewStarted':    return 'notif-icon--blue';
         case 'AuditApproved':    return 'notif-icon--green';
         case 'AuditDistributed': return 'notif-icon--purple';
         case 'CaAssigned':       return 'notif-icon--amber';

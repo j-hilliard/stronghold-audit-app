@@ -12,7 +12,8 @@ using AuditSectionNaOverrideEntity = Stronghold.AppDashboard.Data.Models.Audit.A
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
 [AllowedAuthorizationRole(
-    AuthorizationRole.AuditManager, AuthorizationRole.TemplateAdmin,
+    AuthorizationRole.AuditManager, AuthorizationRole.AuditReviewer,
+    AuthorizationRole.TemplateAdmin,
     AuthorizationRole.Administrator,
     AuthorizationRole.Auditor, AuthorizationRole.AuditAdmin)]
 public class SaveAuditResponses : IRequest<Unit>

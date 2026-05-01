@@ -4,13 +4,23 @@ namespace Stronghold.AppDashboard.Data;
 
 public static class DbInitializer
 {
-    public static void Initialize(AppDbContext dbContext, bool isProductionEnvironment = false)
+    /// <summary>
+    /// Seeds system reference data safe for ALL environments: roles and audit reference data.
+    /// Never seeds local-only users or demo audits — those belong in the Local Program.cs block.
+    /// </summary>
+    public static void Initialize(AppDbContext dbContext)
     {
         SeedUserRoles(dbContext);
         SeedAuditRoles(dbContext);
-        SeedDefaultLocalUser(dbContext);
         AuditDbInitializer.SeedAuditData(dbContext);
-        AuditDemoDataSeeder.SeedDemoAudits(dbContext);
+    }
+
+    /// <summary>
+    /// Seeds the default LocalDevTesting admin user. Local environment only.
+    /// </summary>
+    public static void SeedDefaultLocalUser(AppDbContext dbContext)
+    {
+        SeedDefaultLocalUserInternal(dbContext);
     }
 
     private const string AdministratorRoleDescription =
@@ -94,7 +104,7 @@ public static class DbInitializer
         dbContext.SaveChanges();
     }
 
-    private static void SeedDefaultLocalUser(AppDbContext dbContext)
+    private static void SeedDefaultLocalUserInternal(AppDbContext dbContext)
     {
         if (dbContext.Users.Any())
             return;

@@ -152,7 +152,7 @@ export const useAuditStore = defineStore('audit', () => {
     const score = computed(() => calculateScore(allResponses.value));
 
     const isSubmitted = computed(() =>
-        auditStatus.value === 'Submitted' || auditStatus.value === 'Closed',
+        !['Draft', 'Reopened'].includes(auditStatus.value),
     );
 
     /**
@@ -680,6 +680,7 @@ export const useAuditStore = defineStore('audit', () => {
         includeCorrectiveActions?: boolean,
         includeOpenCasOnly?: boolean,
         message?: string | null,
+        includePdf?: boolean,
     ): Promise<void> {
         await getClient().sendDistributionEmail(auditId, {
             attachmentIds,
@@ -687,6 +688,7 @@ export const useAuditStore = defineStore('audit', () => {
             includeCorrectiveActions,
             includeOpenCasOnly,
             message: message || undefined,
+            includePdf,
         });
         await loadReview(auditId);
     }

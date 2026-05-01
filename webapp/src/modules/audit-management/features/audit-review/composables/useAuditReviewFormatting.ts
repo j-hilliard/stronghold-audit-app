@@ -55,7 +55,9 @@ export function useAuditReviewFormatting(review: Ref<AuditReviewDto | null>) {
 
     // ── Status helpers ────────────────────────────────────────────────────────
     function caSeverity(status: string): string {
-        const map: Record<string, string> = { Open: 'danger', InProgress: 'warning', Closed: 'success' };
+        const map: Record<string, string> = {
+            Open: 'danger', InProgress: 'warning', Submitted: 'warn', Closed: 'success', Voided: 'secondary', Overdue: 'danger',
+        };
         return map[status] ?? 'secondary';
     }
 

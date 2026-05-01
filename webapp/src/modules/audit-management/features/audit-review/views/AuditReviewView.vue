@@ -146,6 +146,15 @@
                     <span class="font-semibold text-blue-300">Review Mode</span>
                     <span class="text-blue-400/80"> — You can edit this audit. Make updates, preview the PDF, then approve.</span>
                 </p>
+                <Button
+                    v-if="review.status === 'UnderReview' && hasPermission('audit.review')"
+                    label="Edit Responses"
+                    icon="pi pi-pencil"
+                    severity="info"
+                    size="small"
+                    outlined
+                    @click="router.push(`/audit-management/audits/${route.params.id}?reviewerMode=1`)"
+                />
             </div>
 
             <!-- ── Life-Critical Failure Banner ───────────────────────────────── -->
@@ -413,10 +422,10 @@
                                     <div class="flex items-center gap-2">
                                         <Tag :value="ca.status" :severity="caSeverity(ca.status)" />
                                         <Button
-                                            v-if="ca.status !== 'Closed'"
-                                            label="Close"
+                                            v-if="ca.status !== 'Closed' && ca.status !== 'Voided' && hasPermission('audit.review')"
+                                            :label="ca.status === 'Submitted' ? 'Approve' : 'Close'"
                                             size="small"
-                                            severity="success"
+                                            :severity="ca.status === 'Submitted' ? 'warning' : 'success'"
                                             outlined
                                             class="no-print"
                                             @click="openCloseModal(ca)"

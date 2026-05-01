@@ -472,6 +472,7 @@ public class AuditController : V1ControllerBase
                     IncludeCorrectiveActions = body.IncludeCorrectiveActions,
                     IncludeOpenCasOnly       = body.IncludeOpenCasOnly,
                     Message                  = body.Message,
+                    IncludePdf               = body.IncludePdf,
                     SentBy                   = user.Email!,
                 });
                 return NoContent();

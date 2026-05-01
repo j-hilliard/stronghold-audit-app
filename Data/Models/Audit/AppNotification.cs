@@ -2,7 +2,7 @@ namespace Stronghold.AppDashboard.Data.Models.Audit;
 
 /// <summary>
 /// In-app notification for audit lifecycle and CA events.
-/// Type: "AuditSubmitted" | "AuditApproved" | "AuditDistributed" | "CaAssigned" | "CaCompleted"
+/// Type: "AuditSubmitted" | "ReviewStarted" | "AuditApproved" | "AuditDistributed" | "CaAssigned" | "CaCompleted"
 /// </summary>
 public class AppNotification
 {
@@ -11,7 +11,7 @@ public class AppNotification
     /// <summary>Email address of the recipient user.</summary>
     public string RecipientEmail { get; set; } = null!;
 
-    /// <summary>"AuditSubmitted" | "AuditApproved" | "AuditDistributed" | "CaAssigned" | "CaCompleted"</summary>
+    /// <summary>"AuditSubmitted" | "ReviewStarted" | "AuditApproved" | "AuditDistributed" | "CaAssigned" | "CaCompleted"</summary>
     public string Type { get; set; } = null!;
 
     public string Title { get; set; } = null!;

@@ -8,7 +8,7 @@ namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 public class UpdateCaByPublicToken : IRequest<Unit>
 {
     public string  Token         { get; set; } = null!;
-    /// <summary>Only "InProgress" is permitted — external parties cannot close a CA.</summary>
+    /// <summary>"InProgress" or "Submitted" — external parties mark progress or declare work done.</summary>
     public string  NewStatus     { get; set; } = null!;
     public string? Notes         { get; set; }
     public string? UpdatedByName { get; set; }
@@ -43,9 +43,9 @@ public class UpdateCaByPublicTokenHandler : IRequestHandler<UpdateCaByPublicToke
         if (ca.Status is "Closed" or "Voided")
             throw new InvalidOperationException("This corrective action is no longer open for updates.");
 
-        // External parties may only mark as InProgress — closing requires an authenticated Admin/Auditor
-        if (request.NewStatus != "InProgress")
-            throw new ArgumentException("External access is limited to marking corrective actions as 'InProgress'.");
+        // External parties may mark InProgress (started work) or Submitted (work done, pending admin close)
+        if (request.NewStatus is not ("InProgress" or "Submitted"))
+            throw new ArgumentException("External access allows marking corrective actions as 'InProgress' or 'Submitted'.");
 
         var now     = DateTime.UtcNow;
         var updater = request.UpdatedByName ?? record.SentToName ?? "External";

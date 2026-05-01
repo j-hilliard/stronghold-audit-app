@@ -464,7 +464,7 @@ export interface BulkUpdateCorrectiveActionsRequest {
     correctiveActionIds: number[];
     /** "status" | "reassign" */
     action: string;
-    /** For action="status": "InProgress" | "Closed" | "Voided" */
+    /** For action="status": "InProgress" | "Submitted" | "Closed" | "Voided" */
     newStatus?: string | null;
     /** Required when newStatus="Closed" */
     closureNotes?: string | null;
@@ -801,6 +801,7 @@ export interface SendDistributionEmailRequest {
     includeCorrectiveActions?: boolean;
     includeOpenCasOnly?: boolean;
     message?: string | null;
+    includePdf?: boolean;
 }
 
 export interface DistributionPreviewDto {
@@ -1703,7 +1704,7 @@ export interface AuditTrailLogDto {
 
 export interface NotificationDto {
     id:         number;
-    type:       'AuditSubmitted' | 'AuditApproved' | 'AuditDistributed' | 'CaAssigned' | 'CaCompleted';
+    type:       'AuditSubmitted' | 'ReviewStarted' | 'AuditApproved' | 'AuditDistributed' | 'CaAssigned' | 'CaCompleted';
     title:      string;
     body:       string;
     entityType: string | null;

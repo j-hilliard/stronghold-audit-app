@@ -302,10 +302,12 @@ if (!AppConfigExtensions.IsRunningForNswagCodegen())
     if (app.Environment.IsEnvironment("Local"))
     {
         // Local dev: auto-migrate so individual developers don't need to run EF CLI manually.
-        // Also seeds full dev data (users, divisions, templates, etc.).
+        // Also seeds local-only users and demo audits — never seeded in shared environments.
         context.Database.Migrate();
         DbInitializer.Initialize(context);
+        DbInitializer.SeedDefaultLocalUser(context);
         DbInitializer.SeedLocalTestUsers(context);
+        AuditDemoDataSeeder.SeedDemoAudits(context);
     }
     else if (app.Environment.IsDevelopment())
     {
@@ -315,9 +317,8 @@ if (!AppConfigExtensions.IsRunningForNswagCodegen())
     }
     else if (app.Environment.IsProduction())
     {
-        // Production: same as Development — pipeline handles migrations.
-        // Production-mode seed skips dev-only data and dummy records.
-        DbInitializer.Initialize(context, true);
+        // Production: pipeline handles migrations. Reference data only — no demo data, no dev users.
+        DbInitializer.Initialize(context);
     }
 }
 

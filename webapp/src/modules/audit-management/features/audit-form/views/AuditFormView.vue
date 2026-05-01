@@ -12,8 +12,18 @@
                 :severity="statusSeverity(store.auditStatus)"
                 class="mr-2"
             />
+            <!-- Reviewer mode: back nav -->
             <Button
-                v-if="!store.isSubmitted"
+                v-if="isReviewerMode"
+                label="Back to Review"
+                icon="pi pi-arrow-left"
+                severity="secondary"
+                outlined
+                size="small"
+                @click="router.push(`/audit-management/audits/${store.auditId}/review`)"
+            />
+            <Button
+                v-if="!formIsLocked"
                 label="Collapse All"
                 icon="pi pi-minus"
                 severity="secondary"
@@ -22,7 +32,7 @@
                 @click="collapseAll"
             />
             <Button
-                v-if="!store.isSubmitted"
+                v-if="!formIsLocked"
                 label="Expand All"
                 icon="pi pi-plus"
                 severity="secondary"
@@ -31,20 +41,20 @@
                 @click="expandAll"
             />
             <BaseButtonSave
-                v-if="!store.isSubmitted"
-                label="Save Draft"
+                v-if="!formIsLocked"
+                :label="isReviewerMode ? 'Save Changes' : 'Save Draft'"
                 :loading="store.saving"
                 @click="store.saveDraft()"
             />
             <Button
-                v-if="!store.isSubmitted && hasPermission('audit.submit')"
+                v-if="!formIsLocked && !isReviewerMode && hasPermission('audit.submit')"
                 label="Submit for Review"
                 icon="pi pi-send"
                 :loading="store.saving"
                 @click="onSubmit"
             />
             <Button
-                v-if="!store.isSubmitted"
+                v-if="!formIsLocked && !isReviewerMode"
                 label="Delete Draft"
                 icon="pi pi-trash"
                 severity="danger"
@@ -53,7 +63,7 @@
                 @click="onDeleteDraft"
             />
             <Button
-                v-if="store.isSubmitted"
+                v-if="formIsLocked && !isReviewerMode"
                 label="View Review"
                 icon="pi pi-eye"
                 severity="info"
@@ -117,7 +127,7 @@
                 <AuditHeader
                     :header="store.header"
                     :audit-type="store.template.auditType"
-                    :disabled="store.isSubmitted"
+                    :disabled="formIsLocked"
                     :tracking-number="store.trackingNumber"
                 />
             </div>
@@ -127,7 +137,7 @@
                 <AuditAttachments
                     v-if="store.auditId"
                     :audit-id="store.auditId"
-                    :readonly="store.isSubmitted"
+                    :readonly="formIsLocked"
                 />
             </div>
 
@@ -139,7 +149,7 @@
                     :ref="el => { if (el) sectionRefs.set(section.id, el as unknown as SectionRef) }"
                     :section="section"
                     :start-open="true"
-                    :disabled="store.isSubmitted"
+                    :disabled="formIsLocked"
                 />
             </div>
         </template>
@@ -154,7 +164,7 @@
         <!-- Sticky bottom action bar (visible while editing) -->
         <StickyFormActions
             v-if="store.template"
-            :visible="!store.isSubmitted"
+            :visible="!formIsLocked"
             :saving="store.saving"
             :can-submit="hasPermission('audit.submit')"
             :status-label="store.auditStatus ? `Status: ${store.auditStatus}` : 'Editing draft'"
@@ -272,6 +282,9 @@ const sectionRefs = ref<Map<number, SectionRef>>(new Map());
 const showSummary = ref(false);
 const submitEmailHref = ref<string | null>(null);
 
+const isReviewerMode = computed(() => route.query.reviewerMode === '1');
+const formIsLocked = computed(() => store.isSubmitted && !isReviewerMode.value);
+
 const summaryNcItems = computed(() =>
     Array.from(store.responses.values()).filter(r => r.status === 'NonConforming'),
 );
@@ -319,10 +332,13 @@ function expandAll() {
 
 function statusSeverity(status: string): string {
     const map: Record<string, string> = {
-        Draft: 'warning',
-        Submitted: 'info',
-        Reopened: 'warning',
-        Closed: 'success',
+        Draft:       'warning',
+        Submitted:   'info',
+        Reopened:    'warning',
+        UnderReview: 'info',
+        Approved:    'success',
+        Distributed: 'success',
+        Closed:      'secondary',
     };
     return map[status] ?? 'secondary';
 }

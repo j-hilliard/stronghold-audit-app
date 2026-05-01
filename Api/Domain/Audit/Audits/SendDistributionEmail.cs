@@ -6,6 +6,7 @@ using Stronghold.AppDashboard.Api.Services;
 using Stronghold.AppDashboard.Data;
 using Stronghold.AppDashboard.Data.Models.Audit;
 using Stronghold.AppDashboard.Shared.Enumerations;
+using System.Security.Cryptography;
 
 namespace Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 
@@ -21,23 +22,27 @@ public class SendDistributionEmail : IRequest<Unit>
     public bool IncludeCorrectiveActions { get; set; }
     public bool IncludeOpenCasOnly { get; set; }
     public string? Message { get; set; }
+    public bool IncludePdf { get; set; }
 }
 
 public class SendDistributionEmailHandler : IRequestHandler<SendDistributionEmail, Unit>
 {
     private readonly AppDbContext _context;
     private readonly IEmailService _email;
+    private readonly IPdfGeneratorService _pdf;
     private readonly IConfiguration _config;
     private readonly ILogger<SendDistributionEmailHandler> _log;
 
     public SendDistributionEmailHandler(
         AppDbContext context,
         IEmailService email,
+        IPdfGeneratorService pdf,
         IConfiguration config,
         ILogger<SendDistributionEmailHandler> log)
     {
         _context = context;
         _email = email;
+        _pdf = pdf;
         _config = config;
         _log = log;
     }
@@ -71,17 +76,14 @@ public class SendDistributionEmailHandler : IRequestHandler<SendDistributionEmai
 
         var allRecipients = divisionRecipients.Union(perAuditRecipients).Distinct().ToList();
         if (allRecipients.Count == 0)
-        {
-            _log.LogWarning("SendDistributionEmail: audit {AuditId} has no recipients — skipping send.", request.AuditId);
-            // Still mark reviewed even if no recipients
-        }
-        else
-        {
-            await SendEmailAsync(audit, allRecipients, request.AttachmentIds, request.SubjectOverride,
-                request.IncludeCorrectiveActions, request.IncludeOpenCasOnly, request.Message, cancellationToken);
-        }
+            throw new InvalidOperationException(
+                "Cannot distribute: no recipients are configured. Add distribution recipients before sending.");
 
-        // ── Mark distributed ──────────────────────────────────────────────────
+        await SendEmailAsync(audit, allRecipients, request.AttachmentIds, request.SubjectOverride,
+            request.IncludeCorrectiveActions, request.IncludeOpenCasOnly, request.Message,
+            request.IncludePdf, cancellationToken);
+
+        // ── Mark distributed only after a successful send ─────────────────────
         var now = DateTime.UtcNow;
         audit.ReviewedAt = now;
         audit.ReviewedBy = request.SentBy;
@@ -126,10 +128,9 @@ public class SendDistributionEmailHandler : IRequestHandler<SendDistributionEmai
         bool includeCorrectiveActions,
         bool includeOpenCasOnly,
         string? message,
+        bool includePdf,
         CancellationToken ct)
     {
-        try
-        {
             var header = audit.Header;
             var divCode = audit.Division?.Code ?? "—";
             var auditDate = header?.AuditDate?.ToString("MM/dd/yyyy") ?? (audit.SubmittedAt?.ToString("MM/dd/yyyy") ?? "—");
@@ -182,7 +183,7 @@ public class SendDistributionEmailHandler : IRequestHandler<SendDistributionEmai
                     else
                     {
                         var cas = f.CorrectiveActions
-                            .Where(ca => !ca.IsDeleted && (!includeOpenCasOnly || ca.Status != "Resolved"))
+                            .Where(ca => !ca.IsDeleted && (!includeOpenCasOnly || (ca.Status != "Closed" && ca.Status != "Voided")))
                             .OrderBy(ca => ca.CreatedAt)
                             .ToList();
                         caRows = cas.Count == 0
@@ -284,11 +285,26 @@ public class SendDistributionEmailHandler : IRequestHandler<SendDistributionEmai
                 .Select(a => (a.FileName, a.BlobPath!))
                 .ToList();
 
-            await _email.SendAsync(subject, body, recipients, smtpAttachments, ct);
-        }
-        catch (Exception ex)
-        {
-            _log.LogWarning(ex, "SendDistributionEmail: email send failed for audit {AuditId} — reviewed status still recorded.", audit.Id);
-        }
+            // ── PDF attachment ────────────────────────────────────────────────
+            string? pdfTempPath = null;
+            try
+            {
+                if (includePdf)
+                {
+                    var pdfBytes = await _pdf.GeneratePdfAsync(body, ct: ct);
+                    pdfTempPath = Path.Combine(Path.GetTempPath(),
+                        $"audit-{audit.Id}-{Convert.ToHexString(RandomNumberGenerator.GetBytes(8)).ToLowerInvariant()}.pdf");
+                    await File.WriteAllBytesAsync(pdfTempPath, pdfBytes, ct);
+                    var pdfName = $"Audit-{(audit.TrackingNumber ?? audit.Id.ToString()).Replace("/", "-")}.pdf";
+                    smtpAttachments.Add((pdfName, pdfTempPath));
+                }
+
+                await _email.SendAsync(subject, body, recipients, smtpAttachments, ct);
+            }
+            finally
+            {
+                if (pdfTempPath != null && File.Exists(pdfTempPath))
+                    File.Delete(pdfTempPath);
+            }
     }
 }
