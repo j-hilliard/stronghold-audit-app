@@ -35,8 +35,10 @@ public class ReopenAuditHandler : IRequestHandler<ReopenAudit, Unit>
             .FirstOrDefaultAsync(a => a.Id == request.AuditId, cancellationToken)
             ?? throw new ArgumentException($"Audit {request.AuditId} not found.");
 
-        if (audit.Status != "Submitted" && audit.Status != "Closed")
-            throw new InvalidOperationException($"Audit {request.AuditId} cannot be reopened from status '{audit.Status}'.");
+        var reopenableStatuses = new[] { "Submitted", "Approved", "Distributed", "Closed" };
+        if (!reopenableStatuses.Contains(audit.Status))
+            throw new InvalidOperationException(
+                $"Cannot reopen audit: current status '{audit.Status}' is not eligible for reopening.");
 
         var now = DateTime.UtcNow;
         audit.Status = "Reopened";

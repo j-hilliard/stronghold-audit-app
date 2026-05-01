@@ -36,9 +36,9 @@ public class ApproveAuditHandler : IRequestHandler<ApproveAudit, Unit>
             .FirstOrDefaultAsync(a => a.Id == request.AuditId, cancellationToken)
             ?? throw new KeyNotFoundException($"Audit {request.AuditId} not found.");
 
-        if (audit.Status != "UnderReview" && audit.Status != "Submitted")
+        if (audit.Status != "UnderReview")
             throw new InvalidOperationException(
-                $"Audit {request.AuditId} cannot be approved from status '{audit.Status}'. Expected 'UnderReview' or 'Submitted'.");
+                $"Cannot approve audit: audit must be Under Review. Current status: '{audit.Status}'.");
 
         var now = DateTime.UtcNow;
         audit.Status    = "Approved";

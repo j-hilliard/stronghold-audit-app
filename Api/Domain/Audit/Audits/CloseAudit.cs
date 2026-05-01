@@ -22,13 +22,11 @@ public class CloseAuditHandler : IRequestHandler<CloseAudit, Unit>
 {
     private readonly AppDbContext _context;
     private readonly IProcessLogService _log;
-    private readonly IMediator _mediator;
 
-    public CloseAuditHandler(AppDbContext context, IProcessLogService log, IMediator mediator)
+    public CloseAuditHandler(AppDbContext context, IProcessLogService log)
     {
         _context = context;
         _log = log;
-        _mediator = mediator;
     }
 
     public async Task<Unit> Handle(CloseAudit request, CancellationToken cancellationToken)
@@ -62,23 +60,6 @@ public class CloseAuditHandler : IRequestHandler<CloseAudit, Unit>
         await _log.LogAsync("CloseAudit", "Audit", "Info",
             $"Audit {audit.Id} closed by {request.ClosedBy}. Notes: {request.Notes ?? "none"}",
             relatedObject: audit.Id.ToString());
-
-        // Auto-send distribution email on close — non-fatal if it fails
-        try
-        {
-            await _mediator.Send(new SendDistributionEmail
-            {
-                AuditId    = request.AuditId,
-                SentBy     = request.ClosedBy,
-                AttachmentIds = new List<int>(),
-            }, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            await _log.LogAsync("CloseAudit", "Audit", "Warning",
-                $"Auto-distribution email failed for audit {audit.Id}: {ex.Message}",
-                relatedObject: audit.Id.ToString());
-        }
 
         return Unit.Value;
     }

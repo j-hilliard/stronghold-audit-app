@@ -19,6 +19,8 @@ public class SaveAuditResponses : IRequest<Unit>
 {
     public int AuditId { get; set; }
     public string SavedBy { get; set; } = null!;
+    /// <summary>True when the caller holds an admin/reviewer role. Governs which statuses allow editing.</summary>
+    public bool SaverIsReviewer { get; set; }
     public AuditHeaderDto? Header { get; set; }
     public List<AuditResponseUpsertDto> Responses { get; set; } = new();
     public List<SectionNaOverrideDto> SectionNaOverrides { get; set; } = new();
@@ -44,8 +46,21 @@ public class SaveAuditResponsesHandler : IRequestHandler<SaveAuditResponses, Uni
             .FirstOrDefaultAsync(a => a.Id == request.AuditId, cancellationToken)
             ?? throw new ArgumentException($"Audit {request.AuditId} not found.");
 
-        if (audit.Status != "Draft" && audit.Status != "Reopened")
-            throw new InvalidOperationException($"Audit {request.AuditId} is {audit.Status} and cannot be edited.");
+        var canEdit = audit.Status switch
+        {
+            "Draft"       => true,
+            "Reopened"    => true,
+            "UnderReview" => request.SaverIsReviewer,
+            _             => false,
+        };
+
+        if (!canEdit)
+        {
+            var reason = audit.Status == "UnderReview"
+                ? "Cannot save audit responses: only admins and reviewers can edit an audit that is Under Review."
+                : $"Cannot save audit responses: audit is '{audit.Status}' and cannot be edited.";
+            throw new InvalidOperationException(reason);
+        }
 
         var now = DateTime.UtcNow;
 

@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Stronghold.AppDashboard.Api.Authorization;
 using Stronghold.AppDashboard.Api.Domain.Audit.Admin;
 using Stronghold.AppDashboard.Api.Domain.Audit.Audits;
 using Stronghold.AppDashboard.Api.Domain.Audit.Divisions;
@@ -25,8 +26,13 @@ public record SetDivisionSlaRequest(int? SlaNormalDays, int? SlaUrgentDays, int?
 [Route(Constants.Routes.ApiTemplate)]
 public class AuditController : V1ControllerBase
 {
-    public AuditController(IMediator mediator, ILogger<AuditController> logger)
-        : base(mediator, logger) { }
+    private readonly IAuditUserContext _userContext;
+
+    public AuditController(IMediator mediator, ILogger<AuditController> logger, IAuditUserContext userContext)
+        : base(mediator, logger)
+    {
+        _userContext = userContext;
+    }
 
     // ── Divisions ─────────────────────────────────────────────────────────────
 
@@ -230,6 +236,7 @@ public class AuditController : V1ControllerBase
                 {
                     AuditId = id,
                     SavedBy = user.Email!,
+                    SaverIsReviewer = !_userContext.IsAuditorOnly,
                     Header = body.Header,
                     Responses = body.Responses,
                     SectionNaOverrides = body.SectionNaOverrides

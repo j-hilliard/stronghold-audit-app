@@ -25,6 +25,10 @@ public class SaveReviewSummaryHandler : IRequestHandler<SaveReviewSummary, Unit>
             .FirstOrDefaultAsync(a => a.Id == request.AuditId, cancellationToken)
             ?? throw new KeyNotFoundException($"Audit {request.AuditId} not found.");
 
+        if (audit.Status != "UnderReview" && audit.Status != "Approved")
+            throw new InvalidOperationException(
+                $"Cannot save review summary: audit must be Under Review or Approved. Current status: '{audit.Status}'.");
+
         audit.ReviewSummary = string.IsNullOrWhiteSpace(request.Summary) ? null : request.Summary.Trim();
         await _context.SaveChangesAsync(cancellationToken);
 
