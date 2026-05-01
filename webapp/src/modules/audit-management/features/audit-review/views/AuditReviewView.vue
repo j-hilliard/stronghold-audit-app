@@ -5,37 +5,32 @@
             :title="review ? `${review.divisionCode} Audit Review` : 'Audit Review'"
             :subtitle="review ? `${review.divisionName} — ${review.status}${review.trackingNumber ? ` · ${review.trackingNumber}` : ''}` : ''"
         >
-            <!-- ── Step 1: Enter Review Mode — admin only, Submitted or UnderReview ── -->
-            <Button
-                v-if="review && hasPermission('audit.review') && (review.status === 'Submitted' || (review.status === 'UnderReview' && !reviewEditMode))"
+                <Button
+                v-if="canEnterReview"
                 label="Enter Review Mode"
                 icon="pi pi-search"
                 severity="info"
                 :loading="auditActionSaving"
                 @click="enterReviewMode"
             />
-
-            <!-- ── Step 2: Save Changes — visible when in active review edit mode ── -->
             <Button
-                v-if="review && hasPermission('audit.review') && reviewEditMode"
+                v-if="canSaveChanges"
                 label="Save Changes"
                 icon="pi pi-save"
                 severity="info"
                 outlined
                 :loading="summarySaving"
-                :disabled="reviewSummaryDraft === (review.reviewSummary ?? '')"
+                :disabled="reviewSummaryDraft === (review?.reviewSummary ?? '')"
                 @click="submitSaveSummary"
             />
             <Button
-                v-if="reviewEditMode"
+                v-if="showExitReviewMode"
                 label="Exit Review Mode"
                 icon="pi pi-times"
                 severity="secondary"
                 text
                 @click="reviewEditMode = false"
             />
-
-            <!-- ── Step 3: Preview PDF ── -->
             <Button
                 v-if="review"
                 label="Preview PDF"
@@ -44,8 +39,6 @@
                 outlined
                 @click="showPdfPreviewModal = true"
             />
-
-            <!-- Print / PDF ── -->
             <Button
                 v-if="review"
                 label="Print / PDF"
@@ -53,48 +46,38 @@
                 severity="secondary"
                 @click="printPage"
             />
-
-            <!-- ── Step 4: Approve Audit — UnderReview only ── -->
             <Button
-                v-if="review && hasPermission('audit.review') && review.status === 'UnderReview'"
+                v-if="canApprove"
                 label="Approve Audit"
                 icon="pi pi-check"
                 severity="success"
                 :loading="auditActionSaving"
                 @click="approveAudit"
             />
-
-            <!-- ── Step 5: Send Distribution — visible only when Approved or already Distributed ── -->
             <Button
-                v-if="review && hasPermission('audit.review') && (review.status === 'Approved' || review.status === 'Distributed')"
-                :label="review.status === 'Distributed' ? 'Resend Distribution' : 'Send Distribution'"
+                v-if="canDistribute"
+                :label="isResend ? 'Resend Distribution' : 'Send Distribution'"
                 icon="pi pi-send"
                 :loading="distributionLoadingPreview"
                 @click="openDistributionDialog"
             />
-
-            <!-- ── Secondary: Reopen ── -->
             <Button
-                v-if="review && hasPermission('audit.reopen') && ['Submitted','UnderReview','Approved','Distributed','Closed'].includes(review.status)"
+                v-if="canReopen"
                 label="Reopen"
                 icon="pi pi-refresh"
                 severity="warning"
                 outlined
                 @click="showReopenDialog = true"
             />
-
-            <!-- ── Submit for Review — auditor/non-admin only, when Reopened ── -->
             <Button
-                v-if="review && review.status === 'Reopened' && !hasPermission('audit.review')"
+                v-if="canSubmitForReview"
                 label="Submit for Review"
                 icon="pi pi-send"
                 severity="info"
                 @click="router.push(`/audit-management/audits/${route.params.id}`)"
             />
-
-            <!-- ── Close Audit — only after workflow completes (Approved or Distributed) ── -->
             <Button
-                v-if="review && hasPermission('audit.close') && ['Approved','Distributed'].includes(review.status)"
+                v-if="canClose"
                 label="Close Audit"
                 icon="pi pi-check-circle"
                 severity="secondary"
@@ -140,14 +123,14 @@
         <div v-else-if="review" class="p-4 space-y-4 audit-review-content">
 
             <!-- ── Review Mode Banner ─────────────────────────────────────────── -->
-            <div v-if="reviewEditMode || review.status === 'UnderReview'" class="review-mode-banner">
+            <div v-if="showReviewBanner" class="review-mode-banner">
                 <i class="pi pi-pencil text-blue-400 text-sm shrink-0" />
                 <p class="text-sm flex-1">
                     <span class="font-semibold text-blue-300">Review Mode</span>
                     <span class="text-blue-400/80"> — You can edit this audit. Make updates, preview the PDF, then approve.</span>
                 </p>
                 <Button
-                    v-if="review.status === 'UnderReview' && hasPermission('audit.review')"
+                    v-if="showEditResponsesButton"
                     label="Edit Responses"
                     icon="pi pi-pencil"
                     severity="info"
@@ -765,6 +748,7 @@ import { useAuditReviewData } from '../composables/useAuditReviewData';
 import { useAuditReviewActions } from '../composables/useAuditReviewActions';
 import { useAuditReviewFormatting } from '../composables/useAuditReviewFormatting';
 import { useAuditReviewNavigation } from '../composables/useAuditReviewNavigation';
+import { useAuditWorkflowMeta } from '../composables/useAuditWorkflowMeta';
 
 const router = useRouter();
 const route  = useRoute();
@@ -793,6 +777,13 @@ const {
     distributionStep, distributionSentInfo, distributionExcludedEmails,
     openDistributionDialog, closeDistributionDialog, submitDistributionEmail, openMailtoFallback,
 } = useAuditReviewActions({ review, allRoutingEntries });
+
+const {
+    canEnterReview, canSaveChanges, showExitReviewMode,
+    canApprove, canDistribute, isResend,
+    canReopen, canSubmitForReview, canClose,
+    showReviewBanner, showEditResponsesButton,
+} = useAuditWorkflowMeta({ review, reviewEditMode });
 
 const {
     scoreDisplay, scoreColor, barColor,

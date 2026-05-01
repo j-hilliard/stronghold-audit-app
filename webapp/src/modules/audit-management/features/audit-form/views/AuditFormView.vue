@@ -71,6 +71,13 @@
             />
         </BasePageHeader>
 
+        <!-- Reviewer mode: persistent context banner reinforcing review workspace -->
+        <ReviewerContextBanner
+            v-if="isReviewerMode"
+            :audit-ref="store.template ? `${store.template.divisionCode} · ${store.trackingNumber || store.auditId}` : null"
+            @back="router.push(`/audit-management/audits/${store.auditId}/review`)"
+        />
+
         <!-- Loading state -->
         <div v-if="store.loading" class="flex justify-center py-16">
             <ProgressSpinner />
@@ -268,6 +275,7 @@ import AuditSection from '../components/AuditSection.vue';
 import ScoreSummaryBar from '../components/ScoreSummaryBar.vue';
 import StickyFormActions from '../components/StickyFormActions.vue';
 import AuditAttachments from '../components/AuditAttachments.vue';
+import ReviewerContextBanner from '@/modules/audit-management/features/audit-review/components/ReviewerContextBanner.vue';
 
 interface SectionRef {
     toggleOpen(): void;
