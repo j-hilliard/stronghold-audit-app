@@ -681,6 +681,7 @@ export const useAuditStore = defineStore('audit', () => {
         includeOpenCasOnly?: boolean,
         message?: string | null,
         includePdf?: boolean,
+        excludedEmails?: string[],
     ): Promise<void> {
         await getClient().sendDistributionEmail(auditId, {
             attachmentIds,
@@ -689,6 +690,7 @@ export const useAuditStore = defineStore('audit', () => {
             includeOpenCasOnly,
             message: message || undefined,
             includePdf,
+            excludedEmails,
         });
         await loadReview(auditId);
     }

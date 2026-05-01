@@ -475,6 +475,7 @@ public class AuditController : V1ControllerBase
                     IncludeOpenCasOnly       = body.IncludeOpenCasOnly,
                     Message                  = body.Message,
                     IncludePdf               = body.IncludePdf,
+                    ExcludedEmails           = body.ExcludedEmails,
                     SentBy                   = user.Email!,
                 });
                 return NoContent();

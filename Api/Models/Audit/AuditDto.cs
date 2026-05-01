@@ -256,6 +256,8 @@ public class SendDistributionEmailRequest
     public string? Message { get; set; }
     /// <summary>When true, generate and attach a PDF copy of the audit report to the email.</summary>
     public bool IncludePdf { get; set; }
+    /// <summary>Routing recipient emails to exclude from this send (ephemeral, not persisted).</summary>
+    public List<string> ExcludedEmails { get; set; } = new();
 }
 
 public class AuditFindingDto

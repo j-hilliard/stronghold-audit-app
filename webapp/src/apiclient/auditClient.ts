@@ -802,11 +802,24 @@ export interface SendDistributionEmailRequest {
     includeOpenCasOnly?: boolean;
     message?: string | null;
     includePdf?: boolean;
+    excludedEmails?: string[];
+}
+
+export interface PreviewRecipientDto {
+    emailAddress: string;
+    name?: string | null;
+    /** "Routing" = division routing rule; "Manual" = per-audit manually added */
+    source: 'Routing' | 'Manual';
+    /** Set only when source === "Manual" — used for permanent removal */
+    manualRecipientId?: number | null;
 }
 
 export interface DistributionPreviewDto {
     subject: string;
+    /** Flat email list — kept for legacy count display */
     recipients: string[];
+    /** Full recipient details with source info for inline editing */
+    recipientDetails: PreviewRecipientDto[];
     bodyHtml: string;
     findingsSummary: string | null;
 }

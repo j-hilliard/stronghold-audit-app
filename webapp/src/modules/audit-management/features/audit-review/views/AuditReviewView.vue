@@ -656,6 +656,7 @@
         v-model:includeCas="includeCas"
         v-model:includeOpenCasOnly="includeOpenCasOnly"
         v-model:includeAttachments="includeAttachments"
+        v-model:excludedEmails="distributionExcludedEmails"
         :review="review"
         :distribution-preview="distributionPreview"
         :distribution-step="distributionStep"
@@ -789,7 +790,7 @@ const {
     showDistributionDialog, distributionLoadingPreview, distributionSending,
     distributionPreview, distributionSummaryEdit, editableSubject, selectedAttachmentIds,
     includeAuditPdf, includeCas, includeOpenCasOnly, includeAttachments,
-    distributionStep, distributionSentInfo,
+    distributionStep, distributionSentInfo, distributionExcludedEmails,
     openDistributionDialog, closeDistributionDialog, submitDistributionEmail, openMailtoFallback,
 } = useAuditReviewActions({ review, allRoutingEntries });
 

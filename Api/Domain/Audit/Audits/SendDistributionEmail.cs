@@ -23,6 +23,8 @@ public class SendDistributionEmail : IRequest<Unit>
     public bool IncludeOpenCasOnly { get; set; }
     public string? Message { get; set; }
     public bool IncludePdf { get; set; }
+    /// <summary>Routing recipients to skip for this send (ephemeral — not persisted).</summary>
+    public List<string> ExcludedEmails { get; set; } = new();
 }
 
 public class SendDistributionEmailHandler : IRequestHandler<SendDistributionEmail, Unit>
@@ -74,7 +76,11 @@ public class SendDistributionEmailHandler : IRequestHandler<SendDistributionEmai
             .Select(r => r.EmailAddress)
             .ToListAsync(cancellationToken);
 
-        var allRecipients = divisionRecipients.Union(perAuditRecipients).Distinct().ToList();
+        var excluded = new HashSet<string>(request.ExcludedEmails, StringComparer.OrdinalIgnoreCase);
+        var allRecipients = divisionRecipients.Union(perAuditRecipients)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(r => !excluded.Contains(r))
+            .ToList();
         if (allRecipients.Count == 0)
             throw new InvalidOperationException(
                 "Cannot distribute: no recipients are configured. Add distribution recipients before sending.");

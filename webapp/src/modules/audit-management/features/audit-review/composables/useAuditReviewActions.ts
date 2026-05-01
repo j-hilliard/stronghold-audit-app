@@ -309,9 +309,11 @@ export function useAuditReviewActions({ review, allRoutingEntries }: ActionOptio
         try {
             await store.addDistributionRecipient(id, email, name || undefined);
             if (distributionPreview.value) {
+                const newDetail = { emailAddress: email, name: name || null, source: 'Manual' as const, manualRecipientId: null };
                 distributionPreview.value = {
                     ...distributionPreview.value,
                     recipients: [...distributionPreview.value.recipients, email],
+                    recipientDetails: [...distributionPreview.value.recipientDetails, newDetail],
                 };
             }
             toast.add({ severity: 'success', summary: 'Recipient Added', detail: email, life: 2000 });
@@ -324,14 +326,20 @@ export function useAuditReviewActions({ review, allRoutingEntries }: ActionOptio
 
     async function quickRemoveRecipient(recipientId: number) {
         const id = Number(route.params.id);
-        const emailToRemove = review.value?.distributionRecipients?.find(r => r.id === recipientId)?.emailAddress;
+        const detailToRemove = distributionPreview.value?.recipientDetails?.find(r => r.manualRecipientId === recipientId);
+        const emailToRemove  = detailToRemove?.emailAddress;
         removingRecipientId.value = recipientId;
         try {
             await store.removeDistributionRecipient(id, recipientId);
-            if (distributionPreview.value && emailToRemove) {
+            if (distributionPreview.value) {
                 distributionPreview.value = {
                     ...distributionPreview.value,
-                    recipients: distributionPreview.value.recipients.filter(r => r !== emailToRemove),
+                    recipients: emailToRemove
+                        ? distributionPreview.value.recipients.filter(r => r !== emailToRemove)
+                        : distributionPreview.value.recipients,
+                    recipientDetails: distributionPreview.value.recipientDetails.filter(
+                        r => r.manualRecipientId !== recipientId,
+                    ),
                 };
             }
             toast.add({ severity: 'success', summary: 'Removed', detail: 'Recipient removed.', life: 2000 });
@@ -352,13 +360,15 @@ export function useAuditReviewActions({ review, allRoutingEntries }: ActionOptio
     const selectedAttachmentIds      = ref<number[]>([]);
 
     // Step tracks compose vs. sent-confirmation state inside the dialog
-    const distributionStep     = ref<'compose' | 'sent'>('compose');
-    const distributionSentInfo = ref<{ type: 'api' | 'mailto'; recipients: string[]; items: string[] } | null>(null);
+    const distributionStep          = ref<'compose' | 'sent'>('compose');
+    const distributionSentInfo      = ref<{ type: 'api' | 'mailto'; recipients: string[]; items: string[] } | null>(null);
+    const distributionExcludedEmails = ref<string[]>([]);
 
     function closeDistributionDialog() {
-        showDistributionDialog.value = false;
-        distributionStep.value       = 'compose';
-        distributionSentInfo.value   = null;
+        showDistributionDialog.value      = false;
+        distributionStep.value            = 'compose';
+        distributionSentInfo.value        = null;
+        distributionExcludedEmails.value  = [];
     }
 
     function buildSentItemsList(): string[] {
@@ -389,101 +399,6 @@ export function useAuditReviewActions({ review, allRoutingEntries }: ActionOptio
         if (!includeAttachments.value) selectedAttachmentIds.value = [];
     }
 
-    function escapeHtml(input: string): string {
-        return input
-            .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-            .replaceAll('"', '&quot;').replaceAll("'", '&#39;');
-    }
-
-    function buildFallbackDistributionPreview(auditId: number): DistributionPreviewDto | null {
-        if (!review.value) return null;
-        const division        = review.value.divisionCode || 'Audit';
-        const trackingOrJob   = review.value.trackingNumber || review.value.header?.jobNumber || `Audit ${auditId}`;
-        const auditDate       = review.value.header?.auditDate ? ` — ${review.value.header.auditDate}` : '';
-        const recipients      = [
-            ...(review.value.reviewEmailRouting ?? []).map(r => r.emailAddress),
-            ...(review.value.distributionRecipients ?? []).map(r => r.emailAddress),
-        ].filter((v): v is string => Boolean(v?.trim())).map(v => v.trim());
-        const findingsSummary = reviewSummaryDraft.value || review.value.reviewSummary || null;
-        const safeSummary     = findingsSummary ? escapeHtml(findingsSummary) : 'No findings summary provided.';
-        const location        = review.value.header?.location ? escapeHtml(review.value.header.location) : 'N/A';
-        const auditor         = review.value.header?.auditor  ? escapeHtml(review.value.header.auditor)  : 'N/A';
-        const r       = review.value;
-        const score   = r.scorePercent != null ? Math.round(r.scorePercent) : null;
-        const scoreBg = score == null ? '#e5e7eb' : score >= 90 ? '#dcfce7' : score >= 75 ? '#fef9c3' : '#fee2e2';
-        const scoreClr= score == null ? '#374151' : score >= 90 ? '#166534' : score >= 75 ? '#92400e' : '#991b1b';
-        const nc      = r.nonConformingCount ?? 0;
-        const warn    = r.warningCount ?? 0;
-        const conf    = r.conformingCount ?? 0;
-
-        const scoreRow = score != null ? `
-            <tr>
-                <td colspan="4" style="padding:0 0 12px 0;">
-                    <div style="display:flex;gap:8px;align-items:stretch;">
-                        <div style="background:${scoreBg};border-radius:8px;padding:12px 16px;text-align:center;min-width:72px;">
-                            <div style="font-size:24px;font-weight:700;color:${scoreClr};line-height:1;">${score}%</div>
-                            <div style="font-size:11px;color:${scoreClr};margin-top:2px;">Score</div>
-                        </div>
-                        <div style="background:#dcfce7;border-radius:8px;padding:10px 14px;text-align:center;flex:1;">
-                            <div style="font-size:20px;font-weight:700;color:#166534;">${conf}</div>
-                            <div style="font-size:11px;color:#166534;">Conforming</div>
-                        </div>
-                        <div style="background:#fee2e2;border-radius:8px;padding:10px 14px;text-align:center;flex:1;">
-                            <div style="font-size:20px;font-weight:700;color:#991b1b;">${nc}</div>
-                            <div style="font-size:11px;color:#991b1b;">Non-Conforming</div>
-                        </div>
-                        ${warn > 0 ? `<div style="background:#fef9c3;border-radius:8px;padding:10px 14px;text-align:center;flex:1;">
-                            <div style="font-size:20px;font-weight:700;color:#92400e;">${warn}</div>
-                            <div style="font-size:11px;color:#92400e;">Warning</div>
-                        </div>` : ''}
-                    </div>
-                </td>
-            </tr>` : '';
-
-        return {
-            subject: `[${division}] Safety &amp; Compliance Audit — ${escapeHtml(trackingOrJob)}${auditDate}`,
-            recipients,
-            findingsSummary,
-            bodyHtml: `
-<div style="font-family:Segoe UI,Arial,sans-serif;max-width:620px;color:#111827;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;">
-  <div style="background:#1a3a5c;padding:22px 24px;">
-    <h1 style="color:#ffffff;margin:0 0 4px;font-size:18px;font-weight:700;letter-spacing:-0.2px;">Safety &amp; Compliance Audit</h1>
-    <p style="color:#93c5fd;margin:0;font-size:13px;font-weight:500;">${escapeHtml(division)} Division &nbsp;·&nbsp; ${escapeHtml(trackingOrJob)}</p>
-  </div>
-  <div style="background:#f8fafc;padding:0 24px 4px;">
-    <table style="width:100%;border-collapse:collapse;font-size:13px;padding-top:16px;">
-      <tbody>
-        <tr><td style="height:14px;" colspan="4"></td></tr>
-        ${scoreRow}
-        <tr>
-          <td style="padding:3px 12px 3px 0;color:#6b7280;white-space:nowrap;font-weight:500;">Location</td>
-          <td style="padding:3px 16px 3px 4px;color:#111827;">${location}</td>
-          <td style="padding:3px 12px 3px 0;color:#6b7280;white-space:nowrap;font-weight:500;">Auditor</td>
-          <td style="padding:3px 0;color:#111827;">${auditor}</td>
-        </tr>
-        <tr>
-          <td style="padding:3px 12px 3px 0;color:#6b7280;white-space:nowrap;font-weight:500;">Date</td>
-          <td style="padding:3px 16px 3px 4px;color:#111827;">${escapeHtml(r.header?.auditDate ?? 'N/A')}</td>
-          <td style="padding:3px 12px 3px 0;color:#6b7280;white-space:nowrap;font-weight:500;">Status</td>
-          <td style="padding:3px 0;color:#111827;">${escapeHtml(r.status ?? '')}</td>
-        </tr>
-        <tr><td style="height:16px;" colspan="4"></td></tr>
-      </tbody>
-    </table>
-  </div>
-  ${findingsSummary ? `
-  <div style="padding:16px 24px;background:#ffffff;border-top:1px solid #e2e8f0;">
-    <h3 style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:0.05em;">Findings Summary</h3>
-    <p style="margin:0;font-size:13px;line-height:1.6;color:#374151;white-space:pre-wrap;">${safeSummary}</p>
-  </div>` : ''}
-  <div style="padding:16px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:12px;color:#9ca3af;">
-    Sent via Stronghold Audit System &nbsp;·&nbsp; Safety &amp; Compliance
-  </div>
-</div>
-            `,
-        };
-    }
-
     async function openDistributionDialog() {
         const id = Number(route.params.id);
         distributionStep.value     = 'compose';
@@ -498,16 +413,6 @@ export function useAuditReviewActions({ review, allRoutingEntries }: ActionOptio
             showDistributionDialog.value   = true;
         } catch (e: any) {
             const status = e?.response?.status;
-            if (status !== 403 && status !== 401) {
-                const fallback = buildFallbackDistributionPreview(id);
-                if (fallback) {
-                    distributionPreview.value     = fallback;
-                    distributionSummaryEdit.value = fallback.findingsSummary ?? '';
-                    editableSubject.value         = fallback.subject;
-                    showDistributionDialog.value  = true;
-                    return;
-                }
-            }
             const detail = status === 403
                 ? 'You do not have permission to preview distribution emails.'
                 : status === 404
@@ -614,6 +519,7 @@ export function useAuditReviewActions({ review, allRoutingEntries }: ActionOptio
                 includeOpenCasOnly.value,
                 distributionSummaryEdit.value || null,
                 includeAuditPdf.value,
+                distributionExcludedEmails.value.length > 0 ? distributionExcludedEmails.value : undefined,
             );
             selectedAttachmentIds.value = [];
             distributionSentInfo.value  = { type: 'api', recipients: sentRecipients, items: sentItems };
@@ -651,7 +557,7 @@ export function useAuditReviewActions({ review, allRoutingEntries }: ActionOptio
         showDistributionDialog, distributionLoadingPreview, distributionSending,
         distributionPreview, distributionSummaryEdit, editableSubject, selectedAttachmentIds,
         includeAuditPdf, includeCas, includeOpenCasOnly, includeAttachments,
-        distributionStep, distributionSentInfo,
+        distributionStep, distributionSentInfo, distributionExcludedEmails,
         openDistributionDialog, closeDistributionDialog, submitDistributionEmail, openMailtoFallback,
     };
 }

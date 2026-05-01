@@ -47,6 +47,16 @@ public class UpdateCaByPublicTokenHandler : IRequestHandler<UpdateCaByPublicToke
         if (request.NewStatus is not ("InProgress" or "Submitted"))
             throw new ArgumentException("External access allows marking corrective actions as 'InProgress' or 'Submitted'.");
 
+        // Require at least one proof photo before declaring work complete
+        if (request.NewStatus == "Submitted")
+        {
+            var hasPhoto = await _context.CorrectiveActionPhotos
+                .AnyAsync(p => p.CorrectiveActionId == ca.Id, cancellationToken);
+            if (!hasPhoto)
+                throw new InvalidOperationException(
+                    "A proof photo is required before submitting work as complete. Please upload a photo first.");
+        }
+
         var now     = DateTime.UtcNow;
         var updater = request.UpdatedByName ?? record.SentToName ?? "External";
 

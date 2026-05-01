@@ -16,10 +16,23 @@ public class GetDistributionPreview : IRequest<DistributionPreviewDto>
     public List<int> AttachmentIds { get; set; } = new();
 }
 
+public class PreviewRecipientDto
+{
+    public string EmailAddress { get; set; } = null!;
+    public string? Name { get; set; }
+    /// <summary>"Routing" = division-level routing rule; "Manual" = per-audit manually added.</summary>
+    public string Source { get; set; } = null!;
+    /// <summary>Set only when Source == "Manual" — used for permanent removal.</summary>
+    public int? ManualRecipientId { get; set; }
+}
+
 public class DistributionPreviewDto
 {
     public string Subject { get; set; } = string.Empty;
+    /// <summary>Flat email list — kept for legacy count display.</summary>
     public List<string> Recipients { get; set; } = new();
+    /// <summary>Full recipient details including source and ID for inline editing.</summary>
+    public List<PreviewRecipientDto> RecipientDetails { get; set; } = new();
     public string BodyHtml { get; set; } = string.Empty;
     public string? FindingsSummary { get; set; }
 }
@@ -46,17 +59,31 @@ public class GetDistributionPreviewHandler : IRequestHandler<GetDistributionPrev
             .FirstOrDefaultAsync(a => a.Id == request.AuditId, cancellationToken)
             ?? throw new KeyNotFoundException($"Audit {request.AuditId} not found.");
 
-        var divisionRecipients = await _context.EmailRoutingRules
+        var routingRecipients = await _context.EmailRoutingRules
             .Where(r => r.DivisionId == audit.DivisionId && r.IsActive)
-            .Select(r => r.EmailAddress)
+            .Select(r => new { r.EmailAddress, Name = (string?)null })
             .ToListAsync(cancellationToken);
 
-        var perAuditRecipients = await _context.AuditDistributionRecipients
+        var manualRecipients = await _context.AuditDistributionRecipients
             .Where(r => r.AuditId == request.AuditId)
-            .Select(r => r.EmailAddress)
+            .Select(r => new { r.Id, r.EmailAddress, r.Name })
             .ToListAsync(cancellationToken);
 
-        var allRecipients = divisionRecipients.Union(perAuditRecipients).Distinct().ToList();
+        var seenEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var recipientDetails = new List<PreviewRecipientDto>();
+
+        foreach (var r in routingRecipients)
+        {
+            if (seenEmails.Add(r.EmailAddress ?? string.Empty) && !string.IsNullOrWhiteSpace(r.EmailAddress))
+                recipientDetails.Add(new PreviewRecipientDto { EmailAddress = r.EmailAddress, Source = "Routing" });
+        }
+        foreach (var r in manualRecipients)
+        {
+            if (seenEmails.Add(r.EmailAddress ?? string.Empty) && !string.IsNullOrWhiteSpace(r.EmailAddress))
+                recipientDetails.Add(new PreviewRecipientDto { EmailAddress = r.EmailAddress, Name = r.Name, Source = "Manual", ManualRecipientId = r.Id });
+        }
+
+        var allRecipients = recipientDetails.Select(r => r.EmailAddress).ToList();
 
         var header = audit.Header;
         var divCode = audit.Division?.Code ?? "—";
@@ -184,10 +211,11 @@ public class GetDistributionPreviewHandler : IRequestHandler<GetDistributionPrev
 
         return new DistributionPreviewDto
         {
-            Subject = subject,
-            Recipients = allRecipients,
-            BodyHtml = bodyHtml,
-            FindingsSummary = audit.ReviewSummary,
+            Subject          = subject,
+            Recipients       = allRecipients,
+            RecipientDetails = recipientDetails,
+            BodyHtml         = bodyHtml,
+            FindingsSummary  = audit.ReviewSummary,
         };
     }
 }

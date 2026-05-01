@@ -116,7 +116,7 @@
 
                     <!-- Photo Upload -->
                     <div>
-                        <label class="block text-xs text-slate-400 mb-1">Proof Photo <span class="text-slate-600">(optional)</span></label>
+                        <label class="block text-xs text-slate-400 mb-1">Proof Photo <span class="text-red-400">*</span></label>
                         <div v-if="photoPreviewUrl" class="mb-2 relative">
                             <img :src="photoPreviewUrl" alt="Preview" class="rounded-lg max-h-48 w-full object-cover" />
                             <button
@@ -135,11 +135,17 @@
                         </label>
                     </div>
 
+                    <p v-if="!photoFile" class="text-xs text-amber-400 flex items-center gap-1.5">
+                        <i class="pi pi-exclamation-triangle text-[11px]" />
+                        A proof photo is required before submitting.
+                    </p>
+
                     <Button
                         label="Submit Work Complete"
                         icon="pi pi-check"
                         class="w-full"
                         :loading="saving"
+                        :disabled="!photoFile"
                         @click="submitWork"
                     />
 
@@ -249,16 +255,16 @@ async function markInProgress() {
 }
 
 async function submitWork() {
+    if (!photoFile.value) return;
     saving.value = true;
     try {
+        // Upload photo first — backend requires a photo record to exist before allowing Submitted status
+        await client.uploadCaPhoto(token, photoFile.value);
         await client.updateCaByToken(token, {
             newStatus:     'Submitted',
             notes:         notes.value || null,
             updatedByName: updaterName.value || null,
         });
-        if (photoFile.value) {
-            await client.uploadCaPhoto(token, photoFile.value);
-        }
         submitted.value = true;
         submittedMessage.value = 'Work submitted successfully. The audit team will review and close this action.';
         if (ca.value) ca.value.status = 'Submitted';

@@ -109,28 +109,40 @@
                 </div>
             </div>
 
-            <!-- Section 2 — Recipients -->
+            <!-- Section 2 — Recipients (full effective To-list: routing + manual, all editable) -->
             <div class="dist-section">
                 <div class="dist-section-header">
                     <i class="pi pi-users text-blue-400 text-sm" />
                     <span>Recipients</span>
-                    <span class="dist-count">{{ review?.distributionRecipients?.length ?? 0 }}</span>
+                    <span class="dist-count">{{ effectiveCount }}</span>
+                    <span v-if="excludedEmails.length > 0" class="text-xs text-amber-400 font-normal ml-1">({{ excludedEmails.length }} excluded this send)</span>
                 </div>
-                <div v-if="(review?.distributionRecipients?.length ?? 0) > 0" class="dist-recipients-list mb-2">
+                <div v-if="distributionPreview.recipientDetails.length > 0" class="dist-recipients-list mb-2">
                     <div
-                        v-for="r in review!.distributionRecipients"
-                        :key="r.id"
-                        class="flex items-center gap-2 text-xs text-slate-300 py-1"
+                        v-for="r in distributionPreview.recipientDetails"
+                        :key="r.emailAddress"
+                        class="flex items-center gap-2 text-xs py-1"
+                        :class="excludedEmails.includes(r.emailAddress) ? 'opacity-40 line-through text-slate-500' : 'text-slate-300'"
                     >
                         <i class="pi pi-envelope text-slate-500 text-[10px] shrink-0" />
                         <span class="flex-1 truncate">{{ r.name ? `${r.name} <${r.emailAddress}>` : r.emailAddress }}</span>
+                        <span class="text-[9px] text-slate-600 shrink-0 mr-1">{{ r.source === 'Routing' ? 'routing' : 'manual' }}</span>
                         <button
+                            v-if="!excludedEmails.includes(r.emailAddress)"
                             class="text-slate-600 hover:text-red-400 transition-colors p-0.5 flex-shrink-0"
-                            :disabled="removingRecipientId === r.id"
-                            title="Remove recipient"
-                            @click="$emit('removeRecipient', r.id)"
+                            :disabled="r.source === 'Manual' && removingRecipientId === r.manualRecipientId"
+                            :title="r.source === 'Routing' ? 'Exclude from this send' : 'Remove permanently'"
+                            @click="handleRemoveRecipient(r)"
                         >
-                            <i :class="removingRecipientId === r.id ? 'pi pi-spin pi-spinner' : 'pi pi-times'" class="text-[10px]" />
+                            <i :class="r.source === 'Manual' && removingRecipientId === r.manualRecipientId ? 'pi pi-spin pi-spinner' : 'pi pi-times'" class="text-[10px]" />
+                        </button>
+                        <button
+                            v-else
+                            class="text-amber-600 hover:text-amber-400 transition-colors p-0.5 flex-shrink-0"
+                            title="Re-include in this send"
+                            @click="$emit('update:excludedEmails', excludedEmails.filter(e => e !== r.emailAddress))"
+                        >
+                            <i class="pi pi-undo text-[10px]" />
                         </button>
                     </div>
                 </div>
@@ -138,7 +150,7 @@
                     <i class="pi pi-exclamation-triangle text-[11px]" />
                     No recipients — add one below before sending.
                 </p>
-                <!-- Inline add -->
+                <!-- Inline add (adds permanent per-audit recipient) -->
                 <div class="flex gap-2">
                     <InputText
                         v-model="newRecipientEmail"
@@ -209,7 +221,7 @@
                 <div class="flex flex-wrap gap-2">
                     <span class="send-pill send-pill--blue">
                         <i class="pi pi-users text-[10px]" />
-                        {{ distributionPreview.recipients.length }} recipient{{ distributionPreview.recipients.length !== 1 ? 's' : '' }}
+                        {{ effectiveCount }} recipient{{ effectiveCount !== 1 ? 's' : '' }}
                     </span>
                     <span v-if="includeAuditPdf" class="send-pill send-pill--red">
                         <i class="pi pi-file-pdf text-[10px]" />Audit PDF
@@ -241,7 +253,7 @@
                     icon="pi pi-envelope"
                     severity="secondary"
                     outlined
-                    :disabled="(distributionPreview?.recipients.length ?? 0) === 0"
+                    :disabled="effectiveCount <= 0"
                     @click="$emit('openMailto')"
                 />
                 <Button
@@ -249,7 +261,7 @@
                     icon="pi pi-send"
                     severity="success"
                     :loading="distributionSending"
-                    :disabled="(distributionPreview?.recipients.length ?? 0) === 0"
+                    :disabled="effectiveCount <= 0"
                     @click="$emit('send')"
                 />
             </template>
@@ -258,12 +270,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import Dialog from 'primevue/dialog';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
-import type { AuditReviewDto, DistributionPreviewDto } from '@/apiclient/auditClient';
+import type { AuditReviewDto, DistributionPreviewDto, PreviewRecipientDto } from '@/apiclient/auditClient';
 
 type SentInfo = { type: 'api' | 'mailto'; recipients: string[]; items: string[] } | null;
 
@@ -281,6 +293,7 @@ const props = defineProps<{
     includeCas: boolean;
     includeOpenCasOnly: boolean;
     includeAttachments: boolean;
+    excludedEmails: string[];
     addingRecipient?: boolean;
     removingRecipientId?: number | null;
 }>();
@@ -294,12 +307,25 @@ const emit = defineEmits<{
     'update:includeCas': [value: boolean];
     'update:includeOpenCasOnly': [value: boolean];
     'update:includeAttachments': [value: boolean];
+    'update:excludedEmails': [emails: string[]];
     send: [];
     openMailto: [];
     close: [];
     addRecipient: [email: string, name: string];
     removeRecipient: [id: number];
 }>();
+
+const effectiveCount = computed(() =>
+    (props.distributionPreview?.recipientDetails?.length ?? 0) - props.excludedEmails.length,
+);
+
+function handleRemoveRecipient(r: PreviewRecipientDto) {
+    if (r.source === 'Routing') {
+        emit('update:excludedEmails', [...props.excludedEmails, r.emailAddress]);
+    } else if (r.manualRecipientId != null) {
+        emit('removeRecipient', r.manualRecipientId);
+    }
+}
 
 const newRecipientEmail = ref('');
 const newRecipientName  = ref('');
