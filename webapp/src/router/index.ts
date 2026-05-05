@@ -19,12 +19,14 @@ const routes = [
         path: '/audit-management/newsletter',
         name: 'audit-management-newsletter',
         component: () => import('@/modules/audit-management/features/reports/views/NewsletterView.vue'),
+        meta: { requiresReports: true },
     },
     {
         // Quarterly summary — standalone print view
         path: '/audit-management/reports/quarterly-summary',
         name: 'audit-management-quarterly-summary',
         component: () => import('@/modules/audit-management/features/reports/views/QuarterlySummaryView.vue'),
+        meta: { requiresReports: true },
     },
     {
         // Print view — no AppLayout wrapper, renders standalone for window.print()
@@ -113,7 +115,7 @@ router.beforeEach((to, _from, next) => {
                 return;
             }
 
-            if (path.includes('/corrective-actions') && !userStore.canManageCas) {
+            if (meta.requiresCA && !userStore.canManageCas) {
                 next({ path: unauthorized });
                 return;
             }

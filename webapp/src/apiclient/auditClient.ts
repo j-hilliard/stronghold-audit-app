@@ -1,7 +1,16 @@
 ﻿/**
  * Handwritten TypeScript API client for the Audit module.
- * Mirrors the shape of the NSwag-generated IncidentReportClient but written manually
- * because the NSwag post-build step cannot run on the OneDrive path (comma in folder name).
+ *
+ * WHY HANDWRITTEN: NSwag cannot run directly from the OneDrive path because the folder name
+ * contains a comma ("Quanta Services Management Partnership, L.P"), which breaks MSBuild tooling.
+ *
+ * TO REGENERATE: Run Scripts/generate-api-client.ps1 (elevated PowerShell, API must build).
+ * The script creates a temporary directory junction at C:\StrongholdDev, runs NSwag, then
+ * writes the generated output to webapp/src/apiclient/client.g.ts for manual merging.
+ *
+ * CONTRACT DRIFT PROTECTION: webapp/tests/e2e/api-client-contract.spec.ts validates the
+ * shape of key API responses against the interfaces declared in this file. Run it with
+ * the live API to catch drift before it reaches production.
  *
  * Keep in sync with Api/Models/Audit/*.cs
  */

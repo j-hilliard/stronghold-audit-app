@@ -175,10 +175,18 @@ export const useAuditStore = defineStore('audit', () => {
         const hiddenByRule = new Set<number>();
         const shownByRule  = new Set<number>();
 
+        // responses is keyed by questionId (base), but rules reference versionQuestionId.
+        // Build the translation map once from the template sections (each question has both IDs).
+        const vqToQid = new Map<number, number>();
+        for (const s of template.value.sections) {
+            for (const q of s.questions) vqToQid.set(q.versionQuestionId, q.questionId);
+        }
+
         for (const rule of rules) {
             if (!rule.targetSectionId) continue;
-            // Find the current response status for this trigger question
-            const respState = responses.value.get(rule.triggerVersionQuestionId);
+            // Translate versionQuestionId → questionId to look up in responses Map
+            const qid = vqToQid.get(rule.triggerVersionQuestionId);
+            const respState = qid !== undefined ? responses.value.get(qid) : undefined;
             const currentStatus = respState?.status ?? null;
 
             const fires = rule.triggerResponse === 'AnyAnswer'

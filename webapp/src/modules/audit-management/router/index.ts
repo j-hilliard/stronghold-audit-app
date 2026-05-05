@@ -74,6 +74,7 @@ export const auditManagementRoutes = [
         component: () => import('@/modules/audit-management/features/corrective-actions/views/CorrectiveActionsView.vue'),
         meta: {
             title: 'Corrective Actions',
+            requiresCA: true,
             breadcrumbItems: () => [
                 { label: 'Compliance Audit' },
                 { label: 'Corrective Actions' },

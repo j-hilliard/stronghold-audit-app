@@ -68,10 +68,13 @@ test.describe('API client contract drift guard', () => {
         if (!data) return;
         expect(Array.isArray(data)).toBe(true);
         if (data.length > 0) {
+            // TemplateVersionListItemDto: uses 'id' and 'status' — no 'versionId' or 'isActive'
             assertHasFields(data[0],
-                ['versionId', 'versionNumber', 'divisionCode', 'isActive', 'publishedAt'],
+                ['id', 'versionNumber', 'divisionCode', 'status'],
                 'TemplateVersionListItemDto',
             );
+            expect(typeof data[0].id).toBe('number');
+            expect(typeof data[0].status).toBe('string');
         }
     });
 
@@ -81,10 +84,13 @@ test.describe('API client contract drift guard', () => {
         if (!data) return;
         expect(Array.isArray(data)).toBe(true);
         if (data.length > 0) {
+            // Fields from auditClient.ts ComplianceStatusDto — no totalAudits field exists
             assertHasFields(data[0],
-                ['divisionId', 'divisionCode', 'totalAudits'],
+                ['divisionId', 'divisionCode', 'divisionName', 'status'],
                 'ComplianceStatusDto',
             );
+            expect(typeof data[0].divisionId).toBe('number');
+            expect(typeof data[0].status).toBe('string');
         }
     });
 
@@ -125,10 +131,12 @@ test.describe('API client contract drift guard', () => {
         const data = await getJson(request, `/v1/audits/${reviewable.id}/review`);
         if (!data) return;
 
+        // AuditReviewDto uses 'id' not 'auditId'; 'auditDate' is inside header, not top-level
         assertHasFields(data,
-            ['auditId', 'status', 'divisionCode', 'auditDate', 'sections'],
+            ['id', 'status', 'divisionCode', 'sections', 'nonConformingItems'],
             'AuditReviewDto',
         );
+        expect(typeof data.id).toBe('number');
         expect(Array.isArray(data.sections)).toBe(true);
     });
 

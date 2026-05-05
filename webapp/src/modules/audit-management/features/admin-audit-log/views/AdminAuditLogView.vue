@@ -89,151 +89,148 @@
             </div>
 
             <!-- ── Tabs ────────────────────────────────────────────────────────── -->
-            <Tabs v-model:value="activeTab">
-                <TabList>
-                    <Tab value="actions">
-                        <i class="pi pi-list mr-2" />
-                        Action Log
-                        <Badge v-if="result" :value="result.totalActionLogs" class="ml-2" severity="info" />
-                    </Tab>
-                    <Tab value="trail">
-                        <i class="pi pi-database mr-2" />
-                        Change Trail
-                        <Badge v-if="result" :value="result.totalTrailLogs" class="ml-2" severity="secondary" />
-                    </Tab>
-                </TabList>
+            <TabView v-model:activeIndex="activeTabIndex" @tab-change="onTabChange">
 
-                <TabPanels>
+                <!-- Action Log tab -->
+                <TabPanel>
+                    <template #header>
+                        <span class="flex items-center gap-2">
+                            <i class="pi pi-list" />
+                            Action Log
+                            <Badge v-if="result" :value="result.totalActionLogs" severity="info" />
+                        </span>
+                    </template>
+                    <DataTable
+                        :value="result?.actionLogs ?? []"
+                        :loading="loading"
+                        row-hover
+                        striped-rows
+                        size="small"
+                        class="stronghold-table text-sm"
+                        dataKey="id"
+                        v-model:expandedRows="expandedActionRows"
+                    >
+                        <Column expander style="width: 3rem" />
+                        <Column field="timestamp" header="Time" style="width: 170px">
+                            <template #body="{ data }">
+                                <span class="text-slate-300 text-xs font-mono">{{ formatTs(data.timestamp) }}</span>
+                            </template>
+                        </Column>
+                        <Column field="severity" header="Sev" style="width: 80px">
+                            <template #body="{ data }">
+                                <Tag :value="data.severity" :severity="severityTag(data.severity)" size="small" />
+                            </template>
+                        </Column>
+                        <Column field="performedBy" header="User">
+                            <template #body="{ data }">
+                                <span class="text-slate-200 text-xs">{{ data.performedBy }}</span>
+                            </template>
+                        </Column>
+                        <Column field="action" header="Action">
+                            <template #body="{ data }">
+                                <span class="font-mono text-xs text-cyan-400">{{ data.action }}</span>
+                            </template>
+                        </Column>
+                        <Column field="entityType" header="Entity">
+                            <template #body="{ data }">
+                                <span class="text-slate-300 text-xs">{{ data.entityType }}</span>
+                                <span v-if="data.entityId" class="text-slate-500 text-xs ml-1">#{{ data.entityId }}</span>
+                            </template>
+                        </Column>
+                        <Column field="description" header="Description">
+                            <template #body="{ data }">
+                                <span class="text-slate-300 text-xs">{{ data.description }}</span>
+                            </template>
+                        </Column>
+                        <Column field="ipAddress" header="IP" style="width: 130px">
+                            <template #body="{ data }">
+                                <span class="font-mono text-xs text-slate-500">{{ data.ipAddress ?? '—' }}</span>
+                            </template>
+                        </Column>
+                        <template #expansion="{ data }">
+                            <div class="p-3 bg-slate-900 rounded text-xs font-mono text-slate-300 whitespace-pre-wrap">
+                                {{ data.description }}
+                            </div>
+                        </template>
+                        <template #empty>
+                            <div class="text-center py-8 text-slate-500">No action log entries match the current filters.</div>
+                        </template>
+                    </DataTable>
+                </TabPanel>
 
-                    <!-- Action Log tab -->
-                    <TabPanel value="actions">
-                        <DataTable
-                            v-if="activeTab === 'actions'"
-                            :value="result?.actionLogs ?? []"
-                            :loading="loading"
-                            row-hover
-                            striped-rows
-                            size="small"
-                            class="stronghold-table text-sm"
-                            dataKey="id"
-                            v-model:expandedRows="expandedActionRows"
-                        >
-                            <Column expander style="width: 3rem" />
-                            <Column field="timestamp" header="Time" style="width: 170px">
-                                <template #body="{ data }">
-                                    <span class="text-slate-300 text-xs font-mono">{{ formatTs(data.timestamp) }}</span>
-                                </template>
-                            </Column>
-                            <Column field="severity" header="Sev" style="width: 80px">
-                                <template #body="{ data }">
-                                    <Tag :value="data.severity" :severity="severityTag(data.severity)" size="small" />
-                                </template>
-                            </Column>
-                            <Column field="performedBy" header="User">
-                                <template #body="{ data }">
-                                    <span class="text-slate-200 text-xs">{{ data.performedBy }}</span>
-                                </template>
-                            </Column>
-                            <Column field="action" header="Action">
-                                <template #body="{ data }">
-                                    <span class="font-mono text-xs text-cyan-400">{{ data.action }}</span>
-                                </template>
-                            </Column>
-                            <Column field="entityType" header="Entity">
-                                <template #body="{ data }">
-                                    <span class="text-slate-300 text-xs">{{ data.entityType }}</span>
-                                    <span v-if="data.entityId" class="text-slate-500 text-xs ml-1">#{{ data.entityId }}</span>
-                                </template>
-                            </Column>
-                            <Column field="description" header="Description">
-                                <template #body="{ data }">
-                                    <span class="text-slate-300 text-xs">{{ data.description }}</span>
-                                </template>
-                            </Column>
-                            <Column field="ipAddress" header="IP" style="width: 130px">
-                                <template #body="{ data }">
-                                    <span class="font-mono text-xs text-slate-500">{{ data.ipAddress ?? '—' }}</span>
-                                </template>
-                            </Column>
-                            <template #expansion="{ data }">
-                                <div class="p-3 bg-slate-900 rounded text-xs font-mono text-slate-300 whitespace-pre-wrap">
-                                    {{ data.description }}
+                <!-- Change Trail tab -->
+                <TabPanel>
+                    <template #header>
+                        <span class="flex items-center gap-2">
+                            <i class="pi pi-database" />
+                            Change Trail
+                            <Badge v-if="result" :value="result.totalTrailLogs" severity="secondary" />
+                        </span>
+                    </template>
+                    <DataTable
+                        :value="result?.trailLogs ?? []"
+                        :loading="loading"
+                        row-hover
+                        striped-rows
+                        size="small"
+                        class="stronghold-table text-sm"
+                        dataKey="id"
+                        v-model:expandedRows="expandedTrailRows"
+                    >
+                        <Column expander style="width: 3rem" />
+                        <Column field="timestamp" header="Time" style="width: 170px">
+                            <template #body="{ data }">
+                                <span class="text-slate-300 text-xs font-mono">{{ formatTs(data.timestamp) }}</span>
+                            </template>
+                        </Column>
+                        <Column field="action" header="Op" style="width: 80px">
+                            <template #body="{ data }">
+                                <Tag :value="data.action" :severity="opTag(data.action)" size="small" />
+                            </template>
+                        </Column>
+                        <Column field="userEmail" header="User">
+                            <template #body="{ data }">
+                                <span class="text-slate-200 text-xs">{{ data.userEmail }}</span>
+                            </template>
+                        </Column>
+                        <Column field="entityType" header="Entity">
+                            <template #body="{ data }">
+                                <span class="text-slate-300 text-xs">{{ data.entityType }}</span>
+                                <span class="text-slate-500 text-xs ml-1">#{{ data.entityId }}</span>
+                            </template>
+                        </Column>
+                        <Column field="changedColumns" header="Changed Fields">
+                            <template #body="{ data }">
+                                <span class="text-xs text-amber-400 font-mono">{{ data.changedColumns ?? '—' }}</span>
+                            </template>
+                        </Column>
+                        <Column field="ipAddress" header="IP" style="width: 130px">
+                            <template #body="{ data }">
+                                <span class="font-mono text-xs text-slate-500">{{ data.ipAddress ?? '—' }}</span>
+                            </template>
+                        </Column>
+                        <template #expansion="{ data }">
+                            <div class="grid grid-cols-2 gap-3 p-3">
+                                <div v-if="data.oldValues">
+                                    <div class="text-xs text-slate-400 mb-1 uppercase tracking-wide">Before</div>
+                                    <pre class="bg-red-950/40 border border-red-900/40 rounded p-2 text-xs text-red-300 overflow-auto max-h-48">{{ prettyJson(data.oldValues) }}</pre>
                                 </div>
-                            </template>
-                            <template #empty>
-                                <div class="text-center py-8 text-slate-500">No action log entries match the current filters.</div>
-                            </template>
-                        </DataTable>
-                    </TabPanel>
-
-                    <!-- Change Trail tab -->
-                    <TabPanel value="trail">
-                        <DataTable
-                            v-if="activeTab === 'trail'"
-                            :value="result?.trailLogs ?? []"
-                            :loading="loading"
-                            row-hover
-                            striped-rows
-                            size="small"
-                            class="stronghold-table text-sm"
-                            dataKey="id"
-                            v-model:expandedRows="expandedTrailRows"
-                        >
-                            <Column expander style="width: 3rem" />
-                            <Column field="timestamp" header="Time" style="width: 170px">
-                                <template #body="{ data }">
-                                    <span class="text-slate-300 text-xs font-mono">{{ formatTs(data.timestamp) }}</span>
-                                </template>
-                            </Column>
-                            <Column field="action" header="Op" style="width: 80px">
-                                <template #body="{ data }">
-                                    <Tag :value="data.action" :severity="opTag(data.action)" size="small" />
-                                </template>
-                            </Column>
-                            <Column field="userEmail" header="User">
-                                <template #body="{ data }">
-                                    <span class="text-slate-200 text-xs">{{ data.userEmail }}</span>
-                                </template>
-                            </Column>
-                            <Column field="entityType" header="Entity">
-                                <template #body="{ data }">
-                                    <span class="text-slate-300 text-xs">{{ data.entityType }}</span>
-                                    <span class="text-slate-500 text-xs ml-1">#{{ data.entityId }}</span>
-                                </template>
-                            </Column>
-                            <Column field="changedColumns" header="Changed Fields">
-                                <template #body="{ data }">
-                                    <span class="text-xs text-amber-400 font-mono">{{ data.changedColumns ?? '—' }}</span>
-                                </template>
-                            </Column>
-                            <Column field="ipAddress" header="IP" style="width: 130px">
-                                <template #body="{ data }">
-                                    <span class="font-mono text-xs text-slate-500">{{ data.ipAddress ?? '—' }}</span>
-                                </template>
-                            </Column>
-                            <template #expansion="{ data }">
-                                <div class="grid grid-cols-2 gap-3 p-3">
-                                    <div v-if="data.oldValues">
-                                        <div class="text-xs text-slate-400 mb-1 uppercase tracking-wide">Before</div>
-                                        <pre class="bg-red-950/40 border border-red-900/40 rounded p-2 text-xs text-red-300 overflow-auto max-h-48">{{ prettyJson(data.oldValues) }}</pre>
-                                    </div>
-                                    <div v-if="data.newValues">
-                                        <div class="text-xs text-slate-400 mb-1 uppercase tracking-wide">After</div>
-                                        <pre class="bg-emerald-950/40 border border-emerald-900/40 rounded p-2 text-xs text-emerald-300 overflow-auto max-h-48">{{ prettyJson(data.newValues) }}</pre>
-                                    </div>
-                                    <div v-if="!data.oldValues && !data.newValues" class="col-span-2 text-slate-500 text-xs">
-                                        No field-level diff available for this entry.
-                                    </div>
+                                <div v-if="data.newValues">
+                                    <div class="text-xs text-slate-400 mb-1 uppercase tracking-wide">After</div>
+                                    <pre class="bg-emerald-950/40 border border-emerald-900/40 rounded p-2 text-xs text-emerald-300 overflow-auto max-h-48">{{ prettyJson(data.newValues) }}</pre>
                                 </div>
-                            </template>
-                            <template #empty>
-                                <div class="text-center py-8 text-slate-500">No change trail entries match the current filters.</div>
-                            </template>
-                        </DataTable>
-                    </TabPanel>
+                                <div v-if="!data.oldValues && !data.newValues" class="col-span-2 text-slate-500 text-xs">
+                                    No field-level diff available for this entry.
+                                </div>
+                            </div>
+                        </template>
+                        <template #empty>
+                            <div class="text-center py-8 text-slate-500">No change trail entries match the current filters.</div>
+                        </template>
+                    </DataTable>
+                </TabPanel>
 
-                </TabPanels>
-            </Tabs>
+            </TabView>
 
             <!-- ── Pagination ──────────────────────────────────────────────────── -->
             <div class="flex items-center justify-between mt-2">
@@ -259,10 +256,15 @@ import type { AuditLogsResult } from '@/apiclient/auditClient';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 
-const service   = useAuditService();
-const loading   = ref(false);
-const activeTab = ref<'actions' | 'trail'>('actions');
-const page      = ref(1);
+const service        = useAuditService();
+const loading        = ref(false);
+const activeTab      = ref<'actions' | 'trail'>('actions');
+const activeTabIndex = computed({
+    get: () => activeTab.value === 'trail' ? 1 : 0,
+    set: (idx: number) => { activeTab.value = idx === 1 ? 'trail' : 'actions'; },
+});
+function onTabChange(e: { index: number }) { activeTabIndex.value = e.index; }
+const page           = ref(1);
 const pageSize  = 50;
 
 const result = ref<AuditLogsResult | null>(null);
