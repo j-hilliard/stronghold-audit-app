@@ -17,18 +17,28 @@ public class GetComplianceStatus : IRequest<List<ComplianceStatusDto>> { }
 public class GetComplianceStatusHandler : IRequestHandler<GetComplianceStatus, List<ComplianceStatusDto>>
 {
     private readonly AppDbContext _db;
+    private readonly IAuditUserContext _userContext;
 
-    public GetComplianceStatusHandler(AppDbContext db) => _db = db;
+    public GetComplianceStatusHandler(AppDbContext db, IAuditUserContext userContext)
+    {
+        _db = db;
+        _userContext = userContext;
+    }
 
     public async Task<List<ComplianceStatusDto>> Handle(GetComplianceStatus request, CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        // Load all active divisions
-        var divisions = await _db.Divisions
+        // Load active divisions scoped to this user's allowed set
+        var divisionsQuery = _db.Divisions
             .Where(d => d.IsActive)
             .OrderBy(d => d.Name)
-            .ToListAsync(cancellationToken);
+            .AsQueryable();
+
+        if (!_userContext.IsGlobal && _userContext.AllowedDivisionIds is { Count: > 0 } allowed)
+            divisionsQuery = divisionsQuery.Where(d => allowed.Contains(d.Id));
+
+        var divisions = await divisionsQuery.ToListAsync(cancellationToken);
 
         // For each division, find the most recent submitted/closed audit date
         var divisionIds = divisions.Select(d => d.Id).ToList();

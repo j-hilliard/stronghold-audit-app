@@ -141,6 +141,7 @@ export const auditManagementRoutes = [
         component: () => import('@/modules/audit-management/features/reports/views/NewsletterTemplateEditorView.vue'),
         meta: {
             title: 'Newsletter Template Editor',
+            requiresAuditAdmin: true,
             breadcrumbItems: () => [
                 { label: 'Compliance Audit' },
                 { label: 'Dashboard', to: '/audit-management/reports' },

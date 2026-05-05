@@ -58,8 +58,13 @@ public class GetScheduledReports : IRequest<List<ScheduledReportDto>>
 public class GetScheduledReportsHandler : IRequestHandler<GetScheduledReports, List<ScheduledReportDto>>
 {
     private readonly AppDbContext _db;
+    private readonly IAuditUserContext _userContext;
 
-    public GetScheduledReportsHandler(AppDbContext db) => _db = db;
+    public GetScheduledReportsHandler(AppDbContext db, IAuditUserContext userContext)
+    {
+        _db = db;
+        _userContext = userContext;
+    }
 
     public async Task<List<ScheduledReportDto>> Handle(GetScheduledReports request, CancellationToken ct)
     {
@@ -67,6 +72,9 @@ public class GetScheduledReportsHandler : IRequestHandler<GetScheduledReports, L
             .Include(r => r.Division)
             .Where(r => r.IsActive)
             .AsQueryable();
+
+        if (!_userContext.IsGlobal && _userContext.AllowedDivisionIds is { Count: > 0 } allowed)
+            query = query.Where(r => r.DivisionId == null || allowed.Contains(r.DivisionId.Value));
 
         if (request.DivisionId.HasValue)
             query = query.Where(r => r.DivisionId == request.DivisionId.Value || r.DivisionId == null);

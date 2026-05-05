@@ -37,11 +37,14 @@ import { ref, computed, onMounted } from 'vue';
 
 const STORAGE_KEY = 'stronghold-audit-dev-role';
 
-// Mirrors the 5 official roles in Shared/Enumerations/AuthorizationRole.cs
+// Mirrors the roles in Shared/Enumerations/AuthorizationRole.cs
 const ROLES = [
     'ITAdmin',
     'Auditor',
     'AuditAdmin',
+    'AuditReviewer',
+    'AuditManager',
+    'TemplateAdmin',
     'Executive',
     'NormalUser',
 ];

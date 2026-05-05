@@ -97,7 +97,7 @@ router.beforeEach((to, _from, next) => {
             }
 
             const isReviewRoute = /^\/audit-management\/audits\/[^/]+\/review(\/|$)/.test(path);
-            if (isReviewRoute && !userStore.isAuditReviewer && !userStore.isAuditAdmin) {
+            if (isReviewRoute && !userStore.isAuditReviewer && !userStore.isAuditAdmin && !userStore.isAdmin) {
                 next({ path: unauthorized });
                 return;
             }
