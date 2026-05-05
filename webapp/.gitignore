@@ -20,4 +20,6 @@ tests/e2e/*
 !tests/e2e/audit-report-composer-contract.spec.ts
 !tests/e2e/audit-corrective-actions-contract.spec.ts
 !tests/e2e/admin-users-contract.spec.ts
+!tests/e2e/external-ca-public-flow.spec.ts
+!tests/e2e/reviewer-mode-roundtrip.spec.ts
 playwright.config.ts

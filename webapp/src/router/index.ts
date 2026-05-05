@@ -86,7 +86,7 @@ router.beforeEach((to, _from, next) => {
                 return;
             }
 
-            if (meta.requiresAuditAdmin && !userStore.canAccessAdminTemplates && !userStore.isITAdmin && !userStore.isAdmin) {
+            if (meta.requiresAuditAdmin && !userStore.canAccessAdminTemplates && !userStore.isAdmin) {
                 next({ path: unauthorized });
                 return;
             }
