@@ -29,6 +29,15 @@ public class ScheduledReportService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Gate on ScheduledReports:Enabled — defaults to true (production behavior preserved).
+        // Set ScheduledReports:Enabled=false in appsettings.Local.json to prevent unwanted
+        // PDF generation and email sends during local development.
+        if (!_config.GetValue<bool>("ScheduledReports:Enabled", true))
+        {
+            _logger.LogInformation("ScheduledReportService: disabled via ScheduledReports:Enabled=false. No scheduled reports will run.");
+            return;
+        }
+
         try
         {
             while (!stoppingToken.IsCancellationRequested)

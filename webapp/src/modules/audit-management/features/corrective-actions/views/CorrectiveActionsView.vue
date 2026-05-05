@@ -39,7 +39,7 @@
                     option-value="value"
                     placeholder="All Divisions"
                     show-clear
-                    class="w-48"
+                    class="w-full md:w-48"
                     @change="loadFiltered"
                 />
             </div>
@@ -54,7 +54,7 @@
                     option-value="value"
                     placeholder="All Statuses"
                     show-clear
-                    class="w-40"
+                    class="w-full md:w-40"
                     @change="loadFiltered"
                 />
             </div>
@@ -69,7 +69,7 @@
                     option-value="value"
                     placeholder="All Sources"
                     show-clear
-                    class="w-40"
+                    class="w-full md:w-40"
                     @change="loadFiltered"
                 />
             </div>
@@ -84,7 +84,7 @@
                     option-value="value"
                     placeholder="All"
                     show-clear
-                    class="w-32"
+                    class="w-full md:w-32"
                     @change="loadFiltered"
                 />
             </div>

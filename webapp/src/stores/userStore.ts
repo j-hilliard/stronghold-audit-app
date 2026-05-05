@@ -92,7 +92,9 @@ export const useUserStore = defineStore('user', () => {
     const canAccessAdminTemplates = computed(() => isTemplateAdmin.value || isAuditAdmin.value);
 
     /** User can access the reports and dashboard section. */
-    const canViewReports = computed(() => isAuditAdmin.value || isExecutive.value || isAuditManager.value || isAdmin.value);
+    const canViewReports = computed(() =>
+        isAuditAdmin.value || isExecutive.value || isAuditManager.value || isAuditReviewer.value || isAdmin.value
+    );
 
     async function logoutUser() {
         await logout();

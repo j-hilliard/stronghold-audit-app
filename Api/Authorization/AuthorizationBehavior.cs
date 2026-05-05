@@ -192,7 +192,9 @@ public class AuthorizationBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
                 .ToListAsync(cancellationToken);
 
             authEntry = new UserAuthCacheEntry(currentUser.UserId, currentUser.Email ?? string.Empty, roles, divisionIds);
-            _cache.Set(cacheKey, authEntry, new MemoryCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromMinutes(60)));
+            // 5-minute TTL: role/division changes take effect within one cache window.
+            // (Previously 60 min — reduced to limit stale-access window after role changes.)
+            _cache.Set(cacheKey, authEntry, new MemoryCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromMinutes(5)));
         }
 
         // Populate the scoped IAuditUserContext for this request

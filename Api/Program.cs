@@ -323,7 +323,34 @@ if (!AppConfigExtensions.IsRunningForNswagCodegen())
     }
 }
 
-app.UseCors(policyBuilder => policyBuilder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+// CORS — open in Local dev; config-restricted in all other environments.
+// Set Cors:AllowedOrigins in appsettings.{env}.json or Azure App Config for Production/Development.
+if (isLocal)
+{
+    app.UseCors(p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+}
+else
+{
+    var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+    if (corsOrigins is { Length: > 0 })
+    {
+        app.UseCors(p => p
+            .WithOrigins(corsOrigins)
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials());
+    }
+    else
+    {
+        // Cors:AllowedOrigins not configured — fall back to open policy with a warning.
+        // Configure Cors:AllowedOrigins in production App Config to lock this down.
+        var corsLogger = app.Services.GetRequiredService<ILogger<Program>>();
+        corsLogger.LogWarning(
+            "CORS: Cors:AllowedOrigins not configured — allowing all origins. " +
+            "Set this key in production App Config to restrict to known app origins.");
+        app.UseCors(p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+    }
+}
 // Skip HTTPS redirect in Local dev — Vite proxy uses plain HTTP to avoid OpenSSL cert issues
 if (!isLocal)
     app.UseHttpsRedirection();

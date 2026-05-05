@@ -18,7 +18,7 @@
             />
         </div>
         <div class="layout-main bg-gradient-to-b from-slate-900 to-slate-800">
-            <div class="layout-content p-12">
+            <div class="layout-content p-4 sm:p-6 lg:p-12">
                 <router-view v-slot="{ Component }">
                     <component v-if="Component" :is="Component" :key="route.fullPath" />
                     <div v-else class="text-slate-400" data-testid="route-view-loading">

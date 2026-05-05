@@ -31,6 +31,7 @@
             emptyMessage="No audits found."
             v-model:selection="selectedAudits"
             dataKey="id"
+            scrollable
             @row-dblclick="onRowDblClick"
         >
             <template #filters>
@@ -326,12 +327,13 @@ function onBulkDelete() {
     display: flex;
     gap: 2px;
     justify-content: flex-end;
-    opacity: 0;
     transition: opacity 0.15s ease;
 }
 
-:deep(tr:hover) .audit-row-actions {
-    opacity: 1;
+/* Hide actions on hover-capable pointer devices only — always visible on touch. */
+@media (hover: hover) and (pointer: fine) {
+    .audit-row-actions { opacity: 0; }
+    :deep(tr:hover) .audit-row-actions { opacity: 1; }
 }
 
 :deep(.audit-action-btn) {

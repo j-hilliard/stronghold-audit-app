@@ -1,6 +1,6 @@
 # Role / Access Matrix
 
-**Last updated:** 2026-05-05  
+**Last updated:** 2026-05-05 (Pass B)
 **Branch:** feat/phase-2c-enhancements
 
 This document is the authoritative reference for which roles can access which areas of the Stronghold Audit application.
@@ -12,48 +12,55 @@ This document is the authoritative reference for which roles can access which ar
 | Role | Code | Description |
 |------|------|-------------|
 | Administrator | `Administrator` | Full system access. Bypasses all frontend guards. |
-| IT Admin | `ITAdmin` | Manages users and roles. Cannot access audit content. |
-| Audit Admin | `AuditAdmin` | Full audit lifecycle access + template/settings admin. |
-| Audit Manager | `AuditManager` | Manages audits and reports across divisions. Read/manage, no settings admin. |
-| Audit Reviewer | `AuditReviewer` | Reviews submitted audits, writes review summaries, distributes. |
-| Auditor | `Auditor` | Creates and submits audits for assigned divisions only. |
-| Template Admin | `TemplateAdmin` | Manages templates and newsletter. No audit create/approve. |
-| Executive | `Executive` | Read-only: reports and compliance status. |
+| IT Admin | `ITAdmin` | Manages users and roles only. No access to audit content, reports, or templates. |
+| Audit Admin | `AuditAdmin` | Full audit lifecycle access + template/settings admin. Global division view. |
+| Audit Manager | `AuditManager` | Manages audits and reports across divisions. No settings/template admin. |
+| Audit Reviewer | `AuditReviewer` | Reviews submitted audits: edits responses on UnderReview audits, writes review summaries, approves, distributes, views reports. |
+| Auditor | `Auditor` | Creates and submits audits for assigned divisions only. Sees only own audits. |
+| Template Admin | `TemplateAdmin` | Manages templates and newsletter. Included in AuditAdmin access group for guards. |
+| Executive | `Executive` | Read-only: reports, compliance dashboard, audits. No editing. |
 | Executive Viewer | `ExecutiveViewer` | Same as Executive (legacy alias). |
-| Normal User | `NormalUser` | Limited: corrective actions assigned to them only. |
-| Read-Only Viewer | `ReadOnlyViewer` | Read-only access to reports. |
+| Normal User | `NormalUser` | Corrective actions assigned to them only. No audit or report access. |
+| Read-Only Viewer | `ReadOnlyViewer` | Read-only access to reports. Backend only — no distinct frontend route. |
 
 ---
 
 ## Frontend Route Guards
 
-Guards are enforced in `webapp/src/router/index.ts` and `webapp/src/modules/audit-management/router/index.ts`.
+Guards are enforced via route meta flags in `webapp/src/modules/audit-management/router/index.ts`
+and the `beforeEach` hook in `webapp/src/router/index.ts`.
 
-> **Important:** Frontend guards are a UX convenience only. Backend authorization via `[AllowedAuthorizationRole]` attributes is the enforced security boundary.
+> **Important:** Frontend guards are a UX convenience layer only. Backend `[AllowedAuthorizationRole]` attributes on MediatR handlers are the enforced security boundary.
 
-| Route / Area | Admin | ITAdmin | AuditAdmin | AuditManager | AuditReviewer | Auditor | TemplateAdmin | Executive | NormalUser |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| `/audit-management/audits` | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `/audit-management/audits/new` | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| `/audit-management/audits/:id/review` | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `/audit-management/corrective-actions` | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| `/audit-management/reports` | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
-| `/audit-management/admin/templates` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| `/audit-management/admin/settings` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| `/audit-management/admin/users` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `/audit-management/newsletter/template-editor` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| `/audit-management/print/:divisionId` | Unguarded (backend enforces) | | | | | | | | |
-| `/audit-management/newsletter` | Unguarded (backend enforces) | | | | | | | | |
-| `/audit-management/print-review/:auditId` | Unguarded (backend enforces) | | | | | | | | |
-| `/ca/:token` | Anonymous — public token endpoint | | | | | | | | |
+| Route / Area | Guard Meta | Admin | ITAdmin | AuditAdmin | AuditManager | AuditReviewer | Auditor | TemplateAdmin | Executive | NormalUser |
+|---|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| `/audits` | `isAuditRoute` | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅¹ | ✅ | ❌ |
+| `/audits/new` | `requiresCreateAudit` | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| `/audits/:id` | `isAuditRoute` | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅¹ | ✅ | ❌ |
+| `/audits/:id/review` | review regex | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `/corrective-actions` | path check | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅¹ | ✅² | ✅ |
+| `/reports` (all sub-routes) | `requiresReports` | ✅ | ❌ | ✅ | ✅ | **✅³** | ❌ | ✅¹ | ✅ | ❌ |
+| `/admin/templates` | `requiresAuditAdmin` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| `/admin/settings` | `requiresAuditAdmin` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| `/admin/audit-log` | `requiresAuditAdmin` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| `/admin/users` | `requiresITAdmin` | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `/newsletter/template-editor` | `requiresAuditAdmin` | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| `/print/:divisionId` | Unguarded (backend enforces) | — | — | — | — | — | — | — | — | — |
+| `/newsletter` | Unguarded (backend enforces) | — | — | — | — | — | — | — | — | — |
+| `/print-review/:auditId` | Unguarded (backend enforces) | — | — | — | — | — | — | — | — | — |
+| `/ca/:token` | Anonymous — public token endpoint | — | — | — | — | — | — | — | — | — |
 
-**Note on print/newsletter routes:** These standalone print/export routes have no frontend guard because they are used by server-side PDF generation (PuppeteerSharp makes headless requests). Backend handlers enforce authorization on the underlying data APIs they call. Direct browser access without a valid session returns no meaningful data.
+¹ TemplateAdmin is included in `isAuditAdmin` computed, which is checked in most guards.  
+² Executive can view CAs read-only; backend blocks write operations.  
+³ **Fixed in Pass B** — AuditReviewer was previously blocked from all reports pages.
+
+**Note on unguarded print/newsletter routes:** These are standalone print/export views used by PuppeteerSharp (headless Chromium) for server-side PDF generation. They have no session context when rendered by the PDF service. Direct browser access without a real session only renders an empty page — no authenticated data is exposed.
 
 ---
 
 ## Backend Authorization (Handler Level)
 
-Authorization is enforced by `AuthorizationBehavior<TRequest, TResponse>` in the MediatR pipeline. Each handler is decorated with `[AllowedAuthorizationRole(...)]`.
+Authorization is enforced by `AuthorizationBehavior<TRequest, TResponse>` in the MediatR pipeline. Each handler must declare `[AllowedAuthorizationRole(...)]` — handlers without this attribute throw `UnauthorizedAccessException` for all callers.
 
 | Handler | Allowed Roles |
 |---------|--------------|
@@ -68,6 +75,7 @@ Authorization is enforced by `AuthorizationBehavior<TRequest, TResponse>` in the
 | `GetDistributionPreview` | AuditManager, AuditReviewer, Administrator, AuditAdmin |
 | `GetComplianceStatus` | AuditManager, AuditReviewer, ReadOnlyViewer, ExecutiveViewer, TemplateAdmin, Administrator, AuditAdmin, Executive |
 | `GetScheduledReports` | AuditManager, AuditReviewer, TemplateAdmin, Administrator, AuditAdmin, Executive |
+| `SaveScheduledReport` (create/edit) | AuditManager, TemplateAdmin, Administrator, AuditAdmin |
 | `GenerateReport` | AuditManager, AuditReviewer, ReadOnlyViewer, ExecutiveViewer, TemplateAdmin, Administrator, AuditAdmin, Executive |
 | `GetCorrectiveActions` | AuditManager, AuditReviewer, TemplateAdmin, Administrator, AuditAdmin, Auditor, NormalUser |
 | `AssignCorrectiveAction` | AuditManager, Administrator, AuditAdmin |
@@ -78,25 +86,35 @@ Authorization is enforced by `AuthorizationBehavior<TRequest, TResponse>` in the
 
 ## Division Scope Enforcement (Backend)
 
-Users can be assigned to specific divisions, restricting which audit data they see.
+Users can be assigned to specific divisions, limiting the audit data they see. `IAuditUserContext` carries `AllowedDivisionIds` set by `AuthorizationBehavior` from the `UserDivisions` table.
 
 | Handler | Division Scoping |
 |---------|-----------------|
-| `GetAuditList` | ✅ Enforced via `AllowedDivisionIds` |
-| `GetComplianceStatus` | ✅ Enforced (fixed 2026-05-05) |
-| `GetScheduledReports` | ✅ Enforced (fixed 2026-05-05) |
+| `GetAuditList` | ✅ Enforced |
+| `GetComplianceStatus` | ✅ Enforced (Pass A) |
+| `GetScheduledReports` | ✅ Enforced (Pass A) |
 | `GenerateReport` | ✅ Enforced |
 | `GetCorrectiveActions` | ✅ Enforced |
 | `GetAuditsByEmployee` | ✅ Enforced |
 
-**Global roles** (Administrator, AuditAdmin, AuditManager, TemplateAdmin, Executive, ExecutiveViewer) see all divisions regardless of UserDivisions assignment.
+**Global roles** (Administrator, AuditAdmin, AuditManager, TemplateAdmin, Executive, ExecutiveViewer) bypass `AllowedDivisionIds` and see all divisions.
+
+---
+
+## Auth Cache
+
+Roles and division assignments are cached per user in `IMemoryCache` with a **5-minute absolute TTL** (reduced from 60 min in Pass B). Changes take effect within one cache window. Cache key: `AuditAuth_{azureAdObjectId}`.
+
+No explicit invalidation path exists — the 5-minute TTL is the invalidation mechanism. If a security-critical role change must take effect immediately, restart the API process.
 
 ---
 
 ## Known Remaining Risks
 
-| Risk | Severity | Mitigation |
-|------|----------|-----------|
-| Print/newsletter routes unguarded on frontend | Low | Backend data APIs require authentication; PuppeteerSharp-rendered pages have no interactive attack surface |
-| Scheduled report background service runs without user auth context | Low | Service runs with DB access only; cannot bypass API authorization; runs only for pre-configured schedules created by authorized admins |
-| NormalUser can access corrective-actions list | By Design | NormalUser is a valid CA assignee; backend filters CAs to assigned-to-email scope |
+| Risk | Severity | Status | Mitigation |
+|------|----------|--------|-----------|
+| CORS: `Cors:AllowedOrigins` not yet set in production App Config | Medium | Pending operator action | Code is ready; falls back to open with log warning until configured |
+| Auth cache: no explicit invalidation on role change | Low | Accepted | 5-min TTL is adequate for role change propagation in this use case |
+| Print/newsletter/print-review routes unguarded on frontend | Low | Accepted | No sensitive data rendered without authenticated API calls succeeding |
+| ScheduledReportService: deactivated user's schedules continue firing | Low | Accepted | Service reads stored schedules only; admin must manually disable stale schedules |
+| NormalUser can reach `/corrective-actions` URL | By Design | Accepted | Backend filters to assigned-to-email CAs only |

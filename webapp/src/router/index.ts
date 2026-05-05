@@ -108,7 +108,7 @@ router.beforeEach((to, _from, next) => {
                 return;
             }
 
-            if (path.includes('/reports') && !userStore.canViewReports) {
+            if (meta.requiresReports && !userStore.canViewReports) {
                 next({ path: unauthorized });
                 return;
             }

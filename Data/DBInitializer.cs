@@ -49,27 +49,20 @@ public static class DbInitializer
 
     private static void SeedUserRoles(AppDbContext dbContext)
     {
-        if (dbContext.Roles.Any())
-            return;
-
+        // Per-role idempotent — never bail on Any(). New roles can be added to the list
+        // and will be seeded even when other roles already exist in the database.
         foreach (var roleWithDescription in Roles)
         {
-            var existingRole = dbContext.Roles.FirstOrDefault(r =>
-                r.Name == roleWithDescription.RoleName
-            );
-            
-            if (existingRole == null)
+            if (!dbContext.Roles.Any(r => r.Name == roleWithDescription.RoleName))
             {
-                var role = new Role
+                dbContext.Roles.Add(new Role
                 {
                     Name = roleWithDescription.RoleName,
                     Description = roleWithDescription.Description,
-                };
-
-                dbContext.Roles.Add(role);
-                dbContext.SaveChanges();
+                });
             }
         }
+        dbContext.SaveChanges();
     }
 
     /// <summary>
@@ -82,7 +75,7 @@ public static class DbInitializer
         {
             (Shared.Enumerations.AuthorizationRoles.TemplateAdmin,          "Audit Template Admin — create, edit, and publish audit templates. Cannot manage users."),
             (Shared.Enumerations.AuthorizationRoles.AuditManager,           "Audit Manager — view and finalize audits in assigned divisions, manage corrective actions, run reports."),
-            (Shared.Enumerations.AuthorizationRoles.AuditReviewer,          "Audit Reviewer — read-only access to submitted audits and reports. Cannot edit templates or audits."),
+            (Shared.Enumerations.AuthorizationRoles.AuditReviewer,          "Audit Reviewer — reviews submitted audits: can edit responses on UnderReview audits, write review summaries, approve, distribute, and view reports. Cannot manage templates or users."),
             (Shared.Enumerations.AuthorizationRoles.CorrectiveActionOwner,  "Corrective Action Owner — update and close assigned corrective actions only."),
             (Shared.Enumerations.AuthorizationRoles.ReadOnlyViewer,         "Read-Only Viewer — search, view, and export audits. No edit rights."),
             (Shared.Enumerations.AuthorizationRoles.ExecutiveViewer,        "Executive Viewer — access KPI dashboards and summary reports only."),

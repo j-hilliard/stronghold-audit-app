@@ -2,7 +2,7 @@ import { apps } from '@/apps.ts';
 import { getErrorRoutes } from '@/router/errorRoutes.ts';
 
 export const auditManagementRoutes = [
-    { path: '', redirect: `/${apps.auditManagement.baseSlug}/reports` },
+    { path: '', redirect: `/${apps.auditManagement.baseSlug}/audits` },
     {
         path: 'audits',
         name: 'audit-management-dashboard',
@@ -61,6 +61,7 @@ export const auditManagementRoutes = [
         component: () => import('@/modules/audit-management/features/reports/views/ReportsView.vue'),
         meta: {
             title: 'Dashboard',
+            requiresReports: true,
             breadcrumbItems: () => [
                 { label: 'Compliance Audit' },
                 { label: 'Dashboard' },
@@ -155,6 +156,7 @@ export const auditManagementRoutes = [
         component: () => import('@/modules/audit-management/features/reports/views/ReportComposerView.vue'),
         meta: {
             title: 'Report Composer',
+            requiresReports: true,
             breadcrumbItems: () => [
                 { label: 'Compliance Audit' },
                 { label: 'Dashboard', to: '/audit-management/reports' },
@@ -168,6 +170,7 @@ export const auditManagementRoutes = [
         component: () => import('@/modules/audit-management/features/reports/views/ReportGalleryView.vue'),
         meta: {
             title: 'Generate Report',
+            requiresReports: true,
             breadcrumbItems: () => [
                 { label: 'Compliance Audit' },
                 { label: 'Dashboard', to: '/audit-management/reports' },
@@ -181,6 +184,7 @@ export const auditManagementRoutes = [
         component: () => import('@/modules/audit-management/features/reports/views/ScheduledReportsView.vue'),
         meta: {
             title: 'Scheduled Reports',
+            requiresReports: true,
             breadcrumbItems: () => [
                 { label: 'Compliance Audit' },
                 { label: 'Dashboard', to: '/audit-management/reports' },
@@ -194,6 +198,7 @@ export const auditManagementRoutes = [
         component: () => import('@/modules/audit-management/features/reports/views/AuditsByEmployeeView.vue'),
         meta: {
             title: 'Audits by Employee',
+            requiresReports: true,
             breadcrumbItems: () => [
                 { label: 'Compliance Audit' },
                 { label: 'Dashboard', to: '/audit-management/reports' },

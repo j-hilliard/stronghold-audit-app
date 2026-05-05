@@ -58,7 +58,7 @@
                     option-label="code"
                     option-value="id"
                     placeholder="All Divisions"
-                    class="w-44"
+                    class="w-full md:w-44"
                     :show-clear="!!filterDivisionId"
                     @change="loadReport"
                     data-testid="report-filter-division"
@@ -72,7 +72,7 @@
                     option-label="label"
                     option-value="value"
                     placeholder="All Statuses"
-                    class="w-40"
+                    class="w-full md:w-40"
                     :show-clear="!!filterStatus"
                     @change="loadReport"
                     data-testid="report-filter-status"
@@ -84,7 +84,7 @@
                     v-model="filterDateFrom"
                     placeholder="From date"
                     dateFormat="yy-mm-dd"
-                    class="w-36"
+                    class="w-full md:w-36"
                     :show-clear="!!filterDateFrom"
                     @date-select="loadReport"
                     @clear-click="loadReport"
@@ -97,7 +97,7 @@
                     v-model="filterDateTo"
                     placeholder="To date"
                     dateFormat="yy-mm-dd"
-                    class="w-36"
+                    class="w-full md:w-36"
                     :show-clear="!!filterDateTo"
                     @date-select="loadReport"
                     @clear-click="loadReport"
@@ -273,7 +273,7 @@
             </div>
 
             <!-- ── Tab strip (immediately below KPIs) ─────────────────────────── -->
-            <div ref="tabBarEl" class="border-b border-slate-700 flex items-center gap-1 -mx-4 px-4 pt-1">
+            <div ref="tabBarEl" class="border-b border-slate-700 flex items-center gap-1 -mx-4 px-4 pt-1 overflow-x-auto">
                 <button
                     v-for="tab in TABS"
                     :key="tab.key"
@@ -657,7 +657,7 @@
                     </template>
                     <template #content>
                         <div v-show="!collapsed.openCAs">
-                        <DataTable :value="report.openCorrectiveActions" :rows="10" paginator sortField="dueDate" :sortOrder="1" class="stronghold-table text-sm" :row-class="(r: any) => r.isOverdue ? 'row--overdue' : ''">
+                        <DataTable :value="report.openCorrectiveActions" :rows="10" paginator sortField="dueDate" :sortOrder="1" class="stronghold-table text-sm" :row-class="(r: any) => r.isOverdue ? 'row--overdue' : ''" scrollable>
                             <Column field="id" header="CA #" style="width:60px" sortable />
                             <Column field="auditId" header="Audit #" style="width:80px" sortable />
                             <Column field="description" header="Description">
@@ -773,7 +773,7 @@
                     </template>
                     <template #content>
                         <div v-show="!collapsed.auditDetail">
-                        <DataTable :value="filteredAuditRows" :rows="20" paginator sortField="id" :sortOrder="-1" class="stronghold-table text-sm">
+                        <DataTable :value="filteredAuditRows" :rows="20" paginator sortField="id" :sortOrder="-1" class="stronghold-table text-sm" scrollable>
                             <Column field="id" header="#" style="width:60px" sortable>
                                 <template #body="{ data }"><span data-testid="report-grid-row">{{ data.id }}</span></template>
                             </Column>
