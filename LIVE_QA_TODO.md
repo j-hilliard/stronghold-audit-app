@@ -1,5 +1,5 @@
 # LIVE QA TODO — Stronghold Audit App
-_Last updated: 2026-04-27 | 11 code fixes applied (P1-002/003/005/006/007/008/010/012/014, P2-001/002) | full-stack benchmark audit charter added_
+_Last updated: 2026-05-05 | Claude fix audit verified P1-016/018/019 DONE, P1-017 PARTIAL (tabs still broken) | full-stack benchmark audit charter added_
 
 ## How to use this file
 - **OPEN** = verified defect, needs fixing, awaiting Joseph approval
@@ -94,6 +94,7 @@ Evidence root: `docs/qa-evidence/QA_AUDIT_20260427_SCREEN_SWEEP/`
 - **Evidence:** Original failure: `docs/qa-evidence/QA_AUDIT_20260427_SCREEN_SWEEP/screenshots/78-admin-audit-log-action-tab.png`, `79-admin-audit-log-change-trail-tab.png`, `80-admin-audit-log-expanded-row.png`; original `sweep-log.json` console error. Partial-fix audit: `docs/qa-evidence/QA_AUDIT_20260428_CLAUDE_FIX_AUDIT/admin-audit-log-regression-result.json` has no console errors, but `admin-audit-log-actions-after-fix.png` and `admin-audit-log-expanded-after-fix.png` still show both tables rendered.
 - **Likely files:** `webapp/src/modules/audit-management/features/admin-audit-log/views/AdminAuditLogView.vue`; PrimeVue 3 DataTable/Tabs usage.
 - **Claude note:** The `expandedRows` part is fixed with `dataKey="id"` and `v-model:expandedRows`, but the remaining failure is likely the `<Tabs>/<TabList>/<TabPanels>` pattern in a `primevue@3.26.1` app. Replace with PrimeVue 3 `TabView`/`TabPanel`, or render each table with explicit `v-if="activeTab === 'actions'"` / `v-if="activeTab === 'trail'"`.
+- **Root cause (verified):** Repo dependency is `primevue@3.26.1` (no `primevue/tabs` component). `AdminAuditLogView.vue` uses PrimeVue v4-style `<Tabs>/<TabList>/<TabPanels>/<TabPanel>`, so tab state does not control panel visibility and both tables render together (see `docs/qa-evidence/QA_AUDIT_20260428_CLAUDE_FIX_AUDIT/admin-audit-log-actions-after-fix.png`).
 - **Expected behavior:** Only the selected tab panel renders, row expansion works, and the page emits no console errors.
 - **Verification required:** Open `/audit-management/admin/audit-log`, switch both tabs, expand one row in each tab, assert no console errors and no mixed tab content.
 - **Regression linkage:** `QA_REGRESSION_CHECKLIST.md` section 16.4.
