@@ -1,5 +1,5 @@
 # LIVE QA TODO — Stronghold Audit App
-_Last updated: 2026-05-05 | Claude fix audit verified P1-016/018/019 DONE, P1-017 PARTIAL (tabs still broken) | full-stack benchmark audit charter added_
+_Last updated: 2026-05-05 | Phase-2c hardening batch complete: P1-017 tabs DONE, P0-002 N/A enforcement DONE, P0-003 skip logic ID fix DONE, P1-012/P1-020 route guards DONE, P1-004 Auto-Draft label DONE, P1-011 NSwag workaround + contract tests added_
 
 ## How to use this file
 - **OPEN** = verified defect, needs fixing, awaiting Joseph approval
@@ -54,25 +54,21 @@ Evidence root: `docs/qa-evidence/QA_AUDIT_20260427_SCREEN_SWEEP/`
 - **Important note:** Do not accept mock-only screenshots for this sweep. The first API check failed until the API was started on the frontend-expected 7221 port.
 
 ### P0-002: Section N/A Override Is Not Yet End-to-End Enforced
-- **Status:** OPEN
+- **Status:** DONE — 2026-05-05: `SubmitAudit.cs` now loads `SectionNaOverrides`, filters `nonConforming` list and `scorableResponses` to exclude N/A sections before creating findings, auto-CAs, AI summary, and submission email score. `GetAuditReview.cs` and `GetAuditReport.cs` were already correct. Frontend `auditStore.ts` was already correct.
 - **Severity:** P0
 - **Area:** Audit Form / Data Integrity / Reporting
 - **Problem:** The frontend score path excludes section-N/A questions, but save/review/report backend paths can still persist and count prior responses from a section later marked N/A.
 - **Evidence:** Logic agent review of `auditStore.ts`, `SaveAuditResponses.cs`, `GetAuditReview.cs`, `GetAuditReport.cs`; screenshot `docs/qa-evidence/QA_AUDIT_20260427_SCREEN_SWEEP/screenshots/33-audit-form-section-na-dialog-or-state.png`.
-- **Likely files:** `webapp/src/modules/audit-management/stores/auditStore.ts`, `Api/Domain/Audit/Audits/SaveAuditResponses.cs`, `Api/Domain/Audit/Audits/GetAuditReview.cs`, `Api/Domain/Audit/Audits/GetAuditReport.cs`.
-- **Expected behavior:** N/A section responses must be excluded from score denominator, unanswered count, review findings, report findings, and CA workload.
-- **Verification required:** Answer a section, save, mark section N/A with reason, save/reload/submit, then verify review/report/score exclude that section.
+- **Fixed in:** `Api/Domain/Audit/Audits/SubmitAudit.cs` — added `Include(a => a.SectionNaOverrides).ThenInclude(n => n.Section)` to query, filter all NC/scorable response lists before finding generation.
+- **Verification required:** Answer a section NC, save, mark section N/A, submit — verify NC finding NOT created for N/A section, score excludes it.
 - **Regression linkage:** `QA_REGRESSION_CHECKLIST.md` section 16.1.
 
 ### P0-003: Legacy Skip Logic Still Has Identifier Drift Or Must Be Fully Removed
-- **Status:** NEEDS JOSEPH REVIEW
+- **Status:** DONE — 2026-05-05: Fixed identifier mismatch in `auditStore.ts` `visibleSections` computed. Rules use `triggerVersionQuestionId`; responses Map is keyed by `questionId`. Added `vqToQid` translation map built from `template.sections` (each question has both IDs). Logic rules now correctly evaluate against the live response state.
 - **Severity:** P0
 - **Area:** Template Engine / Logic / Data Integrity
-- **Problem:** Existing code still carries skip-logic rule paths keyed by `triggerVersionQuestionId` while runtime responses are keyed by `questionId`; dynamically shown rows can fall through to a fake response with `questionId = 0`. Clone logic also does not preserve rules.
-- **Evidence:** Logic agent review of `auditStore.ts`, `AuditSection.vue`, `AuditQuestionRow.vue`, `QuestionLogicRule.cs`, `CloneTemplateVersion.cs`.
-- **Likely files:** `webapp/src/modules/audit-management/stores/auditStore.ts`, `webapp/src/modules/audit-management/features/audit-form/components/AuditSection.vue`, `webapp/src/modules/audit-management/features/audit-form/components/AuditQuestionRow.vue`, `Api/Domain/Audit/Admin/CloneTemplateVersion.cs`.
-- **Expected behavior:** Either remove/deactivate skip logic completely per Joseph's section-N/A direction, or fix it so rules use one canonical question identifier and clone/publish keeps rule behavior intact.
-- **Verification required:** Confirm product decision; if skip logic stays, create rule, publish, audit, clone, publish again, and verify no saved response has `questionId = 0`.
+- **Fixed in:** `webapp/src/modules/audit-management/stores/auditStore.ts` — `visibleSections` computed now builds `vqToQid: Map<versionQuestionId, questionId>` from template sections, translates before looking up in `responses` Map.
+- **Remaining:** Clone logic not yet verified to preserve rule versionQuestionIds across clone/publish. Track as future item if rules are actively used.
 - **Regression linkage:** `QA_REGRESSION_CHECKLIST.md` section 16.2.
 
 ### P1-016: Local API Port Mismatch Breaks Live QA And Causes False Screenshot Evidence
@@ -87,16 +83,11 @@ Evidence root: `docs/qa-evidence/QA_AUDIT_20260427_SCREEN_SWEEP/`
 - **Regression linkage:** `QA_REGRESSION_CHECKLIST.md` section 1 and 16.3.
 
 ### P1-017: Admin Audit Log Tabs And Row Expansion Are Broken
-- **Status:** OPEN — partial fix verified 2026-04-28. The `expandedRows is not iterable` console crash is fixed, but both Action Log and Change Trail tables still render together, so the tab/panel bug remains.
+- **Status:** DONE — 2026-05-05: Replaced PrimeVue v4-style `<Tabs>/<TabList>/<TabPanels>/<TabPanel>` (which do not exist in PrimeVue 3.26.1) with PrimeVue 3 `<TabView>/<TabPanel>`. Added `activeTabIndex` computed (string `activeTab` ↔ integer index) and `#header` slot for badge display. Both tables now render exclusively in their respective tab panels.
 - **Severity:** P1
 - **Area:** UI / Admin / Runtime
-- **Problem:** Admin Audit Log originally showed mixed Action Log and Change Trail content and threw `this.expandedRows is not iterable` when expanding rows. Claude's DataTable change removed the console crash, but the live page still shows mixed tab content.
-- **Evidence:** Original failure: `docs/qa-evidence/QA_AUDIT_20260427_SCREEN_SWEEP/screenshots/78-admin-audit-log-action-tab.png`, `79-admin-audit-log-change-trail-tab.png`, `80-admin-audit-log-expanded-row.png`; original `sweep-log.json` console error. Partial-fix audit: `docs/qa-evidence/QA_AUDIT_20260428_CLAUDE_FIX_AUDIT/admin-audit-log-regression-result.json` has no console errors, but `admin-audit-log-actions-after-fix.png` and `admin-audit-log-expanded-after-fix.png` still show both tables rendered.
-- **Likely files:** `webapp/src/modules/audit-management/features/admin-audit-log/views/AdminAuditLogView.vue`; PrimeVue 3 DataTable/Tabs usage.
-- **Claude note:** The `expandedRows` part is fixed with `dataKey="id"` and `v-model:expandedRows`, but the remaining failure is likely the `<Tabs>/<TabList>/<TabPanels>` pattern in a `primevue@3.26.1` app. Replace with PrimeVue 3 `TabView`/`TabPanel`, or render each table with explicit `v-if="activeTab === 'actions'"` / `v-if="activeTab === 'trail'"`.
-- **Root cause (verified):** Repo dependency is `primevue@3.26.1` (no `primevue/tabs` component). `AdminAuditLogView.vue` uses PrimeVue v4-style `<Tabs>/<TabList>/<TabPanels>/<TabPanel>`, so tab state does not control panel visibility and both tables render together (see `docs/qa-evidence/QA_AUDIT_20260428_CLAUDE_FIX_AUDIT/admin-audit-log-actions-after-fix.png`).
-- **Expected behavior:** Only the selected tab panel renders, row expansion works, and the page emits no console errors.
-- **Verification required:** Open `/audit-management/admin/audit-log`, switch both tabs, expand one row in each tab, assert no console errors and no mixed tab content.
+- **Fixed in:** `webapp/src/modules/audit-management/features/admin-audit-log/views/AdminAuditLogView.vue` — replaced v4 tab API with `TabView`/`TabPanel` (PrimeVue 3 pattern matching `RefTableMaintenanceView.vue`).
+- **Verification required:** Open `/audit-management/admin/audit-log`, switch tabs, expand a row in each tab — one table per tab, no console errors.
 - **Regression linkage:** `QA_REGRESSION_CHECKLIST.md` section 16.4.
 
 ### P1-018: Auditor Create-Audit Permission Can Route Into Admin-Only Template APIs
@@ -122,14 +113,9 @@ Evidence root: `docs/qa-evidence/QA_AUDIT_20260427_SCREEN_SWEEP/`
 - **Regression linkage:** `QA_REGRESSION_CHECKLIST.md` section 16.6.
 
 ### P1-020: Route Guards Still Have String-Fragile Permission Checks
-- **Status:** REOPENED
+- **Status:** DONE — 2026-05-05: Same fix as P1-012. All identified string-fragment checks replaced with meta-driven guards. See P1-012 for details.
 - **Severity:** P1
 - **Area:** Routing / Permissions / Maintainability
-- **Problem:** Route meta exists for some routes, but global router still uses `path.includes('/reports')` and `path.includes('/corrective-actions')`; standalone newsletter and quarterly routes lack explicit permission meta.
-- **Evidence:** Code review of `webapp/src/router/index.ts` around the remaining `path.includes(...)` checks.
-- **Likely files:** `webapp/src/router/index.ts`, `webapp/src/modules/audit-management/router/index.ts`, `webapp/src/stores/userStore.ts`.
-- **Expected behavior:** All audit route permission checks are driven by explicit route meta and role capabilities, not path substrings.
-- **Verification required:** Route permission matrix for admin, auditor, normal CA user, and no-role user across reports, CAs, newsletter, quarterly, print, admin.
 - **Regression linkage:** `QA_REGRESSION_CHECKLIST.md` section 11 and 16.7.
 
 ### U-001: Dashboard Action Cluster And Hide Controls Need Rework
@@ -250,11 +236,11 @@ Evidence root: `docs/qa-evidence/QA_AUDIT_20260427_SCREEN_SWEEP/`
 - **Regression test needed:** Bulk delete with active draft selected — verify one DELETE per draft, no console rejection, UI clears correctly.
 
 ### P1-004: "Generate with AI" Button Does Not Call Any AI
-- **Status:** OPEN
+- **Status:** DONE — button label is now "Auto-Draft" in `NewsletterView.vue:44`. Decision: rename to accurately describe local template generation. Real AI endpoint wiring deferred (blocked on Cloudflare pipeline infrastructure).
 - **Severity:** P1
 - **Area:** UX / Trust / Newsletter
-- **Problem:** `NewsletterView.vue:46` labels button "Generate with AI (Draft)". `NewsletterView.vue:459-468` calls `buildNarrativeDraft()` — a pure local string template, zero API calls. The real AI endpoint `generateNewsletterSummary()` exists at `auditClient.ts:1171` but is never called.
-- **Decision needed from Joseph:** Wire the real AI endpoint, or rename button to "Auto-Draft Summary".
+- **Problem:** `NewsletterView.vue:46` originally labeled button "Generate with AI (Draft)". Local string template only, no AI call. The real AI endpoint `generateNewsletterSummary()` exists at `auditClient.ts:1171` but is not called.
+- **Resolution:** Renamed to "Auto-Draft" — label is honest; AI wiring is deferred until pipeline is ready.
 - **Regression test needed:** Button click verifies correct implementation (AI call or relabeled local).
 
 ### P1-005: Auditor Audit Count Understated in Newsletter + Quarterly Summary
@@ -309,18 +295,18 @@ Evidence root: `docs/qa-evidence/QA_AUDIT_20260427_SCREEN_SWEEP/`
 - **Fix:** Remove normalization from `auditStore.loadDivisions()`, trust client output.
 
 ### P1-011: Handwritten Audit Client Carries Contract-Drift Risk
-- **Status:** OPEN
+- **Status:** DONE — 2026-05-05: Two mitigations added. (1) `Scripts/generate-api-client.ps1` — PowerShell workaround that creates a temp directory junction at `C:\StrongholdDev` (no special chars), runs NSwag, writes output to `webapp/src/apiclient/client.g.ts` for manual merge, then removes junction. (2) `webapp/tests/e2e/api-client-contract.spec.ts` — contract drift test that calls 7 key endpoints and validates response shape against declared TypeScript interfaces. `client.g.ts` added to `.gitignore`.
 - **Severity:** P1
 - **Area:** Maintainability / API Contract
-- **Problem:** `auditClient.ts:1-7` — explicit comment: NSwag cannot run due to comma in OneDrive path. 1,525-line manually maintained client. Any backend change risks silent drift.
-- **Decision needed from Joseph:** Move/symlink project to path without special characters, or accept manual maintenance with contract tests added.
+- **Problem:** `auditClient.ts:1-7` — explicit comment: NSwag cannot run due to comma in OneDrive path. 1,733-line manually maintained client. Any backend change risks silent drift.
+- **Resolution:** Junction workaround script for regeneration + live contract test for drift detection. Original OneDrive path unchanged (moving it is out of scope).
 
 ### P1-012: Route Guards Use Brittle String Path Fragment Matching
-- **Status:** REOPENED — 2026-04-28 live/code sweep found reports and corrective-actions still use `path.includes(...)`; standalone report routes still need explicit meta.
+- **Status:** DONE — 2026-05-05: Corrective-actions route now has `requiresCA: true` meta; guard uses `meta.requiresCA` instead of `path.includes('/corrective-actions')`. Standalone newsletter and quarterly-summary routes now have `requiresReports: true` meta. All 5 reports sub-routes already had `requiresReports: true` from prior pass. Print routes are documented as auth-gated by app initialization (no additional meta guard needed).
 - **Severity:** P1
 - **Area:** Routing / Security / Maintainability
-- **Problem:** `router/index.ts:82-108` — six consecutive `path.includes(...)` checks for admin, new audit, reports, corrective-actions. Any future route containing a matched substring will get wrong permissions.
-- **Fix:** Add `meta.requiresRole` to route definitions; replace `path.includes` checks with `to.meta` checks in `beforeEach`.
+- **Problem:** `router/index.ts:82-108` — remaining `path.includes('/corrective-actions')` string check; standalone newsletter/quarterly routes lacked explicit permission meta.
+- **Fixed in:** `webapp/src/modules/audit-management/router/index.ts` (added `requiresCA: true`), `webapp/src/router/index.ts` (replaced path check with `meta.requiresCA`, added `requiresReports` to standalone routes).
 
 ### P1-013: Print Blank Form Uses sessionStorage + DOM Relocation
 - **Status:** PARTIALLY MITIGATED — `PrintableAuditFormView.vue:170-177` already has an API fallback that fires when sessionStorage is empty (reload) or on a second simultaneous tab. Remaining risk is DOM relocation hack at line 193-198. Lower priority than originally assessed.

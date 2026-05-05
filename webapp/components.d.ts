@@ -49,6 +49,7 @@ declare module 'vue' {
     SectionPanel: typeof import('./src/components/ui/SectionPanel.vue')['default']
     StatusBadge: typeof import('./src/components/ui/StatusBadge.vue')['default']
     TabPanel: typeof import('primevue/tabpanel')['default']
+    TabView: typeof import('primevue/tabview')['default']
     Tag: typeof import('primevue/tag')['default']
     Textarea: typeof import('primevue/textarea')['default']
     TheMenu: typeof import('./src/components/layout/TheMenu.vue')['default']

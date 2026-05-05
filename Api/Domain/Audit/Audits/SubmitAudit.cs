@@ -58,15 +58,26 @@ public class SubmitAuditHandler : IRequestHandler<SubmitAudit, SubmitAuditResult
             .Include(a => a.Findings)
             .Include(a => a.Division)
             .Include(a => a.Header)
+            .Include(a => a.SectionNaOverrides).ThenInclude(n => n.Section)
             .FirstOrDefaultAsync(a => a.Id == request.AuditId, cancellationToken)
             ?? throw new ArgumentException($"Audit {request.AuditId} not found.");
 
         if (audit.Status != "Draft" && audit.Status != "Reopened")
             throw new InvalidOperationException($"Audit {request.AuditId} is already {audit.Status}.");
 
+        // ── Exclude responses from sections the auditor explicitly marked N/A ─
+        var naSectionNames = audit.SectionNaOverrides
+            .Select(n => n.Section.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var scorableResponses = naSectionNames.Count > 0
+            ? audit.Responses.Where(r => !naSectionNames.Contains(r.SectionNameSnapshot ?? "")).ToList()
+            : audit.Responses.ToList();
+
         // ── 2A-4: Required photo validation ──────────────────────────────────
         // For each NC response on a question that requires a photo, confirm at least one photo exists.
-        var ncQuestionIds = audit.Responses
+        // Only check scorable (non-N/A-section) responses.
+        var ncQuestionIds = scorableResponses
             .Where(r => r.Status == "NonConforming")
             .Select(r => r.QuestionId)
             .ToHashSet();
@@ -108,7 +119,7 @@ public class SubmitAuditHandler : IRequestHandler<SubmitAudit, SubmitAuditResult
         // Remove any existing findings first (safe on resubmit after reopen)
         _context.AuditFindings.RemoveRange(audit.Findings);
 
-        var nonConforming = audit.Responses
+        var nonConforming = scorableResponses
             .Where(r => r.Status == "NonConforming")
             .ToList();
 
@@ -140,7 +151,7 @@ public class SubmitAuditHandler : IRequestHandler<SubmitAudit, SubmitAuditResult
         // NC on AutoCreateCa question → ensure one open auto-CA (create or reactivate).
         // NC cleared on AutoCreateCa question → void any open auto-CA (never delete).
         var ncQids = nonConforming.Select(r => r.QuestionId).ToHashSet();
-        var allRespondedQids = audit.Responses.Select(r => r.QuestionId).ToHashSet();
+        var allRespondedQids = scorableResponses.Select(r => r.QuestionId).ToHashSet();
 
         var autoCaQuestionIds = await _context.AuditQuestions
             .Where(q => allRespondedQids.Contains(q.Id) && q.AutoCreateCa)
@@ -241,8 +252,13 @@ public class SubmitAuditHandler : IRequestHandler<SubmitAudit, SubmitAuditResult
     {
         try
         {
-            // Current score (simple conformance %)
-            var responses = audit.Responses.Where(r => r.Status != null).ToList();
+            // Current score (simple conformance %) — exclude N/A sections
+            var aiNaNames = audit.SectionNaOverrides
+                .Select(n => n.Section.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var responses = audit.Responses
+                .Where(r => r.Status != null && !aiNaNames.Contains(r.SectionNameSnapshot ?? ""))
+                .ToList();
             var conforming = responses.Count(r => r.Status == "Conforming");
             var denom = responses.Count(r => r.Status is "Conforming" or "NonConforming" or "Warning");
             double? score = denom > 0 ? Math.Round((double)conforming / denom * 100, 1) : null;
@@ -271,7 +287,7 @@ public class SubmitAuditHandler : IRequestHandler<SubmitAudit, SubmitAuditResult
                 .ToList();
 
             var warnItems = audit.Responses
-                .Where(r => r.Status == "Warning")
+                .Where(r => r.Status == "Warning" && !aiNaNames.Contains(r.SectionNameSnapshot ?? ""))
                 .Select(r => (r.SectionNameSnapshot ?? "General", r.QuestionTextSnapshot ?? string.Empty))
                 .ToList();
 
@@ -303,8 +319,13 @@ public class SubmitAuditHandler : IRequestHandler<SubmitAudit, SubmitAuditResult
         string? aiSummaryText,
         CancellationToken cancellationToken)
     {
-        // Score calculation (needed for both email and result)
-        var responses  = audit.Responses.Where(r => r.Status != null).ToList();
+        // Score calculation — exclude N/A sections (SectionNaOverrides already loaded above)
+        var emailNaNames = audit.SectionNaOverrides
+            .Select(n => n.Section.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var responses  = audit.Responses
+            .Where(r => r.Status != null && !emailNaNames.Contains(r.SectionNameSnapshot ?? ""))
+            .ToList();
         var conforming = responses.Count(r => r.Status == "Conforming");
         var denom      = responses.Count(r => r.Status is "Conforming" or "NonConforming" or "Warning");
         var scoreText  = denom > 0 ? $"{Math.Round((double)conforming / denom * 100, 1)}%" : "N/A";
