@@ -6,8 +6,16 @@
             subtitle="Conformance trends and non-conformance analysis"
             icon="pi pi-chart-bar"
         >
-            <Button icon="pi pi-refresh" severity="secondary" outlined size="small" :loading="loading" @click="loadReport" />
-            <Button icon="pi pi-sliders-h" severity="secondary" outlined size="small" title="Customize widgets" @click="toggleCustomize" />
+            <Button icon="pi pi-refresh" severity="secondary" outlined size="small" title="Refresh report data" :loading="loading" @click="loadReport" />
+            <Button
+                label="Reports"
+                icon="pi pi-file-edit"
+                severity="secondary"
+                outlined
+                size="small"
+                @click="toggleReportsMenu"
+            />
+            <Menu ref="reportsMenuRef" :model="reportsMenuItems" popup />
             <SplitButton
                 v-if="report"
                 label="Export"
@@ -18,15 +26,7 @@
                 :model="exportMenuItems"
                 @click="exportCsv"
             />
-            <Button
-                label="Reports"
-                icon="pi pi-file-edit"
-                severity="secondary"
-                outlined
-                size="small"
-                @click="toggleReportsMenu"
-            />
-            <Menu ref="reportsMenuRef" :model="reportsMenuItems" popup />
+            <Button icon="pi pi-sliders-h" severity="secondary" outlined size="small" title="Customize widgets" @click="toggleCustomize" />
             <OverlayPanel ref="customizePanelRef">
                 <div class="flex flex-col gap-1 min-w-[200px]">
                     <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Visible Widgets</div>

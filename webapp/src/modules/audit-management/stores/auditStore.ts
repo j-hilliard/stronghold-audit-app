@@ -119,6 +119,8 @@ export const useAuditStore = defineStore('audit', () => {
     const reviewLoading = ref(false); // review page loading
     const saving = ref(false);
     const isDirty = ref(false);
+    const autosaving = ref(false);
+    const autosaveStatus = ref<'idle' | 'saving' | 'saved' | 'failed'>('idle');
 
     // List filters
     const filterDivisionId = ref<number | null>(null);
@@ -282,12 +284,54 @@ export const useAuditStore = defineStore('audit', () => {
     // ── Auto-save debounce ─────────────────────────────────────────────────────
 
     let _autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+    let _autosaveBackendTimer: ReturnType<typeof setTimeout> | null = null;
+    let _autosaveClearTimer: ReturnType<typeof setTimeout> | null = null;
+    let _autosaveInFlight = false;
+
+    async function _autosaveDraftBackend() {
+        if (!auditId.value || isSubmitted.value || _autosaveInFlight || saving.value || !isDirty.value) return;
+        _autosaveInFlight = true;
+        autosaving.value = true;
+        autosaveStatus.value = 'saving';
+        try {
+            await getClient().saveResponses(auditId.value, {
+                header: { ...header.value },
+                responses: Array.from(responses.value.values()).map(r => ({
+                    questionId: r.questionId,
+                    questionTextSnapshot: r.questionTextSnapshot,
+                    status: r.status,
+                    comment: r.comment,
+                    correctedOnSite: r.correctedOnSite,
+                })),
+                sectionNaOverrides: Array.from(sectionNaOverrides.value.entries()).map(
+                    ([sectionId, reason]): SectionNaOverrideDto => ({ sectionId, reason })
+                ),
+            });
+            clearLocalDraft();
+            isDirty.value = false;
+            autosaveStatus.value = 'saved';
+            if (_autosaveClearTimer) clearTimeout(_autosaveClearTimer);
+            _autosaveClearTimer = setTimeout(() => {
+                if (autosaveStatus.value === 'saved') autosaveStatus.value = 'idle';
+            }, 3000);
+        } catch {
+            autosaveStatus.value = 'failed';
+        } finally {
+            autosaving.value = false;
+            _autosaveInFlight = false;
+        }
+    }
 
     function scheduleAutosave() {
         if (_autosaveTimer) clearTimeout(_autosaveTimer);
         _autosaveTimer = setTimeout(() => {
             saveDraftToLocalStorage();
         }, 800);
+
+        if (_autosaveBackendTimer) clearTimeout(_autosaveBackendTimer);
+        _autosaveBackendTimer = setTimeout(() => {
+            void _autosaveDraftBackend();
+        }, 3000);
     }
 
     watch(
@@ -529,6 +573,8 @@ export const useAuditStore = defineStore('audit', () => {
 
     async function saveDraft(): Promise<boolean> {
         if (!auditId.value) return false;
+        // Cancel pending autosave — manual save supersedes it
+        if (_autosaveBackendTimer) { clearTimeout(_autosaveBackendTimer); _autosaveBackendTimer = null; }
         saving.value = true;
         try {
             await getClient().saveResponses(auditId.value, {
@@ -721,6 +767,11 @@ export const useAuditStore = defineStore('audit', () => {
         priorPrefillDate.value = null;
         _priorPrefillMap.value = {};
         prefillQuestionIds.value = new Set();
+        autosaving.value = false;
+        autosaveStatus.value = 'idle';
+        if (_autosaveBackendTimer) { clearTimeout(_autosaveBackendTimer); _autosaveBackendTimer = null; }
+        if (_autosaveClearTimer)   { clearTimeout(_autosaveClearTimer);   _autosaveClearTimer   = null; }
+        _autosaveInFlight = false;
     }
 
     return {
@@ -744,6 +795,8 @@ export const useAuditStore = defineStore('audit', () => {
         reviewLoading,
         saving,
         isDirty,
+        autosaving,
+        autosaveStatus,
         filterDivisionId,
         filterStatus,
         filterAuditor,

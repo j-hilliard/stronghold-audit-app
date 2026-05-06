@@ -37,7 +37,7 @@
 
         <div v-if="loading" class="loading-msg">Loading…</div>
 
-        <template v-else-if="report">
+        <template v-else-if="report && report.totalAudits > 0">
             <!-- Header -->
             <div class="report-header">
                 <div class="report-header-top">
@@ -203,6 +203,14 @@
                 </div>
             </div>
         </template>
+
+        <div v-else-if="report && report.totalAudits === 0" class="no-data-state no-print">
+            <i class="pi pi-calendar-times" style="font-size:52px;color:#475569;" />
+            <h3>No Audits Found for This Period</h3>
+            <p class="period-desc">{{ quarterLabel }} &nbsp;·&nbsp; {{ divisionLabel }}</p>
+            <p class="no-data-hint">No qualifying audits were completed in this period. Try a different quarter, year, or division.</p>
+            <button @click="printPage" class="print-btn" style="opacity:.4;cursor:not-allowed;" disabled>Print / Save as PDF</button>
+        </div>
 
         <div v-else-if="!loading" class="loading-msg">No audit data for this period.</div>
     </div>
@@ -408,6 +416,20 @@ function printPage() {
 .sig-space { border-bottom: 1px solid #999; min-height: 22px; }
 
 .loading-msg { padding: 40px; text-align: center; color: #555; }
+
+/* No-data state (screen only — hidden on print) */
+.no-data-state {
+    text-align: center;
+    padding: 64px 32px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    margin: 20px 0;
+    color: #94a3b8;
+}
+.no-data-state h3 { font-size: 20px; font-weight: bold; color: #e2e8f0; margin: 16px 0 8px; }
+.no-data-state .period-desc { font-size: 14px; color: #64748b; margin: 0 0 12px; }
+.no-data-state .no-data-hint { font-size: 13px; color: #475569; max-width: 420px; margin: 0 auto 24px; line-height: 1.6; }
 
 /* Print media */
 @media screen {

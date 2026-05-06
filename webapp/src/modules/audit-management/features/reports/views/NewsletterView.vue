@@ -69,7 +69,7 @@
             <i class="pi pi-spin pi-spinner" /> Loading newsletter data…
         </div>
 
-        <template v-else-if="report">
+        <template v-else-if="report && report.totalAudits > 0">
 
             <!-- ══════════════════════════════════════════════════════════════ -->
             <!-- SECTION 1: COVER                                               -->
@@ -415,6 +415,13 @@
             </div>
 
         </template>
+
+        <div v-else-if="report && report.totalAudits === 0" class="nl-empty-period no-print">
+            <i class="pi pi-calendar-times" style="font-size:52px;" />
+            <h3>No Audits Found for This Period</h3>
+            <p class="period-desc">{{ periodLabel }} &nbsp;·&nbsp; {{ divisionLabel }}</p>
+            <p class="no-data-hint">No qualifying audits were completed in this period. Adjust the year, quarter, date range, or division filter above to find data.</p>
+        </div>
 
         <div v-else class="nl-loading">No report data for this period. Select a division and date range above.</div>
     </div>
@@ -876,6 +883,17 @@ onMounted(async () => {
     text-align: center; padding: 48px; color: #64748b;
     background: #0f172a; border: 1px solid #1e293b; border-radius: 10px;
 }
+
+/* ── Empty period state ──────────────────────────────────────────────────────── */
+.nl-empty-period {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; padding: 64px 32px;
+    background: #0f172a; border: 1px solid #1e293b; border-radius: 10px;
+    color: #475569; text-align: center;
+}
+.nl-empty-period h3 { font-size: 18px; font-weight: 600; color: #94a3b8; margin: 0; }
+.nl-empty-period .period-desc { font-size: 13px; color: #64748b; margin: 0; }
+.nl-empty-period .no-data-hint { font-size: 12px; color: #475569; max-width: 400px; margin: 0; }
 
 /* ── Cover ───────────────────────────────────────────────────────────────────── */
 .nl-cover {

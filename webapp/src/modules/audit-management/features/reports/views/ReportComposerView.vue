@@ -25,18 +25,27 @@
 
         <!-- Context bar -->
         <div class="flex items-center gap-2 px-4 py-2.5 bg-surface-2 border-b border-slate-700/60 flex-wrap shadow-elevation-1">
-            <select
-                v-model="selectedDivisionId"
-                data-testid="composer-filter-division"
-                class="composer-select"
-            >
-                <option :value="null" disabled>Select division…</option>
-                <option v-for="d in divisions" :key="d.id" :value="d.id">{{ d.code }} — {{ d.name }}</option>
-            </select>
+            <div class="flex flex-col gap-0.5">
+                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider leading-none">Division</span>
+                <select
+                    v-model="selectedDivisionId"
+                    data-testid="composer-filter-division"
+                    class="composer-select"
+                >
+                    <option :value="null" disabled>Select division…</option>
+                    <option v-for="d in divisions" :key="d.id" :value="d.id">{{ d.code }} — {{ d.name }}</option>
+                </select>
+            </div>
 
-            <input type="date" v-model="dateFrom" data-testid="composer-filter-from" class="composer-input w-36" />
-            <span class="text-slate-600 text-xs font-medium">→</span>
-            <input type="date" v-model="dateTo" data-testid="composer-filter-to" class="composer-input w-36" />
+            <div class="flex flex-col gap-0.5">
+                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider leading-none">From</span>
+                <input type="date" v-model="dateFrom" data-testid="composer-filter-from" class="composer-input w-36" />
+            </div>
+            <span class="text-slate-600 text-xs font-medium self-end mb-1">→</span>
+            <div class="flex flex-col gap-0.5">
+                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider leading-none">To</span>
+                <input type="date" v-model="dateTo" data-testid="composer-filter-to" class="composer-input w-36" />
+            </div>
 
             <button
                 @click="generate"
@@ -187,7 +196,7 @@
                 >
                     <div
                         v-if="!builder.hasData.value"
-                        class="flex flex-col items-center justify-center h-full gap-6 text-center px-6"
+                        class="flex flex-col items-center justify-center h-full gap-6 text-center px-6 py-8"
                     >
                         <div class="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center shadow-elevation-1">
                             <i class="pi pi-file-edit text-3xl text-slate-500" />
@@ -204,6 +213,26 @@
                             <i :class="builder.loading.value ? 'pi pi-spin pi-spinner' : 'pi pi-play'" />
                             {{ builder.loading.value ? 'Generating…' : 'Generate Report' }}
                         </button>
+
+                        <!-- Saved drafts — quick resume -->
+                        <div v-if="draftList.length > 0" class="w-full max-w-sm mt-2">
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Saved Drafts</p>
+                            <div class="flex flex-col gap-1.5">
+                                <button
+                                    v-for="d in draftList"
+                                    :key="d.id"
+                                    class="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-slate-700/60 bg-slate-800/50 hover:bg-slate-700/60 hover:border-slate-600 text-left transition-colors w-full"
+                                    @click="selectedDraftId = d.id; onLoadDraft()"
+                                >
+                                    <i class="pi pi-file text-slate-500 text-sm shrink-0" />
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm text-slate-200 font-medium truncate">{{ d.title }}</p>
+                                        <p class="text-xs text-slate-500 mt-0.5">{{ d.divisionCode }} · {{ d.period }}</p>
+                                    </div>
+                                    <i class="pi pi-arrow-right text-[10px] text-slate-600 shrink-0" />
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <div v-else class="max-w-4xl mx-auto flex flex-col gap-5">

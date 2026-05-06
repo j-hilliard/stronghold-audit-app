@@ -14,7 +14,10 @@
             <template v-else>
                 <!-- Step 1: Division -->
                 <div class="mb-6">
-                    <label class="block text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">Division</label>
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold shrink-0">1</span>
+                        <label class="text-xs text-slate-400 font-medium uppercase tracking-wide">Division</label>
+                    </div>
                     <select
                         v-model="selectedDivisionId"
                         class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 text-sm focus:outline-none focus:border-blue-500 transition-colors"
@@ -47,7 +50,10 @@
                     <!-- Job Prefix picker (only shown when division has multiple prefixes) -->
                     <template v-if="activeTemplate && jobPrefixes.length > 1">
                         <div class="mb-6">
-                            <label class="block text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">Audit Type</label>
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold shrink-0">2</span>
+                                <label class="text-xs text-slate-400 font-medium uppercase tracking-wide">Audit Type</label>
+                            </div>
                             <select
                                 v-model="selectedJobPrefixId"
                                 class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 text-sm focus:outline-none focus:border-blue-500 transition-colors"
@@ -63,9 +69,12 @@
                     <!-- Site Code (always shown for JobSite audits when a template is selected) -->
                     <template v-if="activeTemplate && selectedDivision?.auditType === 'JobSite'">
                         <div class="mb-6">
-                            <label class="block text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">
-                                Site Code <span class="text-slate-500 font-normal normal-case">(3 chars · optional · e.g. IPT for INEOS Pasadena TX)</span>
-                            </label>
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold shrink-0">3</span>
+                                <label class="text-xs text-slate-400 font-medium uppercase tracking-wide">
+                                    Site Code <span class="text-slate-500 font-normal normal-case">(3 chars · optional · e.g. IPT for INEOS Pasadena TX)</span>
+                                </label>
+                            </div>
                             <input
                                 v-model="siteCode"
                                 type="text"
@@ -80,7 +89,10 @@
                     <!-- Optional section groups (only shown when optional groups exist) -->
                     <template v-if="activeTemplate && optionalGroups.length > 0">
                         <div class="mb-6">
-                            <label class="block text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">Special Sections</label>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold shrink-0">4</span>
+                                <label class="text-xs text-slate-400 font-medium uppercase tracking-wide">Special Sections</label>
+                            </div>
                             <p class="text-xs text-slate-500 mb-3">
                                 These sections only apply to certain job types. Toggle on any that apply to this audit.
                                 Sections left off will not appear on the form or affect scoring.
@@ -111,8 +123,23 @@
                     </template>
                 </template>
 
+                <!-- Ready summary (shown when all selections are valid) -->
+                <div
+                    v-if="canStart"
+                    class="mb-5 rounded-xl border border-emerald-700/40 bg-emerald-900/15 px-4 py-3 flex items-center gap-3"
+                >
+                    <i class="pi pi-check-circle text-emerald-400 text-lg shrink-0" />
+                    <div class="flex-1 text-sm text-slate-200">
+                        <span class="font-semibold text-white">{{ selectedDivision?.name }}</span>
+                        <span class="text-slate-400"> · </span>
+                        <span>v{{ activeTemplate?.versionNumber }} template</span>
+                        <span class="text-slate-400"> · </span>
+                        <span>{{ activeTemplate?.sectionCount }} section{{ activeTemplate?.sectionCount !== 1 ? 's' : '' }}, {{ activeTemplate?.questionCount }} questions</span>
+                    </div>
+                </div>
+
                 <!-- Action row -->
-                <div class="flex justify-end gap-3">
+                <div class="flex flex-col-reverse sm:flex-row justify-end gap-3">
                     <Button
                         label="Cancel"
                         severity="secondary"
@@ -123,6 +150,7 @@
                         label="Start Audit"
                         icon="pi pi-arrow-right"
                         icon-pos="right"
+                        class="sm:flex-1 sm:max-w-xs"
                         :disabled="!canStart"
                         :loading="creating"
                         @click="startAudit"

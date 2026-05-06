@@ -40,6 +40,14 @@
                 outlined
                 @click="expandAll"
             />
+            <!-- Autosave status -->
+            <span
+                v-if="!formIsLocked && autosaveStatus !== 'idle'"
+                :class="['flex items-center gap-1 text-xs', autosaveColor]"
+            >
+                <i :class="autosaveIcon" style="font-size: 11px" />
+                {{ autosaveLabel }}
+            </span>
             <BaseButtonSave
                 v-if="!formIsLocked"
                 :label="isReviewerMode ? 'Save Changes' : 'Save Draft'"
@@ -161,6 +169,9 @@
             </div>
         </template>
 
+        <!-- Section navigator (xl+ side rail) -->
+        <AuditFormNavigator v-if="store.template && !store.loading && !formIsLocked" />
+
         <!-- Score bar (always visible when form is loaded) -->
         <ScoreSummaryBar
             v-if="store.template"
@@ -272,10 +283,12 @@ import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
 import { usePermissions } from '@/modules/audit-management/composables/usePermissions';
 import AuditHeader from '../components/AuditHeader.vue';
 import AuditSection from '../components/AuditSection.vue';
+import AuditFormNavigator from '../components/AuditFormNavigator.vue';
 import ScoreSummaryBar from '../components/ScoreSummaryBar.vue';
 import StickyFormActions from '../components/StickyFormActions.vue';
 import AuditAttachments from '../components/AuditAttachments.vue';
 import ReviewerContextBanner from '@/modules/audit-management/features/audit-review/components/ReviewerContextBanner.vue';
+import { useAuditAutosave } from '../composables/useAuditAutosave';
 
 interface SectionRef {
     toggleOpen(): void;
@@ -287,6 +300,7 @@ const route = useRoute();
 const store = useAuditStore();
 const { hasPermission } = usePermissions();
 const confirm = useConfirm();
+const { autosaveStatus, autosaveLabel, autosaveIcon, autosaveColor } = useAuditAutosave();
 const sectionRefs = ref<Map<number, SectionRef>>(new Map());
 const showSummary = ref(false);
 const submitEmailHref = ref<string | null>(null);

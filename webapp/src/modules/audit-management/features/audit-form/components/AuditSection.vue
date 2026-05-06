@@ -1,5 +1,5 @@
 <template>
-    <div class="border border-slate-700 rounded-lg overflow-hidden mb-2 shadow-md">
+    <div :data-section-id="section.id" class="border border-slate-700 rounded-lg overflow-hidden mb-2 shadow-md">
         <!-- Section header -->
         <div
             role="button"
