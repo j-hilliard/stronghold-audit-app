@@ -12,7 +12,8 @@
                 <a href="#" @click="$emit('menu-button-click', $event)" class="menu-button bg-slate-800">
                     <i class="pi pi-bars" />
                 </a>
-                <Breadcrumb :model="breadcrumbItems" class="ml-4" />
+                <!-- Breadcrumb hidden on narrow screens to prevent overlap -->
+                <Breadcrumb :model="breadcrumbItems" class="topbar-breadcrumb ml-4" />
                 <ul class="layout-topbar-actions">
                     <li class="topbar-item">
                         <NotificationBell />
@@ -42,7 +43,8 @@
                             <div v-else class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center">
                                 <i class="pi pi-user text-slate-300" />
                             </div>
-                            <div class="profile-info text-slate-300">
+                            <!-- Profile name/title hidden on narrow screens -->
+                            <div class="profile-info profile-info--text text-slate-300">
                                 <h6>{{ userStore.userFullName }}</h6>
                                 <span v-if="userStore.userTitle">{{ userStore.userTitle }}</span>
                             </div>
@@ -139,5 +141,24 @@ function onTopbarItemClick(event: Event, item: string) {
     background: rgba(99, 179, 237, 0.15);
     color: #63b3ed;
     transform: rotate(15deg) scale(1.1);
+}
+
+/*
+ * Narrow-screen topbar overrides.
+ * Applied when the layout-wrapper has .layout-narrow (set by AppLayout when
+ * either the real viewport is <=768px OR the dev viewport switcher is active
+ * in phone/tablet mode).
+ */
+:global(.layout-narrow) .topbar-breadcrumb {
+    display: none !important;
+}
+
+:global(.layout-narrow) .profile-info--text {
+    display: none !important;
+}
+
+/* Tighten action list spacing on narrow screens */
+:global(.layout-narrow) .layout-topbar-actions {
+    gap: 2px !important;
 }
 </style>

@@ -36,6 +36,7 @@ declare module 'vue' {
     Column: typeof import('primevue/column')['default']
     DataTable: typeof import('primevue/datatable')['default']
     DevRoleSwitcher: typeof import('./src/components/layout/DevRoleSwitcher.vue')['default']
+    DevViewportSwitcher: typeof import('./src/components/layout/DevViewportSwitcher.vue')['default']
     Dialog: typeof import('primevue/dialog')['default']
     Dropdown: typeof import('primevue/dropdown')['default']
     EmptyState: typeof import('./src/components/ui/EmptyState.vue')['default']

@@ -418,6 +418,54 @@ body {
     -webkit-backdrop-filter: blur(14px) saturate(1.4) !important;
 }
 
+/* ── Narrow layout (phone/tablet preview or real mobile device) ────────────────
+   Applied via .layout-narrow class on .layout-wrapper (set by AppLayout.vue).
+   Reduces content padding, ensures the sidebar overlay stays inside the frame,
+   and keeps filter bars from overflowing.
+──────────────────────────────────────────────────────────────────────────────── */
+
+/* Tighten content area padding */
+.layout-narrow .layout-content {
+    padding: 0 !important;
+}
+
+/* Sidebar overlay: position relative to #app, not to viewport */
+.layout-narrow .menu-wrapper {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    z-index: 999;
+    height: 100%;
+}
+
+/* Mobile menu mask — ensure it covers the constrained app frame only */
+.layout-narrow .layout-mask {
+    position: absolute !important;
+    z-index: 998;
+}
+
+/* Topbar: prevent right-side actions from overflowing on very narrow widths */
+.layout-narrow .layout-topbar-wrapper {
+    padding: 0 8px !important;
+}
+
+/* Ensure page header buttons wrap and don't overflow */
+.layout-narrow .layout-topbar-right {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Remove excessive left/right padding from PrimeVue page-header area */
+.layout-narrow .px-4 {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+}
+.layout-narrow .px-6 {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════════
    LIGHT THEME — complete system (toggled via html.theme-light)
    DO NOT modify dark mode defaults above. All changes here are scoped to

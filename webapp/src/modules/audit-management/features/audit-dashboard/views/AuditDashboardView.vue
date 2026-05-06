@@ -25,7 +25,120 @@
             <BaseButtonCreate label="New Audit" @click="router.push('/audit-management/audits/new')" />
         </BasePageHeader>
 
+        <!-- ── Filter bar — shared between card and table modes ─────────────── -->
+        <div class="audit-filter-bar flex flex-wrap items-end gap-2 px-4 py-3 border-b border-slate-700/40">
+            <Dropdown
+                v-model="store.filterDivisionId"
+                :options="store.divisions"
+                option-label="code"
+                option-value="id"
+                placeholder="All Divisions"
+                class="w-full audit-filter-field"
+                :show-clear="!!store.filterDivisionId"
+                @change="store.loadAuditList()"
+            />
+            <Dropdown
+                v-model="store.filterStatus"
+                :options="STATUS_OPTIONS"
+                option-label="label"
+                option-value="value"
+                placeholder="All Statuses"
+                class="w-full audit-filter-field"
+                :show-clear="!!store.filterStatus"
+                @change="store.loadAuditList()"
+            />
+            <InputText
+                v-model="store.filterAuditor"
+                placeholder="Auditor…"
+                class="w-full audit-filter-field"
+                @keydown.enter="store.loadAuditList()"
+                @change="store.filterAuditor = ($event.target as HTMLInputElement).value || null; store.loadAuditList()"
+            />
+            <div class="flex gap-2 w-full audit-filter-dates">
+                <div class="flex flex-col gap-0.5 flex-1">
+                    <label class="text-[10px] text-slate-500 font-medium uppercase tracking-wide px-0.5">From</label>
+                    <InputText
+                        v-model="store.filterDateFrom"
+                        type="date"
+                        class="w-full"
+                        @change="store.loadAuditList()"
+                    />
+                </div>
+                <div class="flex flex-col gap-0.5 flex-1">
+                    <label class="text-[10px] text-slate-500 font-medium uppercase tracking-wide px-0.5">To</label>
+                    <InputText
+                        v-model="store.filterDateTo"
+                        type="date"
+                        class="w-full"
+                        @change="store.loadAuditList()"
+                    />
+                </div>
+            </div>
+            <div class="flex gap-1">
+                <Button icon="pi pi-search" severity="secondary" :loading="loading" @click="store.loadAuditList()" title="Apply filters" />
+                <Button icon="pi pi-times" severity="secondary" text :loading="loading" @click="clearFilters" title="Clear filters" />
+            </div>
+        </div>
+
+        <!-- ── Loading indicator ─────────────────────────────────────────────── -->
+        <div v-if="loading" class="flex justify-center py-8">
+            <i class="pi pi-spin pi-spinner text-2xl text-slate-500" />
+        </div>
+
+        <!-- ── Narrow (phone/tablet) card list mode ──────────────────────────── -->
+        <div v-else-if="isNarrow" class="audit-card-list px-3 py-2 space-y-2">
+            <div v-if="store.audits.length === 0" class="text-center py-12 text-slate-400">
+                <i class="pi pi-clipboard text-4xl mb-3 block opacity-30" />
+                <p class="text-sm">No audits found.</p>
+            </div>
+            <div
+                v-for="audit in store.audits"
+                :key="audit.id"
+                class="audit-card rounded-xl border border-slate-700/60 bg-slate-800/60 px-4 py-3 flex flex-col gap-2 cursor-pointer active:bg-slate-700/60 transition-colors"
+                @click="onAuditCardTap(audit)"
+            >
+                <!-- Row 1: tracking # + status -->
+                <div class="flex items-center justify-between gap-2">
+                    <span v-if="audit.trackingNumber" class="font-mono text-xs font-semibold text-blue-300">{{ audit.trackingNumber }}</span>
+                    <span v-else class="text-slate-500 text-xs">#{{ audit.id }}</span>
+                    <Tag :value="audit.status" :severity="statusSeverity(audit.status)" class="!text-[11px]" />
+                </div>
+                <!-- Row 2: division + date -->
+                <div class="flex items-center gap-2 text-sm">
+                    <span class="font-semibold text-white">{{ audit.divisionCode ?? '—' }}</span>
+                    <span class="text-slate-500 text-xs">{{ audit.auditDate ?? '—' }}</span>
+                </div>
+                <!-- Row 3: auditor + job / location -->
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-400">
+                    <span v-if="audit.auditor"><i class="pi pi-user mr-1 text-[10px]" />{{ audit.auditor }}</span>
+                    <span v-if="audit.jobNumber"><i class="pi pi-hashtag mr-1 text-[10px]" />{{ audit.jobNumber }}</span>
+                    <span v-if="audit.location" class="truncate max-w-[160px]"><i class="pi pi-map-marker mr-1 text-[10px]" />{{ audit.location }}</span>
+                </div>
+                <!-- Row 4: action button -->
+                <div class="flex justify-end pt-1 border-t border-slate-700/40">
+                    <Button
+                        v-if="audit.status === 'Draft' || audit.status === 'Reopened'"
+                        icon="pi pi-pencil"
+                        label="Edit"
+                        size="small"
+                        text
+                        @click.stop="router.push(`/audit-management/audits/${audit.id}`)"
+                    />
+                    <Button
+                        v-else
+                        icon="pi pi-eye"
+                        label="View"
+                        size="small"
+                        text
+                        @click.stop="router.push(`/audit-management/audits/${audit.id}/review`)"
+                    />
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Desktop table mode ────────────────────────────────────────────── -->
         <BaseDataTable
+            v-else
             :value="store.audits"
             :loading="loading"
             emptyMessage="No audits found."
@@ -34,56 +147,6 @@
             scrollable
             @row-dblclick="onRowDblClick"
         >
-            <template #filters>
-                <Dropdown
-                    v-model="store.filterDivisionId"
-                    :options="store.divisions"
-                    option-label="code"
-                    option-value="id"
-                    placeholder="All Divisions"
-                    class="w-full md:w-44"
-                    :show-clear="!!store.filterDivisionId"
-                    @change="store.loadAuditList()"
-                />
-                <Dropdown
-                    v-model="store.filterStatus"
-                    :options="STATUS_OPTIONS"
-                    option-label="label"
-                    option-value="value"
-                    placeholder="All Statuses"
-                    class="w-full md:w-36"
-                    :show-clear="!!store.filterStatus"
-                    @change="store.loadAuditList()"
-                />
-                <InputText
-                    v-model="store.filterAuditor"
-                    placeholder="Auditor…"
-                    class="w-full md:w-36"
-                    @keydown.enter="store.loadAuditList()"
-                    @change="store.filterAuditor = ($event.target as HTMLInputElement).value || null; store.loadAuditList()"
-                />
-                <div class="flex flex-col gap-0.5 w-full md:w-auto">
-                    <label class="text-[10px] text-slate-500 font-medium uppercase tracking-wide px-0.5">From</label>
-                    <InputText
-                        v-model="store.filterDateFrom"
-                        type="date"
-                        class="w-full md:w-36"
-                        @change="store.loadAuditList()"
-                    />
-                </div>
-                <div class="flex flex-col gap-0.5 w-full md:w-auto">
-                    <label class="text-[10px] text-slate-500 font-medium uppercase tracking-wide px-0.5">To</label>
-                    <InputText
-                        v-model="store.filterDateTo"
-                        type="date"
-                        class="w-full md:w-36"
-                        @change="store.loadAuditList()"
-                    />
-                </div>
-                <Button icon="pi pi-search" severity="secondary" :loading="loading" @click="store.loadAuditList()" title="Apply filters" />
-                <Button icon="pi pi-times" severity="secondary" text :loading="loading" @click="clearFilters" title="Clear filters" />
-            </template>
-
             <Column selection-mode="multiple" style="width: 44px;" />
             <Column field="trackingNumber" header="Audit #" style="min-width: 120px;" sortable>
                 <template #body="{ data }">
@@ -203,7 +266,10 @@ import { useAuditStore } from '@/modules/audit-management/stores/auditStore';
 import { useUserStore } from '@/stores/userStore';
 import { usePermissions } from '@/modules/audit-management/composables/usePermissions';
 import { useAuditService } from '@/modules/audit-management/services/useAuditService';
+import { useNarrowScreen } from '@/composables/useNarrowScreen';
 import type { AuditListItemDto } from '@/apiclient/auditClient';
+
+const { isNarrow } = useNarrowScreen();
 
 const router = useRouter();
 const store = useAuditStore();
@@ -296,6 +362,14 @@ function onRowDblClick(event: { data: AuditListItemDto }) {
     }
 }
 
+function onAuditCardTap(audit: AuditListItemDto) {
+    if (audit.status === 'Draft' || audit.status === 'Reopened') {
+        router.push(`/audit-management/audits/${audit.id}`);
+    } else {
+        router.push(`/audit-management/audits/${audit.id}/review`);
+    }
+}
+
 function onBulkDelete() {
     const toDelete = deleteSelection.value;
 
@@ -323,6 +397,7 @@ function onBulkDelete() {
 </script>
 
 <style scoped>
+/* ── Desktop table ─────────────────────────────────────────────────────────── */
 .audit-row-actions {
     display: flex;
     gap: 2px;
@@ -339,5 +414,24 @@ function onBulkDelete() {
 :deep(.audit-action-btn) {
     padding: 3px 8px !important;
     font-size: 0.72rem !important;
+}
+
+/* ── Filter bar — narrow layout ────────────────────────────────────────────── */
+/* On narrow screens, filter fields go full-width and stack */
+:global(.layout-narrow) .audit-filter-field {
+    min-width: 0 !important;
+    width: 100% !important;
+}
+
+:global(.layout-narrow) .audit-filter-dates {
+    flex-direction: row; /* keep from/to side by side even on narrow */
+}
+
+/* ── Mobile audit card ─────────────────────────────────────────────────────── */
+.audit-card {
+    transition: background 0.12s ease, border-color 0.12s ease;
+}
+.audit-card:hover {
+    border-color: rgba(99, 179, 237, 0.3);
 }
 </style>

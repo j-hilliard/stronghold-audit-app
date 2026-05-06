@@ -81,6 +81,11 @@ const isOverlay = computed(() => {
     return menuMode.value === 'overlay';
 });
 
+// Narrow screen = real mobile viewport OR dev viewport preview is phone/tablet
+const isNarrowScreen = computed(() => {
+    return window.innerWidth <= 768 || staticMenuDesktopInactive.value;
+});
+
 const containerClass = computed(() => [
     'layout-wrapper',
     {
@@ -91,6 +96,7 @@ const containerClass = computed(() => [
         'layout-horizontal': menuMode.value === 'horizontal',
         'layout-mobile-active': staticMenuMobileActive.value,
         'layout-static-active': !staticMenuDesktopInactive.value && menuMode.value === 'static',
+        'layout-narrow': isNarrowScreen.value,
     },
     `layout-menu-${menuTheme.value} layout-topbar-${topbarTheme.value}`,
 ]);

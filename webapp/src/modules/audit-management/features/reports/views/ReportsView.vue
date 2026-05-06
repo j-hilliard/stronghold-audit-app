@@ -48,9 +48,9 @@
             </OverlayPanel>
         </BasePageHeader>
 
-        <!-- Filter bar -->
+        <!-- Filter bar — flex-wrap so fields stack on narrow screens -->
         <div class="px-4 pt-3 pb-2 flex flex-wrap gap-3 items-end border-b border-slate-700/40">
-            <div class="flex flex-col gap-1">
+            <div class="flex flex-col gap-1 flex-1 min-w-[160px]">
                 <label class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Division</label>
                 <Dropdown
                     v-model="filterDivisionId"
@@ -58,13 +58,13 @@
                     option-label="code"
                     option-value="id"
                     placeholder="All Divisions"
-                    class="w-full md:w-44"
+                    class="w-full"
                     :show-clear="!!filterDivisionId"
                     @change="loadReport"
                     data-testid="report-filter-division"
                 />
             </div>
-            <div class="flex flex-col gap-1">
+            <div class="flex flex-col gap-1 flex-1 min-w-[140px]">
                 <label class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Status</label>
                 <Dropdown
                     v-model="filterStatus"
@@ -72,32 +72,32 @@
                     option-label="label"
                     option-value="value"
                     placeholder="All Statuses"
-                    class="w-full md:w-40"
+                    class="w-full"
                     :show-clear="!!filterStatus"
                     @change="loadReport"
                     data-testid="report-filter-status"
                 />
             </div>
-            <div class="flex flex-col gap-1">
+            <div class="flex flex-col gap-1 flex-1 min-w-[120px]">
                 <label class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">From</label>
                 <Calendar
                     v-model="filterDateFrom"
                     placeholder="From date"
                     dateFormat="yy-mm-dd"
-                    class="w-full md:w-36"
+                    class="w-full"
                     :show-clear="!!filterDateFrom"
                     @date-select="loadReport"
                     @clear-click="loadReport"
                     data-testid="report-filter-from"
                 />
             </div>
-            <div class="flex flex-col gap-1">
+            <div class="flex flex-col gap-1 flex-1 min-w-[120px]">
                 <label class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">To</label>
                 <Calendar
                     v-model="filterDateTo"
                     placeholder="To date"
                     dateFormat="yy-mm-dd"
-                    class="w-full md:w-36"
+                    class="w-full"
                     :show-clear="!!filterDateTo"
                     @date-select="loadReport"
                     @clear-click="loadReport"
@@ -657,7 +657,29 @@
                     </template>
                     <template #content>
                         <div v-show="!collapsed.openCAs">
-                        <DataTable :value="report.openCorrectiveActions" :rows="10" paginator sortField="dueDate" :sortOrder="1" class="stronghold-table text-sm" :row-class="(r: any) => r.isOverdue ? 'row--overdue' : ''" scrollable>
+                        <!-- Phone card list for open CAs -->
+                        <div v-if="isNarrow" class="space-y-2 py-2">
+                            <div
+                                v-for="ca in report.openCorrectiveActions"
+                                :key="ca.id"
+                                class="rounded-lg border px-3 py-2.5 flex flex-col gap-1.5 cursor-pointer transition-colors"
+                                :class="ca.isOverdue ? 'border-red-700/50 bg-red-950/20' : 'border-slate-700/50 bg-slate-800/40'"
+                                @click="router.push(`/audit-management/audits/${ca.auditId}/review`)"
+                            >
+                                <div class="flex items-center justify-between gap-2">
+                                    <Tag :value="ca.isOverdue ? 'Overdue' : ca.status" :severity="ca.isOverdue ? 'danger' : 'warning'" class="!text-[11px]" />
+                                    <span class="text-xs font-mono" :class="ca.daysOpen > 14 ? 'text-red-400 font-semibold' : ca.daysOpen > 7 ? 'text-amber-400' : 'text-emerald-400'">{{ ca.daysOpen }}d</span>
+                                </div>
+                                <p class="text-sm text-slate-200 line-clamp-2 leading-snug">{{ ca.description }}</p>
+                                <div class="flex items-center justify-between text-xs text-slate-400">
+                                    <span v-if="ca.assignedTo"><i class="pi pi-user mr-1 text-[10px]" />{{ ca.assignedTo }}</span>
+                                    <span v-else class="text-slate-500">Unassigned</span>
+                                    <span :class="ca.isOverdue ? 'text-red-400 font-semibold' : ''">{{ ca.dueDate ?? '—' }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Desktop table for open CAs -->
+                        <DataTable v-else :value="report.openCorrectiveActions" :rows="10" paginator sortField="dueDate" :sortOrder="1" class="stronghold-table text-sm" :row-class="(r: any) => r.isOverdue ? 'row--overdue' : ''" scrollable>
                             <Column field="id" header="CA #" style="width:60px" sortable />
                             <Column field="auditId" header="Audit #" style="width:80px" sortable />
                             <Column field="description" header="Description">
@@ -712,7 +734,29 @@
                     </template>
                     <template #content>
                         <div v-show="!collapsed.auditorPerf">
-                        <DataTable :value="auditorStats" sortField="avgScore" :sortOrder="-1" class="stronghold-table text-sm">
+                        <!-- Phone card list for auditor performance -->
+                        <div v-if="isNarrow" class="space-y-2 py-2">
+                            <div
+                                v-for="stat in auditorStats"
+                                :key="stat.auditor"
+                                class="rounded-lg border border-slate-700/50 bg-slate-800/40 px-3 py-2.5 flex flex-col gap-1.5 cursor-pointer transition-colors hover:border-blue-500/30"
+                                @click="drillByAuditor(stat.auditor)"
+                            >
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="font-semibold text-blue-300 text-sm">{{ stat.auditor }}</span>
+                                    <span :class="['text-sm font-bold', rowScoreColor(stat.avgScore)]">
+                                        {{ stat.avgScore != null ? `${stat.avgScore}%` : '—' }}
+                                    </span>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-400">
+                                    <span>{{ stat.auditCount }} audit{{ stat.auditCount !== 1 ? 's' : '' }}</span>
+                                    <span v-if="stat.totalNcs > 0" class="text-red-400 font-semibold">{{ stat.totalNcs }} NC</span>
+                                    <span v-if="stat.totalWarnings > 0" class="text-amber-400">{{ stat.totalWarnings }} warn</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Desktop table for auditor performance -->
+                        <DataTable v-else :value="auditorStats" sortField="avgScore" :sortOrder="-1" class="stronghold-table text-sm">
                             <Column field="auditor" header="Auditor" sortable>
                                 <template #body="{ data }">
                                     <button class="auditor-link" @click="drillByAuditor(data.auditor)" :title="`Show ${data.auditor}'s audits`">{{ data.auditor }}</button>
@@ -773,7 +817,34 @@
                     </template>
                     <template #content>
                         <div v-show="!collapsed.auditDetail">
-                        <DataTable :value="filteredAuditRows" :rows="20" paginator sortField="id" :sortOrder="-1" class="stronghold-table text-sm" scrollable>
+                        <!-- Phone card list for audit history -->
+                        <div v-if="isNarrow" class="space-y-2 py-2">
+                            <div
+                                v-for="row in filteredAuditRows"
+                                :key="row.id"
+                                class="rounded-lg border border-slate-700/50 bg-slate-800/40 px-3 py-2.5 flex flex-col gap-1.5 cursor-pointer transition-colors hover:border-blue-500/30"
+                                @click="router.push(`/audit-management/audits/${row.id}/review`)"
+                                :data-testid="`report-grid-row`"
+                            >
+                                <div class="flex items-center justify-between gap-2">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="font-semibold text-white text-sm">{{ row.divisionCode }}</span>
+                                        <Tag :value="row.status" :severity="statusSeverity(row.status)" class="!text-[11px]" />
+                                    </div>
+                                    <span :class="['text-sm font-bold', rowScoreColor(row.scorePercent)]">
+                                        {{ row.scorePercent != null ? `${row.scorePercent}%` : '—' }}
+                                    </span>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-400">
+                                    <span>{{ row.auditDate ?? '—' }}</span>
+                                    <span v-if="row.auditor">{{ row.auditor }}</span>
+                                    <span v-if="row.nonConformingCount > 0" class="text-red-400 font-semibold">{{ row.nonConformingCount }} NC</span>
+                                    <span v-if="row.warningCount > 0" class="text-amber-400">{{ row.warningCount }} warn</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Desktop table for audit history -->
+                        <DataTable v-else :value="filteredAuditRows" :rows="20" paginator sortField="id" :sortOrder="-1" class="stronghold-table text-sm" scrollable>
                             <Column field="id" header="#" style="width:60px" sortable>
                                 <template #body="{ data }"><span data-testid="report-grid-row">{{ data.id }}</span></template>
                             </Column>
@@ -850,8 +921,11 @@ import { useReportKpis } from '../composables/useReportKpis';
 import { useReportCharts } from '../composables/useReportCharts';
 import { useReportDrilldowns } from '../composables/useReportDrilldowns';
 
+import { useNarrowScreen } from '@/composables/useNarrowScreen';
+
 const router = useRouter();
 const store  = useAuditStore();
+const { isNarrow } = useNarrowScreen();
 
 // ── Composables ───────────────────────────────────────────────────────────────
 const {

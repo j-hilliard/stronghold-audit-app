@@ -14,9 +14,9 @@
         <div class="flex flex-col gap-4 p-4 min-h-0 flex-1">
 
         <!-- ── Filter Bar ─────────────────────────────────────────────────────── -->
-        <div class="flex flex-wrap gap-2 items-end">
-            <!-- Search -->
-            <div class="flex flex-col gap-1 flex-1 min-w-[200px]">
+        <div class="ca-filter-bar flex flex-wrap gap-2 items-end">
+            <!-- Search — always full width -->
+            <div class="flex flex-col gap-1 w-full">
                 <label class="text-xs text-slate-400 font-medium">Search</label>
                 <div class="relative w-full">
                     <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none z-10" />
@@ -30,7 +30,7 @@
             </div>
 
             <!-- Division -->
-            <div class="flex flex-col gap-1">
+            <div class="flex flex-col gap-1 ca-filter-field">
                 <label class="text-xs text-slate-400 font-medium">Division</label>
                 <Dropdown
                     v-model="filterDivisionId"
@@ -39,13 +39,13 @@
                     option-value="value"
                     placeholder="All Divisions"
                     show-clear
-                    class="w-full md:w-48"
+                    class="w-full"
                     @change="loadFiltered"
                 />
             </div>
 
             <!-- Status -->
-            <div class="flex flex-col gap-1">
+            <div class="flex flex-col gap-1 ca-filter-field">
                 <label class="text-xs text-slate-400 font-medium">Status</label>
                 <Dropdown
                     v-model="filterStatus"
@@ -54,13 +54,13 @@
                     option-value="value"
                     placeholder="All Statuses"
                     show-clear
-                    class="w-full md:w-40"
+                    class="w-full"
                     @change="loadFiltered"
                 />
             </div>
 
             <!-- Source -->
-            <div class="flex flex-col gap-1">
+            <div class="flex flex-col gap-1 ca-filter-field">
                 <label class="text-xs text-slate-400 font-medium">Source</label>
                 <Dropdown
                     v-model="filterSource"
@@ -69,13 +69,13 @@
                     option-value="value"
                     placeholder="All Sources"
                     show-clear
-                    class="w-full md:w-40"
+                    class="w-full"
                     @change="loadFiltered"
                 />
             </div>
 
             <!-- Priority -->
-            <div class="flex flex-col gap-1">
+            <div class="flex flex-col gap-1 ca-filter-field">
                 <label class="text-xs text-slate-400 font-medium">Priority</label>
                 <Dropdown
                     v-model="filterPriority"
@@ -84,7 +84,7 @@
                     option-value="value"
                     placeholder="All"
                     show-clear
-                    class="w-full md:w-32"
+                    class="w-full"
                     @change="loadFiltered"
                 />
             </div>
@@ -116,8 +116,104 @@
             </div>
         </Transition>
 
-        <!-- ── Data Table ─────────────────────────────────────────────────────── -->
+        <!-- ── Phone card list mode ──────────────────────────────────────────── -->
+        <div v-if="isNarrow" class="ca-card-list space-y-2">
+            <div v-if="loading" class="flex justify-center py-8">
+                <i class="pi pi-spin pi-spinner text-2xl text-slate-500" />
+            </div>
+            <div v-else-if="items.length === 0" class="flex flex-col items-center justify-center py-16 gap-3">
+                <i class="pi pi-check-circle text-4xl text-slate-600" />
+                <p class="text-slate-400 font-medium">No corrective actions found</p>
+                <p class="text-xs text-slate-500">Try adjusting your filters</p>
+            </div>
+            <div
+                v-for="item in items"
+                :key="item.id"
+                class="ca-card rounded-xl border px-4 py-3 flex flex-col gap-2 transition-colors"
+                :class="[
+                    item.isOverdue
+                        ? 'border-red-700/50 bg-red-950/20'
+                        : item.status === 'Closed' || item.status === 'Voided'
+                            ? 'border-slate-700/40 bg-slate-800/30 opacity-60'
+                            : 'border-slate-700/60 bg-slate-800/60'
+                ]"
+            >
+                <!-- Row 1: status + overdue badge + due date -->
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <Tag :value="statusLabel(item.status)" :severity="statusSeverity(item)" class="!text-[11px]" />
+                        <span
+                            v-if="item.priority === 'Urgent'"
+                            class="text-[10px] px-1.5 py-0.5 rounded bg-red-900/60 text-red-300 font-bold uppercase tracking-wide"
+                        >Urgent</span>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <span
+                            v-if="item.dueDate"
+                            class="text-xs font-medium"
+                            :class="item.isOverdue ? 'text-red-400 font-semibold' : 'text-slate-400'"
+                        >
+                            <i v-if="item.isOverdue" class="pi pi-exclamation-triangle mr-0.5 text-[10px]" />
+                            {{ item.dueDate }}
+                        </span>
+                        <span v-else class="text-xs text-slate-500">No due date</span>
+                    </div>
+                </div>
+
+                <!-- Row 2: description -->
+                <p class="text-sm text-slate-200 leading-snug line-clamp-2">{{ item.description }}</p>
+
+                <!-- Row 3: assignee + division + age -->
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-400">
+                    <span v-if="item.assignedTo"><i class="pi pi-user mr-1 text-[10px]" />{{ item.assignedTo }}</span>
+                    <span v-if="item.divisionCode"><i class="pi pi-building mr-1 text-[10px]" />{{ item.divisionCode }}</span>
+                    <span
+                        v-if="item.status !== 'Closed' && item.status !== 'Voided'"
+                        :class="[
+                            'font-mono',
+                            item.daysOpen >= 30 ? 'text-red-400 font-bold'
+                            : item.daysOpen >= 14 ? 'text-amber-400'
+                            : 'text-slate-400'
+                        ]"
+                    >{{ item.daysOpen }}d open</span>
+                </div>
+
+                <!-- Row 4: actions -->
+                <div class="flex items-center gap-2 pt-2 border-t border-slate-700/40">
+                    <Button
+                        icon="pi pi-pencil"
+                        label="Edit"
+                        size="small"
+                        text
+                        :disabled="item.status === 'Closed' || item.status === 'Voided'"
+                        @click="openEditDialog(item)"
+                        class="flex-1"
+                    />
+                    <Button
+                        icon="pi pi-eye"
+                        label="Audit"
+                        size="small"
+                        text
+                        @click="goToAudit(item.auditId)"
+                        class="flex-1"
+                    />
+                    <Button
+                        v-if="item.status !== 'Closed' && item.status !== 'Voided'"
+                        icon="pi pi-check"
+                        label="Close"
+                        size="small"
+                        severity="success"
+                        text
+                        @click="openCloseDialog(item)"
+                        class="flex-1"
+                    />
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Desktop data table ─────────────────────────────────────────────── -->
         <DataTable
+            v-else
             v-model:selection="selectedItems"
             :value="items"
             :loading="loading"
@@ -424,17 +520,22 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import type { CorrectiveActionListItemDto, UserAuditRoleDto } from '@/apiclient/auditClient';
 import { useAuditService } from '@/modules/audit-management/services/useAuditService';
 import BasePageHeader from '@/components/layout/BasePageHeader.vue';
 import { MetricCard } from '@/design-system';
+import { useNarrowScreen } from '@/composables/useNarrowScreen';
 import {
     useCorrectiveActions,
     STATUS_OPTIONS as statusOptions,
     SOURCE_OPTIONS as sourceOptions,
     PRIORITY_OPTIONS as priorityOptions,
 } from '../composables/useCorrectiveActions';
+
+const router = useRouter();
+const { isNarrow } = useNarrowScreen();
 
 const toast   = useToast();
 const service = useAuditService();
@@ -691,6 +792,7 @@ onMounted(() => { load(); loadAuditUsers(); });
 </script>
 
 <style scoped>
+/* ── Desktop table action reveal ──────────────────────────────────────────── */
 /* Row state (overdue/closed/voided) and opacity are in global style.css.
    Only action-reveal behavior lives here (scoped to this component). */
 .ca-row-actions {
@@ -716,4 +818,18 @@ onMounted(() => { load(); loadAuditUsers(); });
 .bulk-bar-leave-active { transition: all 0.2s ease; }
 .bulk-bar-enter-from,
 .bulk-bar-leave-to     { opacity: 0; transform: translateY(-6px); }
+
+/* ── Narrow screen filter: fields take full width in a 2-col grid ─────────── */
+:global(.layout-narrow) .ca-filter-field {
+    flex: 1 1 calc(50% - 0.25rem);
+    min-width: 0;
+}
+
+/* ── Mobile CA card ────────────────────────────────────────────────────────── */
+.ca-card-list {
+    padding: 0.75rem;
+}
+.ca-card {
+    transition: border-color 0.12s ease;
+}
 </style>
