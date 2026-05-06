@@ -87,7 +87,7 @@
         </BasePageHeader>
 
         <!-- ── Reopen Audit Dialog ──────────────────────────────────────────── -->
-        <Dialog v-model:visible="showReopenDialog" modal header="Reopen Audit" :style="{ width: '420px' }">
+        <Dialog v-model:visible="showReopenDialog" modal header="Reopen Audit" :style="{ width: '420px', maxWidth: '96vw' }">
             <div class="space-y-3 py-2">
                 <p class="text-sm text-slate-300">This will set the audit back to <strong>Reopened</strong> so responses can be edited.</p>
                 <div>
@@ -102,7 +102,7 @@
         </Dialog>
 
         <!-- ── Close Audit Dialog ───────────────────────────────────────────── -->
-        <Dialog v-model:visible="showCloseAuditDialog" modal header="Close Audit" :style="{ width: '420px' }">
+        <Dialog v-model:visible="showCloseAuditDialog" modal header="Close Audit" :style="{ width: '420px', maxWidth: '96vw' }">
             <div class="space-y-3 py-2">
                 <p class="text-sm text-slate-300">Closing the audit marks it as <strong>Closed</strong>. All corrective actions should be resolved first.</p>
                 <div>
@@ -577,7 +577,7 @@
     </Dialog>
 
     <!-- ══ Add Recipients dialog ════════════════════════════════════════════════ -->
-    <Dialog v-model:visible="showAddRecipientsDialog" modal header="Add Distribution Recipients" :style="{ width: '540px' }">
+    <Dialog v-model:visible="showAddRecipientsDialog" modal header="Add Distribution Recipients" :style="{ width: '540px', maxWidth: '96vw' }">
         <div class="space-y-4 pt-1">
             <div class="flex gap-2">
                 <InputText
@@ -655,7 +655,7 @@
     />
 
     <!-- ══ Assign CA modal ══════════════════════════════════════════════════════ -->
-    <Dialog v-model:visible="showAssign" header="Assign Corrective Action" modal style="width: 500px">
+    <Dialog v-model:visible="showAssign" header="Assign Corrective Action" modal style="width: 500px; max-width: 96vw;">
         <div class="space-y-4 pt-2">
             <div>
                 <label class="text-xs text-slate-400 block mb-1">Finding</label>
@@ -711,7 +711,7 @@
     </Dialog>
 
     <!-- ══ Close CA modal ═══════════════════════════════════════════════════════ -->
-    <Dialog v-model:visible="showClose" header="Close Corrective Action" modal style="width: 420px">
+    <Dialog v-model:visible="showClose" header="Close Corrective Action" modal style="width: 420px; max-width: 96vw;">
         <div class="space-y-4 pt-2">
             <div>
                 <label class="text-xs text-slate-400 block mb-1">Resolution Notes *</label>

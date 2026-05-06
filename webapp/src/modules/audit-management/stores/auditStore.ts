@@ -287,10 +287,14 @@ export const useAuditStore = defineStore('audit', () => {
     let _autosaveBackendTimer: ReturnType<typeof setTimeout> | null = null;
     let _autosaveClearTimer: ReturnType<typeof setTimeout> | null = null;
     let _autosaveInFlight = false;
+    // Tracks whether new edits arrived while an autosave was in-flight.
+    // If true, we must NOT clear isDirty and must re-schedule after the flight lands.
+    let _autosaveEditsArrivedDuringFlight = false;
 
     async function _autosaveDraftBackend() {
         if (!auditId.value || isSubmitted.value || _autosaveInFlight || saving.value || !isDirty.value) return;
         _autosaveInFlight = true;
+        _autosaveEditsArrivedDuringFlight = false;
         autosaving.value = true;
         autosaveStatus.value = 'saving';
         try {
@@ -307,8 +311,12 @@ export const useAuditStore = defineStore('audit', () => {
                     ([sectionId, reason]): SectionNaOverrideDto => ({ sectionId, reason })
                 ),
             });
-            clearLocalDraft();
-            isDirty.value = false;
+            // Only clear dirty state if no new edits arrived while we were saving.
+            // If edits did arrive, isDirty stays true so the re-scheduled save picks them up.
+            if (!_autosaveEditsArrivedDuringFlight) {
+                clearLocalDraft();
+                isDirty.value = false;
+            }
             autosaveStatus.value = 'saved';
             if (_autosaveClearTimer) clearTimeout(_autosaveClearTimer);
             _autosaveClearTimer = setTimeout(() => {
@@ -319,10 +327,20 @@ export const useAuditStore = defineStore('audit', () => {
         } finally {
             autosaving.value = false;
             _autosaveInFlight = false;
+            // Edits arrived during this flight — reschedule so they are not lost.
+            if (_autosaveEditsArrivedDuringFlight) {
+                _autosaveEditsArrivedDuringFlight = false;
+                scheduleAutosave();
+            }
         }
     }
 
     function scheduleAutosave() {
+        // If a save is already in-flight, mark it so the landing path knows to re-run.
+        if (_autosaveInFlight) {
+            _autosaveEditsArrivedDuringFlight = true;
+        }
+
         if (_autosaveTimer) clearTimeout(_autosaveTimer);
         _autosaveTimer = setTimeout(() => {
             saveDraftToLocalStorage();
@@ -769,9 +787,11 @@ export const useAuditStore = defineStore('audit', () => {
         prefillQuestionIds.value = new Set();
         autosaving.value = false;
         autosaveStatus.value = 'idle';
+        if (_autosaveTimer)        { clearTimeout(_autosaveTimer);        _autosaveTimer        = null; }
         if (_autosaveBackendTimer) { clearTimeout(_autosaveBackendTimer); _autosaveBackendTimer = null; }
         if (_autosaveClearTimer)   { clearTimeout(_autosaveClearTimer);   _autosaveClearTimer   = null; }
         _autosaveInFlight = false;
+        _autosaveEditsArrivedDuringFlight = false;
     }
 
     return {

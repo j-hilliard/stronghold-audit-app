@@ -24,6 +24,8 @@ tests/e2e/*
 !tests/e2e/reviewer-mode-roundtrip.spec.ts
 !tests/e2e/smoke.spec.ts
 !tests/e2e/api-client-contract.spec.ts
+!tests/e2e/audit-new-audit.spec.ts
+!tests/e2e/autosave-navigator-nodata.spec.ts
 playwright.config.ts
 
 # NSwag generated client — merge into auditClient.ts manually, then delete

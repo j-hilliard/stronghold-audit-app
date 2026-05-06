@@ -98,7 +98,7 @@
                 header="Unsaved Draft Found"
                 modal
                 :closable="false"
-                style="width: 400px"
+                style="width: 400px; max-width: 96vw;"
             >
                 <p class="text-sm text-slate-300 mb-4">
                     An unsaved local draft was found for this audit. Would you like to restore it?
