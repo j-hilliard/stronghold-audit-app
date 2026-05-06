@@ -101,10 +101,12 @@ watch(() => appStore.currentApp, (app) => {
 
 onBeforeMount(() => {
     document.addEventListener('click', onDocumentClick);
+    if (isDev) window.addEventListener('dev-viewport-change', onDevViewportChange);
 });
 
 onUnmounted(() => {
     document.removeEventListener('click', onDocumentClick);
+    if (isDev) window.removeEventListener('dev-viewport-change', onDevViewportChange);
 });
 
 function onDocumentClick() {
@@ -180,5 +182,17 @@ function onMenuItemClick(event) {
 
 function onTopbarItemClick(event) {
     activeTopBarItem.value = activeTopBarItem.value === event.item ? '' : event.item;
+}
+
+// Dev-only: collapse sidebar when entering tablet/phone preview, restore on desktop
+function onDevViewportChange(e: Event) {
+    const { preset } = (e as CustomEvent<{ preset: string }>).detail;
+    staticMenuMobileActive.value = false;
+    if (preset === 'desktop') {
+        staticMenuDesktopInactive.value = false;
+    } else {
+        // tablet or phone: hide the sidebar so it doesn't eat the constrained frame
+        staticMenuDesktopInactive.value = true;
+    }
 }
 </script>
