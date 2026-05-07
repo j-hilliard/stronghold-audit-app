@@ -1,5 +1,5 @@
 <template>
-    <div class="pb-20">
+    <div class="pb-44">
         <!-- Page header -->
         <BasePageHeader
             icon="pi pi-clipboard"
@@ -23,7 +23,7 @@
                 @click="router.push(`/audit-management/audits/${store.auditId}/review`)"
             />
             <Button
-                v-if="!formIsLocked"
+                v-if="!formIsLocked && !isNarrow"
                 label="Collapse All"
                 icon="pi pi-minus"
                 severity="secondary"
@@ -32,7 +32,7 @@
                 @click="collapseAll"
             />
             <Button
-                v-if="!formIsLocked"
+                v-if="!formIsLocked && !isNarrow"
                 label="Expand All"
                 icon="pi pi-plus"
                 severity="secondary"
@@ -274,6 +274,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute, onBeforeRouteUpdate } from 'vue-router';
 import { useConfirm } from 'primevue/useconfirm';
+import { useNarrowScreen } from '@/composables/useNarrowScreen';
 import Tag from 'primevue/tag';
 import Dialog from 'primevue/dialog';
 import ProgressSpinner from 'primevue/progressspinner';
@@ -301,6 +302,7 @@ const store = useAuditStore();
 const { hasPermission } = usePermissions();
 const confirm = useConfirm();
 const { autosaveStatus, autosaveLabel, autosaveIcon, autosaveColor } = useAuditAutosave();
+const { isNarrow } = useNarrowScreen();
 const sectionRefs = ref<Map<number, SectionRef>>(new Map());
 const showSummary = ref(false);
 const submitEmailHref = ref<string | null>(null);

@@ -1,8 +1,8 @@
 <template>
-    <!-- ── Desktop side rail (xl+) ────────────────────────────────────────────── -->
+    <!-- ── Desktop side rail (non-narrow only) ──────────────────────────────────── -->
     <div
-        v-if="sectionProgress.length > 1"
-        class="hidden xl:flex fixed right-3 z-20 flex-col gap-0.5
+        v-if="sectionProgress.length > 1 && !isNarrow"
+        class="flex fixed right-3 z-20 flex-col gap-0.5
                bg-slate-900/95 backdrop-blur-sm border border-slate-700/80 rounded-xl p-2 shadow-2xl
                max-h-[75vh] overflow-y-auto w-48"
         style="top: 50%; transform: translateY(-50%);"
@@ -74,14 +74,15 @@
         </button>
     </div>
 
-    <!-- ── Mobile/tablet floating button + drawer (below xl) ─────────────────── -->
-    <template v-if="sectionProgress.length > 1">
-        <!-- Floating trigger button -->
+    <!-- ── Mobile/tablet floating button + drawer (narrow mode only) ──────────── -->
+    <template v-if="sectionProgress.length > 1 && isNarrow">
+        <!-- Floating trigger button — frame-aware positioning -->
         <button
             type="button"
-            class="xl:hidden fixed bottom-20 right-4 z-30 flex items-center gap-2
+            class="fixed z-30 flex items-center gap-2
                    bg-slate-800 border border-slate-600 rounded-full px-3 py-2 shadow-xl
                    text-xs text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+            :style="floatingBtnStyle"
             @click="drawerOpen = true"
         >
             <i class="pi pi-list text-sm" />
@@ -93,12 +94,15 @@
         <!-- Drawer overlay -->
         <Teleport to="body">
             <Transition name="nav-drawer">
-                <div v-if="drawerOpen" class="fixed inset-0 z-50 flex flex-col justify-end xl:hidden">
+                <div v-if="drawerOpen" class="fixed inset-0 z-50 flex flex-col justify-end">
                     <!-- Backdrop -->
                     <div class="absolute inset-0 bg-black/50" @click="drawerOpen = false" />
 
-                    <!-- Drawer panel -->
-                    <div class="relative bg-slate-900 border-t border-slate-700 rounded-t-2xl max-h-[70vh] flex flex-col shadow-2xl">
+                    <!-- Drawer panel — frame-aware width/position -->
+                    <div
+                        class="relative bg-slate-900 border-t border-slate-700 rounded-t-2xl max-h-[70vh] flex flex-col shadow-2xl"
+                        :style="drawerPanelStyle"
+                    >
                         <!-- Handle + header -->
                         <div class="flex items-center justify-between px-4 py-3 border-b border-slate-700/60 shrink-0">
                             <div class="flex items-center gap-2">
@@ -184,9 +188,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useAuditSectionProgress } from '../composables/useAuditSectionProgress';
+import { useNarrowScreen } from '@/composables/useNarrowScreen';
 import type { SectionProgressItem } from '../composables/useAuditSectionProgress';
 
 const { sectionProgress } = useAuditSectionProgress();
+const { isNarrow, previewFrameWidth } = useNarrowScreen();
 
 const currentSectionId = ref<number | null>(null);
 const drawerOpen = ref(false);
@@ -198,6 +204,37 @@ const hasWarnSections = computed(() => sectionProgress.value.some(s => !s.nonCon
 const noUnanswered    = computed(() => sectionProgress.value.every(s => s.isNa || s.unanswered === 0));
 const totalNc         = computed(() => sectionProgress.value.reduce((sum, s) => sum + s.nonConforming, 0));
 const totalWarn       = computed(() => sectionProgress.value.reduce((sum, s) => sum + s.warning, 0));
+
+// ── Frame-aware positioning ────────────────────────────────────────────────────
+
+/**
+ * Positions the floating button at bottom-[134px] (above both StickyFormActions + ScoreSummaryBar)
+ * and right-aligned within the preview frame when in dev preview mode.
+ * bottom-[134px] = 176px total bottom clearance minus bar heights (~42px each = ~84px), leaving buffer.
+ * Chosen as: ScoreSummaryBar ~52px + StickyFormActions ~52px + 16px gap + 14px safety = 134px.
+ */
+const floatingBtnStyle = computed(() => {
+    const fw = previewFrameWidth.value;
+    if (!fw || window.innerWidth <= fw) {
+        return { bottom: '134px', right: '16px' };
+    }
+    const left = Math.max(0, Math.round((window.innerWidth - fw) / 2));
+    const rightOffset = left + 16;
+    return {
+        bottom: '134px',
+        right: `${rightOffset}px`,
+    };
+});
+
+/**
+ * Constrains the drawer panel to the preview frame width/position in dev preview mode.
+ */
+const drawerPanelStyle = computed(() => {
+    const fw = previewFrameWidth.value;
+    if (!fw || window.innerWidth <= fw) return {};
+    const left = Math.max(0, Math.round((window.innerWidth - fw) / 2));
+    return { left: `${left}px`, right: 'auto', width: `${fw}px` };
+});
 
 // ── Section jump ───────────────────────────────────────────────────────────────
 
