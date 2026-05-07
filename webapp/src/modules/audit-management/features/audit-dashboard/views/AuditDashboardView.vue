@@ -55,6 +55,16 @@
                 @keydown.enter="store.loadAuditList()"
                 @change="store.filterAuditor = ($event.target as HTMLInputElement).value || null; store.loadAuditList()"
             />
+            <div class="flex gap-2 w-full">
+                <div class="flex flex-col gap-0.5 flex-1 min-w-0">
+                    <label class="text-[10px] text-slate-500 font-medium uppercase tracking-wide px-0.5">From</label>
+                    <InputText v-model="store.filterDateFrom" type="date" class="w-full" @change="store.loadAuditList()" />
+                </div>
+                <div class="flex flex-col gap-0.5 flex-1 min-w-0">
+                    <label class="text-[10px] text-slate-500 font-medium uppercase tracking-wide px-0.5">To</label>
+                    <InputText v-model="store.filterDateTo" type="date" class="w-full" @change="store.loadAuditList()" />
+                </div>
+            </div>
             <div class="flex gap-1 shrink-0">
                 <Button icon="pi pi-search" severity="secondary" :loading="loading" @click="store.loadAuditList()" />
                 <Button icon="pi pi-times" severity="secondary" text :loading="loading" @click="clearFilters" />
@@ -154,6 +164,14 @@
                     @keydown.enter="store.loadAuditList()"
                     @change="store.filterAuditor = ($event.target as HTMLInputElement).value || null; store.loadAuditList()"
                 />
+                <div class="flex flex-col gap-0.5 w-full md:w-auto">
+                    <label class="text-[10px] text-slate-500 font-medium uppercase tracking-wide px-0.5">From</label>
+                    <InputText v-model="store.filterDateFrom" type="date" class="w-full md:w-36" @change="store.loadAuditList()" />
+                </div>
+                <div class="flex flex-col gap-0.5 w-full md:w-auto">
+                    <label class="text-[10px] text-slate-500 font-medium uppercase tracking-wide px-0.5">To</label>
+                    <InputText v-model="store.filterDateTo" type="date" class="w-full md:w-36" @change="store.loadAuditList()" />
+                </div>
                 <div class="flex gap-1">
                     <Button icon="pi pi-search" severity="secondary" :loading="loading" @click="store.loadAuditList()" />
                     <Button icon="pi pi-times" severity="secondary" text :loading="loading" @click="clearFilters" />
@@ -428,7 +446,6 @@ function onBulkDelete() {
     font-size: 0.72rem !important;
 }
 
-/* Narrow-screen filter overrides live in style.css (Vue scoped :global() bug). */
 
 /* ── Mobile audit card ─────────────────────────────────────────────────────── */
 .audit-card {

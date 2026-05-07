@@ -471,22 +471,6 @@ body {
     gap: 2px !important;
 }
 
-/* Audit dashboard: filter fields go full-width on narrow screens */
-.layout-narrow .audit-filter-field {
-    min-width: 0 !important;
-    width: 100% !important;
-}
-
-/* Audit dashboard: date range filters stay side-by-side even on narrow */
-.layout-narrow .audit-filter-dates {
-    flex-direction: row;
-}
-
-/* Corrective Actions: filter fields fill 2-col grid on narrow screens */
-.layout-narrow .ca-filter-field {
-    flex: 1 1 calc(50% - 0.25rem);
-    min-width: 0;
-}
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    LIGHT THEME — complete system (toggled via html.theme-light)

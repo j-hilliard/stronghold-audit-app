@@ -58,6 +58,7 @@ import NarrowNavSheet from '@/components/layout/NarrowNavSheet.vue';
 import DevRoleSwitcher from '@/components/layout/DevRoleSwitcher.vue';
 import DevViewportSwitcher from '@/components/layout/DevViewportSwitcher.vue';
 import { useAppStore } from '@/stores/appStore.ts';
+import { useNarrowScreen } from '@/composables/useNarrowScreen';
 import { ref, computed, onBeforeMount, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
@@ -86,24 +87,27 @@ const appStore = useAppStore();
 const toast = useToast();
 const route = useRoute();
 
-// Close narrow nav on every route change (handles programmatic navigation too)
-watch(() => route.fullPath, () => {
-    narrowNavOpen.value = false;
+// Single source of truth — shared across all consumers (no duplicate resize listeners).
+const { isNarrow: isNarrowScreen } = useNarrowScreen();
+
+// Close narrow nav on route change or when leaving narrow mode
+watch(() => route.fullPath, () => { narrowNavOpen.value = false; });
+watch(isNarrowScreen, (narrow) => { if (!narrow) narrowNavOpen.value = false; });
+
+// Scroll lock + side-effect clear when narrow nav opens/closes
+watch(narrowNavOpen, (open) => {
+    if (open) {
+        activeTopBarItem.value = '';        // dismiss any open topbar dropdown
+        staticMenuMobileActive.value = false; // close old sidebar overlay state
+        document.body.classList.add('blocked-scroll');
+    } else {
+        document.body.classList.remove('blocked-scroll');
+    }
 });
 
 const isMobile = computed(() => window.innerWidth <= 640);
 const isDesktop = computed(() => window.innerWidth > 992);
 const isOverlay = computed(() => menuMode.value === 'overlay');
-
-// Narrow screen — tracks ONLY real viewport width and dev-viewport-change events.
-// NOT coupled to staticMenuDesktopInactive: collapsing the sidebar on desktop
-// must NOT trigger narrow layout mode.
-const isNarrowScreen = ref(window.innerWidth <= 768);
-
-function updateNarrowScreen() {
-    isNarrowScreen.value = window.innerWidth <= 768;
-    if (!isNarrowScreen.value) narrowNavOpen.value = false;
-}
 
 // containerClass:
 //   - In narrow mode, suppress all sidebar-related classes so theme.css
@@ -127,16 +131,19 @@ watch(() => appStore.currentApp, (app) => {
     toast.add({ severity: 'info', summary: 'App Change', detail: `You are now working in ${app.name}`, life: 3000 });
 });
 
+function onKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Escape' && narrowNavOpen.value) narrowNavOpen.value = false;
+}
+
 onBeforeMount(() => {
     document.addEventListener('click', onDocumentClick);
-    window.addEventListener('resize', updateNarrowScreen);
-    if (isDev) window.addEventListener('dev-viewport-change', onDevViewportChange);
+    document.addEventListener('keydown', onKeyDown);
 });
 
 onUnmounted(() => {
     document.removeEventListener('click', onDocumentClick);
-    window.removeEventListener('resize', updateNarrowScreen);
-    if (isDev) window.removeEventListener('dev-viewport-change', onDevViewportChange);
+    document.removeEventListener('keydown', onKeyDown);
+    document.body.classList.remove('blocked-scroll');
 });
 
 function onDocumentClick() {
@@ -192,17 +199,4 @@ function onTopbarItemClick(event) {
     activeTopBarItem.value = activeTopBarItem.value === event.item ? '' : event.item;
 }
 
-// Dev-only: sync narrow state when dev viewport switcher changes preset
-function onDevViewportChange(e: Event) {
-    const { preset } = (e as CustomEvent<{ preset: string }>).detail;
-    narrowNavOpen.value = false;
-    staticMenuMobileActive.value = false;
-    if (preset === 'desktop') {
-        staticMenuDesktopInactive.value = false;
-        isNarrowScreen.value = window.innerWidth <= 768;
-    } else {
-        // phone or tablet: switch to narrow mode
-        isNarrowScreen.value = true;
-    }
-}
 </script>

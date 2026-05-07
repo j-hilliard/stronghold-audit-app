@@ -3,6 +3,7 @@
         <div
             v-if="isOpen"
             class="narrow-nav-backdrop"
+            :style="backdropStyle"
             @click.self="$emit('close')"
         >
             <div class="narrow-nav-panel" @click.stop>
@@ -64,9 +65,11 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useAppStore } from '@/stores/appStore';
 import { useUserStore } from '@/stores/userStore';
+import { useNarrowScreen } from '@/composables/useNarrowScreen';
 import logo from '@/assets/images/header-logo.svg';
 
 defineProps<{ isOpen: boolean }>();
@@ -75,6 +78,16 @@ defineEmits<{ close: [] }>();
 const appStore = useAppStore();
 const userStore = useUserStore();
 const { menu } = storeToRefs(appStore);
+const { previewFrameWidth } = useNarrowScreen();
+
+// When the dev viewport switcher constrains #app to a centred preview frame,
+// position the backdrop inside that frame rather than against the browser viewport.
+const backdropStyle = computed(() => {
+    const fw = previewFrameWidth.value;
+    if (!fw || window.innerWidth <= fw) return {};
+    const left = Math.max(0, Math.round((window.innerWidth - fw) / 2));
+    return { left: `${left}px`, width: `${fw}px` };
+});
 
 function isVisible(item: any): boolean {
     if (item.isHidden) return false;

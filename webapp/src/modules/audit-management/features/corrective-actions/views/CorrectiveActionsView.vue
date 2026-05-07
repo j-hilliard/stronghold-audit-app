@@ -819,7 +819,6 @@ onMounted(() => { load(); loadAuditUsers(); });
 .bulk-bar-enter-from,
 .bulk-bar-leave-to     { opacity: 0; transform: translateY(-6px); }
 
-/* Narrow-screen CA filter overrides live in style.css (Vue scoped :global() bug). */
 
 /* ── Mobile CA card ────────────────────────────────────────────────────────── */
 .ca-card-list {
@@ -827,5 +826,14 @@ onMounted(() => { load(); loadAuditUsers(); });
 }
 .ca-card {
     transition: border-color 0.12s ease;
+}
+</style>
+
+<style>
+/* Narrow-screen: CA filter fields fill 2-column grid.
+   Must be unscoped — Vue scoped :global() strips child selectors on compile. */
+.layout-narrow .ca-filter-field {
+    flex: 1 1 calc(50% - 0.25rem);
+    min-width: 0;
 }
 </style>
