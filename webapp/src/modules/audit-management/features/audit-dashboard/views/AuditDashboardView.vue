@@ -25,15 +25,16 @@
             <BaseButtonCreate label="New Audit" @click="router.push('/audit-management/audits/new')" />
         </BasePageHeader>
 
-        <!-- ── Filter bar — shared between card and table modes ─────────────── -->
-        <div class="audit-filter-bar flex flex-wrap items-end gap-2 px-4 py-3 border-b border-slate-700/40">
+        <!-- ── Narrow (phone/tablet) — filter bar + card list ──────────────────── -->
+        <template v-if="isNarrow">
+        <div class="flex flex-wrap items-end gap-2 px-3 py-2 border-b border-slate-700/40">
             <Dropdown
                 v-model="store.filterDivisionId"
                 :options="store.divisions"
                 option-label="code"
                 option-value="id"
                 placeholder="All Divisions"
-                class="w-full audit-filter-field"
+                class="flex-1 min-w-[140px]"
                 :show-clear="!!store.filterDivisionId"
                 @change="store.loadAuditList()"
             />
@@ -43,50 +44,27 @@
                 option-label="label"
                 option-value="value"
                 placeholder="All Statuses"
-                class="w-full audit-filter-field"
+                class="flex-1 min-w-[140px]"
                 :show-clear="!!store.filterStatus"
                 @change="store.loadAuditList()"
             />
             <InputText
                 v-model="store.filterAuditor"
                 placeholder="Auditor…"
-                class="w-full audit-filter-field"
+                class="flex-1 min-w-[120px]"
                 @keydown.enter="store.loadAuditList()"
                 @change="store.filterAuditor = ($event.target as HTMLInputElement).value || null; store.loadAuditList()"
             />
-            <div class="flex gap-2 w-full audit-filter-dates">
-                <div class="flex flex-col gap-0.5 flex-1">
-                    <label class="text-[10px] text-slate-500 font-medium uppercase tracking-wide px-0.5">From</label>
-                    <InputText
-                        v-model="store.filterDateFrom"
-                        type="date"
-                        class="w-full"
-                        @change="store.loadAuditList()"
-                    />
-                </div>
-                <div class="flex flex-col gap-0.5 flex-1">
-                    <label class="text-[10px] text-slate-500 font-medium uppercase tracking-wide px-0.5">To</label>
-                    <InputText
-                        v-model="store.filterDateTo"
-                        type="date"
-                        class="w-full"
-                        @change="store.loadAuditList()"
-                    />
-                </div>
-            </div>
-            <div class="flex gap-1">
-                <Button icon="pi pi-search" severity="secondary" :loading="loading" @click="store.loadAuditList()" title="Apply filters" />
-                <Button icon="pi pi-times" severity="secondary" text :loading="loading" @click="clearFilters" title="Clear filters" />
+            <div class="flex gap-1 shrink-0">
+                <Button icon="pi pi-search" severity="secondary" :loading="loading" @click="store.loadAuditList()" />
+                <Button icon="pi pi-times" severity="secondary" text :loading="loading" @click="clearFilters" />
             </div>
         </div>
 
-        <!-- ── Loading indicator ─────────────────────────────────────────────── -->
         <div v-if="loading" class="flex justify-center py-8">
             <i class="pi pi-spin pi-spinner text-2xl text-slate-500" />
         </div>
-
-        <!-- ── Narrow (phone/tablet) card list mode ──────────────────────────── -->
-        <div v-else-if="isNarrow" class="audit-card-list px-3 py-2 space-y-2">
+        <div v-else class="audit-card-list px-3 py-2 space-y-2">
             <div v-if="store.audits.length === 0" class="text-center py-12 text-slate-400">
                 <i class="pi pi-clipboard text-4xl mb-3 block opacity-30" />
                 <p class="text-sm">No audits found.</p>
@@ -135,6 +113,7 @@
                 </div>
             </div>
         </div>
+        </template>
 
         <!-- ── Desktop table mode ────────────────────────────────────────────── -->
         <BaseDataTable
@@ -147,6 +126,39 @@
             scrollable
             @row-dblclick="onRowDblClick"
         >
+            <template #filters>
+                <Dropdown
+                    v-model="store.filterDivisionId"
+                    :options="store.divisions"
+                    option-label="code"
+                    option-value="id"
+                    placeholder="All Divisions"
+                    class="w-full md:w-44"
+                    :show-clear="!!store.filterDivisionId"
+                    @change="store.loadAuditList()"
+                />
+                <Dropdown
+                    v-model="store.filterStatus"
+                    :options="STATUS_OPTIONS"
+                    option-label="label"
+                    option-value="value"
+                    placeholder="All Statuses"
+                    class="w-full md:w-40"
+                    :show-clear="!!store.filterStatus"
+                    @change="store.loadAuditList()"
+                />
+                <InputText
+                    v-model="store.filterAuditor"
+                    placeholder="Auditor…"
+                    class="w-full md:w-36"
+                    @keydown.enter="store.loadAuditList()"
+                    @change="store.filterAuditor = ($event.target as HTMLInputElement).value || null; store.loadAuditList()"
+                />
+                <div class="flex gap-1">
+                    <Button icon="pi pi-search" severity="secondary" :loading="loading" @click="store.loadAuditList()" />
+                    <Button icon="pi pi-times" severity="secondary" text :loading="loading" @click="clearFilters" />
+                </div>
+            </template>
             <Column selection-mode="multiple" style="width: 44px;" />
             <Column field="trackingNumber" header="Audit #" style="min-width: 120px;" sortable>
                 <template #body="{ data }">
@@ -416,16 +428,7 @@ function onBulkDelete() {
     font-size: 0.72rem !important;
 }
 
-/* ── Filter bar — narrow layout ────────────────────────────────────────────── */
-/* On narrow screens, filter fields go full-width and stack */
-:global(.layout-narrow) .audit-filter-field {
-    min-width: 0 !important;
-    width: 100% !important;
-}
-
-:global(.layout-narrow) .audit-filter-dates {
-    flex-direction: row; /* keep from/to side by side even on narrow */
-}
+/* Narrow-screen filter overrides live in style.css (Vue scoped :global() bug). */
 
 /* ── Mobile audit card ─────────────────────────────────────────────────────── */
 .audit-card {

@@ -819,11 +819,7 @@ onMounted(() => { load(); loadAuditUsers(); });
 .bulk-bar-enter-from,
 .bulk-bar-leave-to     { opacity: 0; transform: translateY(-6px); }
 
-/* ── Narrow screen filter: fields take full width in a 2-col grid ─────────── */
-:global(.layout-narrow) .ca-filter-field {
-    flex: 1 1 calc(50% - 0.25rem);
-    min-width: 0;
-}
+/* Narrow-screen CA filter overrides live in style.css (Vue scoped :global() bug). */
 
 /* ── Mobile CA card ────────────────────────────────────────────────────────── */
 .ca-card-list {

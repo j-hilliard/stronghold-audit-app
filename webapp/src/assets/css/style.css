@@ -420,50 +420,72 @@ body {
 
 /* ── Narrow layout (phone/tablet preview or real mobile device) ────────────────
    Applied via .layout-narrow class on .layout-wrapper (set by AppLayout.vue).
-   Reduces content padding, ensures the sidebar overlay stays inside the frame,
-   and keeps filter bars from overflowing.
+   Only overrides that are safe and scoped to the topbar/content shell.
+   Do NOT override .menu-wrapper position or z-index — theme.css handles that.
 ──────────────────────────────────────────────────────────────────────────────── */
 
-/* Tighten content area padding */
+/* Suppress the desktop sidebar entirely in narrow mode — NarrowNavSheet handles nav */
+.layout-narrow .menu-wrapper {
+    display: none !important;
+}
+
+/* Content takes full width in narrow mode (no sidebar margin) */
+.layout-narrow .layout-main,
+.layout-narrow.layout-static-active .layout-main {
+    margin-left: 0 !important;
+}
+
+/* Suppress the old mobile-overlay mask — NarrowNavSheet has its own backdrop */
+.layout-narrow .layout-mask {
+    display: none !important;
+}
+
+/* Remove the layout-shell padding so views provide their own padding */
 .layout-narrow .layout-content {
     padding: 0 !important;
 }
 
-/* Sidebar overlay: position relative to #app, not to viewport */
-.layout-narrow .menu-wrapper {
-    position: fixed !important;
-    top: 0;
-    left: 0;
-    z-index: 999;
-    height: 100%;
-}
-
-/* Mobile menu mask — ensure it covers the constrained app frame only */
-.layout-narrow .layout-mask {
-    position: absolute !important;
-    z-index: 998;
-}
-
-/* Topbar: prevent right-side actions from overflowing on very narrow widths */
+/* Topbar: tighten horizontal padding on narrow widths */
 .layout-narrow .layout-topbar-wrapper {
     padding: 0 8px !important;
 }
 
-/* Ensure page header buttons wrap and don't overflow */
+/* Topbar right section: allow it to shrink without overflowing */
 .layout-narrow .layout-topbar-right {
     min-width: 0;
     flex: 1;
-    overflow: hidden;
 }
 
-/* Remove excessive left/right padding from PrimeVue page-header area */
-.layout-narrow .px-4 {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
+/* Topbar breadcrumb: hidden on narrow screens to prevent overlap */
+.layout-narrow .topbar-breadcrumb {
+    display: none !important;
 }
-.layout-narrow .px-6 {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
+
+/* Topbar profile text: hidden on narrow screens */
+.layout-narrow .profile-info--text {
+    display: none !important;
+}
+
+/* Topbar action list: tighter spacing on narrow screens */
+.layout-narrow .layout-topbar-actions {
+    gap: 2px !important;
+}
+
+/* Audit dashboard: filter fields go full-width on narrow screens */
+.layout-narrow .audit-filter-field {
+    min-width: 0 !important;
+    width: 100% !important;
+}
+
+/* Audit dashboard: date range filters stay side-by-side even on narrow */
+.layout-narrow .audit-filter-dates {
+    flex-direction: row;
+}
+
+/* Corrective Actions: filter fields fill 2-col grid on narrow screens */
+.layout-narrow .ca-filter-field {
+    flex: 1 1 calc(50% - 0.25rem);
+    min-width: 0;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════

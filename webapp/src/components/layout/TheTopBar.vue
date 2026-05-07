@@ -143,22 +143,6 @@ function onTopbarItemClick(event: Event, item: string) {
     transform: rotate(15deg) scale(1.1);
 }
 
-/*
- * Narrow-screen topbar overrides.
- * Applied when the layout-wrapper has .layout-narrow (set by AppLayout when
- * either the real viewport is <=768px OR the dev viewport switcher is active
- * in phone/tablet mode).
- */
-:global(.layout-narrow) .topbar-breadcrumb {
-    display: none !important;
-}
-
-:global(.layout-narrow) .profile-info--text {
-    display: none !important;
-}
-
-/* Tighten action list spacing on narrow screens */
-:global(.layout-narrow) .layout-topbar-actions {
-    gap: 2px !important;
-}
+/* Narrow-screen topbar overrides live in style.css to avoid the Vue scoped
+   :global() compiler bug that strips child selectors and nukes the layout. */
 </style>

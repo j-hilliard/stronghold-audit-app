@@ -43,6 +43,7 @@ declare module 'vue' {
     FilterBar: typeof import('./src/components/ui/FilterBar.vue')['default']
     InputText: typeof import('primevue/inputtext')['default']
     MetricCard: typeof import('./src/components/ui/MetricCard.vue')['default']
+    NarrowNavSheet: typeof import('./src/components/layout/NarrowNavSheet.vue')['default']
     NotificationBell: typeof import('./src/components/notifications/NotificationBell.vue')['default']
     Paginator: typeof import('primevue/paginator')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
